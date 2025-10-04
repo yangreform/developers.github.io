@@ -1,6 +1,6 @@
 backend:
   name: github
-  repo: your-username/singapore-real-estate
+  repo: yangreform/developers.github.io
   branch: main
 
 publish_mode: simple
