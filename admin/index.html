@@ -4,15 +4,14 @@
     <meta charset="utf-8" />
     <title>網站後台登入</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://unpkg.com/netlify-cms@^2.10.192/dist/netlify-cms.js"></script>
+    <script src="./netlify-cms.js"></script>
   </head>
   <body>
     <script>
       if (typeof NetlifyCmsApp !== 'undefined') {
-        // 初始化 CMS
         NetlifyCmsApp.init();
       } else {
-        console.error("Netlify CMS failed to load.");
+        console.error("Netlify CMS failed to load (local copy missing).");
       }
     </script>
   </body>
