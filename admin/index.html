@@ -1,18 +1,35 @@
 <!doctype html>
-<html>
+<html lang="zh-Hant">
   <head>
     <meta charset="utf-8" />
-    <title>網站後台登入</title>
+    <title>網站後台登入｜Netlify CMS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- 載入本地 CMS 腳本 -->
     <script src="./netlify-cms.js"></script>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        background: #f7f7f7;
+        font-family: "Noto Sans TC", sans-serif;
+      }
+      #nc-root {
+        height: 100%;
+      }
+    </style>
   </head>
   <body>
+    <!-- ✨ 關鍵掛載容器 -->
+    <div id="nc-root"></div>
+
     <script>
-      if (typeof NetlifyCmsApp !== 'undefined') {
-        NetlifyCmsApp.init();
-      } else {
-        console.error("Netlify CMS failed to load (local copy missing).");
-      }
+      window.addEventListener("DOMContentLoaded", () => {
+        if (typeof NetlifyCmsApp !== "undefined") {
+          NetlifyCmsApp.init();
+        } else {
+          console.error("❌ Netlify CMS failed to load. Check netlify-cms.js path.");
+        }
+      });
     </script>
   </body>
 </html>
