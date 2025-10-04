@@ -1,0 +1,41 @@
+body {
+  font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+  background-color: #f9f9f9;
+  color: #333;
+}
+
+h1, h2, h3, h4, h5 {
+  color: #1a1a1a;
+}
+
+.navbar-brand {
+  font-weight: 700;
+  color: #004080 !important;
+}
+
+.nav-link.active {
+  font-weight: 600;
+  color: #004080 !important;
+}
+
+.btn-primary {
+  background-color: #004080;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #002d5e;
+}
+
+footer {
+  font-size: 14px;
+}
+
+.card {
+  border-radius: 12px;
+}
+
+img.rounded.shadow {
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}

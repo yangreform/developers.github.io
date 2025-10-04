@@ -1,37 +1,103 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
   <title>林威伶律師｜新加坡房產經紀人</title>
-  <style>
-    body { font-family: sans-serif; margin: 20px; background-color: #fafafa; }
-    h1 { color: #333; }
-    .property-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
-    .property { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    .property img { width: 100%; border-radius: 8px; }
-    .property h2 { font-size: 1.2em; margin: 10px 0 5px; }
-    .property a { color: #0078ff; text-decoration: none; }
-  </style>
+  <meta name="description" content="林威伶律師（Lin Wei-ling, Melody）- 新加坡房產經紀人，提供專業法律背景與房地產服務。">
+  <meta name="keywords" content="林威伶, 新加坡房產, 房地產, 律師, 代購房, condo, apartment">
+
+  <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/style.css" rel="stylesheet">
 </head>
+
 <body>
-  <h1>新加坡房產列表</h1>
-  <div class="property-list">
-    <div class="property">
-      <img src="images/uploads/marina-bay.jpg" alt="濱海灣豪宅">
-      <h2><a href="property1.html">濱海灣豪宅</a></h2>
-      <p>高層視野｜$3,500,000 SGD</p>
+
+  <!-- ======= Header ======= -->
+  <header>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+      <div class="container">
+        <a class="navbar-brand fw-bold" href="index.html">林威伶律師｜新加坡房產經紀人</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+          <ul class="navbar-nav">
+            <li class="nav-item"><a class="nav-link active" href="index.html">首頁</a></li>
+            <li class="nav-item"><a class="nav-link" href="about.html">關於我</a></li>
+            <li class="nav-item"><a class="nav-link" href="property1.html">房產物件</a></li>
+            <li class="nav-item"><a class="nav-link" href="contact.html">聯絡我</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ======= Hero Section ======= -->
+  <section id="hero" class="d-flex align-items-center" style="background: url('assets/img/singapore-skyline.jpg') center center/cover no-repeat; height: 90vh;">
+    <div class="container text-center text-white">
+      <h1 class="fw-bold display-5">新加坡房產投資．專業律師服務</h1>
+      <p class="lead">結合法律背景與房產經驗，為您提供最安心的置產顧問服務</p>
+      <a href="contact.html" class="btn btn-primary mt-3">立即聯絡我</a>
     </div>
-    <div class="property">
-      <img src="images/uploads/orchard-condo.jpg" alt="烏節路公寓">
-      <h2><a href="property2.html">烏節路公寓</a></h2>
-      <p>市中心生活圈｜$2,200,000 SGD</p>
+  </section>
+
+  <!-- ======= Properties Section ======= -->
+  <main class="container my-5">
+    <div class="text-center mb-5">
+      <h2 class="fw-bold">精選房產物件</h2>
+      <p>為您嚴選新加坡優質物件</p>
     </div>
-    <div class="property">
-      <img src="images/uploads/lorong-villa.jpg" alt="羅弄春園別墅">
-      <h2><a href="property3.html">羅弄春園別墅</a></h2>
-      <p>靜巷庭院｜$4,800,000 SGD</p>
+
+    <div class="row">
+      <!-- Property 1 -->
+      <div class="col-md-4 mb-4">
+        <div class="card shadow-sm">
+          <img src="assets/img/house1.jpg" class="card-img-top" alt="高樓景觀公寓">
+          <div class="card-body">
+            <h5 class="card-title">市中心高樓景觀公寓</h5>
+            <p class="card-text">位於濱海灣區，俯瞰整個城市天際線，交通便利。</p>
+            <p class="fw-bold text-primary">售價：$1,200,000</p>
+            <a href="property1.html" class="btn btn-outline-primary btn-sm">查看詳情</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Property 2 -->
+      <div class="col-md-4 mb-4">
+        <div class="card shadow-sm">
+          <img src="assets/img/house2.jpg" class="card-img-top" alt="河畔近地鐵三房">
+          <div class="card-body">
+            <h5 class="card-title">河畔近地鐵三房</h5>
+            <p class="card-text">毗鄰地鐵站，生活機能完善，適合家庭自住。</p>
+            <p class="fw-bold text-primary">售價：$980,000</p>
+            <a href="property2.html" class="btn btn-outline-primary btn-sm">查看詳情</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Property 3 -->
+      <div class="col-md-4 mb-4">
+        <div class="card shadow-sm">
+          <img src="assets/img/house3.jpg" class="card-img-top" alt="新落成豪華透天別墅">
+          <div class="card-body">
+            <h5 class="card-title">新落成豪華透天別墅</h5>
+            <p class="card-text">私人車庫與庭園，位於靜巷，環境優雅。</p>
+            <p class="fw-bold text-primary">售價：$2,300,000</p>
+            <a href="property3.html" class="btn btn-outline-primary btn-sm">查看詳情</a>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
+  </main>
+
+  <!-- ======= Footer ======= -->
+  <footer class="bg-dark text-white text-center py-4">
+    <p class="mb-0">林威伶 Lin, Wei-ling (Melody). English Service Available.</p>
+  </footer>
+
+  <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
