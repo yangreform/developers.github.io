@@ -1,12 +1,35 @@
-<!DOCTYPE html>
-<html>
-<head>
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Content Manager</title>
-    <script src="https://unpkg.com/netlify-cms@^2.0.0/dist/netlify-cms.js"></script>
-</head>
-<body>
-    <div id="cms-app"></div>
-</body>
+    <title>網站後台登入｜Netlify CMS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        background: #f8f8f8;
+        font-family: "Noto Sans TC", sans-serif;
+      }
+      #nc-root {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 關鍵：掛載容器 -->
+    <div id="nc-root"></div>
+
+    <!-- ⚠️ 一定要放在 body 最後 -->
+    <script src="./netlify-cms.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (typeof NetlifyCmsApp !== "undefined") {
+          NetlifyCmsApp.init();
+        } else {
+          console.error("❌ Netlify CMS 未正確載入");
+        }
+      });
+    </script>
+  </body>
 </html>
