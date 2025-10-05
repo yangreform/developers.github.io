@@ -1,303 +1,163 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>市中心高樓景觀公寓 - 林威伶房產經紀</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>PENRITH｜Queenstown 最後黃金地段新盤</title>
+  <title>PENRITH 公寓專案 | 房地產專頁</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <style>
-    :root{
-      --accent:#0b5780;
-      --accent-2:#f4b042;
-      --muted:#6b7280;
-      --card-bg:#ffffff;
-      --max-w:1100px;
-      --radius:12px;
-      font-family: "Helvetica Neue", Arial, sans-serif;
-    }
-    body{
-      margin:0;
-      background:linear-gradient(180deg,#f6f9fc 0%, #eef4f8 100%);
-      color:#0b2030;
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
-      padding:24px;
-      display:flex;
-      justify-content:center;
-    }
-    .wrap{
-      width:100%;
-      max-width:var(--max-w);
-      background:var(--card-bg);
-      border-radius:var(--radius);
-      box-shadow:0 8px 30px rgba(11,32,48,0.12);
-      overflow:hidden;
-    }
-    .hero{
-      display:flex;
-      gap:20px;
-      padding:28px;
-      align-items:center;
-      background:linear-gradient(90deg, rgba(11,87,128,0.03), rgba(11,87,128,0.02));
-    }
-    .hero .left{
-      flex:1 1 55%;
-    }
-    .hero h1{
-      margin:0 0 8px 0;
-      font-size:28px;
-      letter-spacing:2px;
-      color:var(--accent);
-    }
-    .subtitle{
-      color:var(--muted);
-      margin:0 0 16px 0;
-      font-size:15px;
-    }
-    .price{
-      display:inline-block;
-      background:linear-gradient(90deg,var(--accent) 0%, #05495f 100%);
-      color:#fff;
-      padding:10px 16px;
-      border-radius:8px;
-      font-weight:700;
-      font-size:18px;
-      box-shadow:0 6px 18px rgba(5,73,95,0.18);
+    /* -------- 全域樣式 -------- */
+    body {
+      font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+      background: #f7f9fb;
+      color: #1f2937;
+      line-height: 1.8;
+      margin: 0;
+      padding: 0;
     }
 
-    .hero .right{
-      flex:1 1 45%;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-    }
-    .hero img{
-      max-width:100%;
-      height:auto;
-      border-radius:10px;
-      box-shadow:0 8px 24px rgba(11,32,48,0.12);
+    header {
+      background: linear-gradient(90deg, #0b2030, #264653);
+      color: #fff;
+      text-align: center;
+      padding: 40px 20px;
     }
 
-    .content{
-      display:grid;
-      grid-template-columns: 1fr 320px;
-      gap:20px;
-      padding:26px;
+    header h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
     }
 
-    .card{
-      background:#ffffff;
-      border-radius:10px;
-      padding:18px;
-      box-shadow:0 6px 18px rgba(11,32,48,0.06);
+    header p {
+      font-size: 1.1rem;
+      opacity: 0.85;
     }
 
-    ul.features{
-      margin:0;
-      padding:0 0 0 18px;
-      color:var(--muted);
-      line-height:1.9;
-    }
-    ul.features li{
-      margin-bottom:8px;
-      font-size:15px;
+    main {
+      max-width: 900px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.05);
     }
 
-    .showflat{
-      margin-top:12px;
-      padding:12px;
-      border-radius:8px;
-      background:linear-gradient(90deg, rgba(244,176,66,0.06), rgba(11,87,128,0.03));
-      display:flex;
-      gap:12px;
-      align-items:center;
-    }
-    .showflat img{ width:100%; height:84px; object-fit:cover; border-radius:8px; }
-
-    .cta{
-      margin-top:14px;
-      display:flex;
-      gap:12px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-    .btn{
-      display:inline-block;
-      background:var(--accent);
-      color:#fff;
-      padding:12px 18px;
-      border-radius:10px;
-      text-decoration:none;
-      font-weight:700;
-      box-shadow:0 8px 20px rgba(11,87,128,0.14);
-    }
-    .btn.secondary{
-      background:transparent;
-      color:var(--accent);
-      border:2px solid rgba(11,87,128,0.12);
-      font-weight:700;
+    /* -------- 圖片統一樣式 -------- */
+    img {
+      width: 90%;
+      display: block;
+      margin: 16px auto;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(11,32,48,0.1);
     }
 
-    /* Agent card */
-    .agent{
-      text-align:center;
-    }
-    .agent img{
-      width:100%;
-      height:120px;
-      object-fit:cover;
-      border-radius:8px;
-      border:4px solid #fff;
-      box-shadow:0 8px 20px rgba(11,32,48,0.12);
-    }
-    .agent h3{
-      margin:12px 0 4px 0;
-      font-size:18px;
-      color:var(--accent);
-    }
-    .agent p{
-      margin:0;
-      color:var(--muted);
-      font-size:13px;
-    }
-    .phone{
-      margin-top:14px;
-      font-size:22px;
-      font-weight:800;
-      color:#0b3b4e;
+    /* -------- 段落留白 -------- */
+    .section {
+      margin: 28px 0;
     }
 
-    .footer-note{
-      font-size:12px;
-      color:var(--muted);
-      margin-top:14px;
+    h2 {
+      font-size: 1.5rem;
+      color: #0b2030;
+      margin-bottom: 16px;
+      border-left: 4px solid #0077b6;
+      padding-left: 12px;
     }
 
-    /* Responsive */
-    @media (max-width:900px){
-      .content{
-        grid-template-columns:1fr;
+    p {
+      margin-bottom: 14px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.9rem;
+      background: #0b2030;
+      color: #fff;
+      margin-top: 60px;
+    }
+
+    /* -------- 手機版調整 -------- */
+    @media (max-width: 600px) {
+      main {
+        padding: 20px;
       }
-      .hero{
-        flex-direction:column;
-        gap:16px;
+      img {
+        width: 100%;
       }
-      .hero .right{ width:100%;}
+      h1 {
+        font-size: 1.6rem;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="wrap" role="main">
-    <!-- HERO -->
-    <div class="hero" aria-label="PENRITH 新盤介紹">
-      <div class="left">
-        <h1>🌟 Queenstown 最後一個黃金地段新盤 — PENRITH</h1>
-        <p class="subtitle">7 年來首次全新登場｜地鐵旁・名校環繞・市區核心地段</p>
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <div class="price">2 房僅從 $1,495,000 起</div>
-          <div style="color:var(--muted);font-size:14px;">投資/自住雙首選 · 區域升值潛力強</div>
-        </div>
 
-        <div style="margin-top:14px;">
-          <p style="margin:0;color:var(--muted);line-height:1.7;">
-            🚆 <strong>步行 2 分鐘直達 Queenstown MRT (EW19)</strong><br>
-            🏫 附近多間名校（Queenstown Primary / New Town Primary 等）<br>
-            🌳 會所配套完善：健身房、泳池、空中花園與綠化庭院
-          </p>
-        </div>
-      </div>
+  <!-- 登入區（Netlify CMS 可用） -->
+  <script>
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on("init", user => {
+        if (!user) {
+          window.netlifyIdentity.on("login", () => {
+            document.location.href = "/admin/";
+          });
+        }
+      });
+    }
+  </script>
 
-      <div class="right">
-        <!-- hero image: 改成你自己圖檔名稱 -->
-        <img src="./assets/img/property1.jpg" alt="PENRITH 項目示意圖">
-      </div>
-    </div>
+  <!-- -------- 頁首 -------- -->
+  <header>
+    <h1>PENRITH 精選公寓專案</h1>
+    <p>Queenstown MRT 黃金地段｜精品住宅｜潛力無限</p>
+  </header>
 
-    <!-- CONTENT -->
-    <div class="content">
-      <div>
-        <div class="card">
-          <h2 style="margin-top:0;color:var(--accent)">為什麼選 PENRITH？</h2>
-          <ul class="features">
-            <li>地鐵+生活圈：交通便捷，日常採買、醫療、學校一應俱全</li>
-            <li>區域稀缺：Queenstown 區少有新盤釋出，稀缺性高，升值機會佳</li>
-            <li>高質會所：戶外花園、泳池與健身房，舒適生活品質</li>
-            <li>適合自住與投資：出租需求穩定，資產配置好選擇</li>
-          </ul>
+  <!-- -------- 主內容 -------- -->
+  <main>
+    <section class="section">
+      <img src="./assets/img/property1.jpg" alt="PENRITH 主視覺圖">
+      <p>
+        「PENRITH」位於 Queenstown 核心地段，結合交通、生活、教育三大優勢，
+        兼具自住與投資潛力，是新加坡市區最後一批黃金住宅用地之一。
+      </p>
+    </section>
 
-          <div id="showflat" class="showflat" aria-label="示範單位資訊">
-            <img width=100% src="./assets/img/property1-1.jpg" alt="示範單位">
-            <div>
-              <div style="font-weight:800;color:#0b3b4e">示範單位現正開放參觀</div>
-              <div style="color:var(--muted);font-size:14px;margin-top:6px;">
-                地點：6A Margaret Drive（PENRITH 銷售廳）<br>
-                特別活動：10 月 9 日（四）19:30 — 免費晚餐 18:30 提供
-              </div>
-            </div>
-          </div>
+    <section class="section">
+      <h2>地理位置與交通優勢</h2>
+      <img src="./assets/img/property1-1.jpg" alt="PENRITH 示範單位">
+      <p>
+        項目步行 2 分鐘即可抵達 Queenstown MRT，10 分鐘直達市中心，周邊商場、
+        醫院與學校配套完善。此區域未來潛在升值空間極大。
+      </p>
+    </section>
 
-          <div style="margin-top:14px;">
-            <h3 style="margin-bottom:8px;color:var(--accent)">立即參與 VIP 觀賞 / RSVP</h3>
-            <p style="margin:0;color:var(--muted);line-height:1.6;">
-              想了解不同單位樓層、朝向與實際視野？我們提供 VIP 專人導覽並協助比較最合適單位。
-            </p>
-          </div>
+    <section class="section">
+      <h2>專案特色</h2>
+      <ul>
+        <li>低密度設計，戶戶採光良好</li>
+        <li>設有泳池、健身房、燒烤區與景觀平台</li>
+        <li>步行即可到達 FairPrice、星巴克與社區中心</li>
+        <li>開發商享有長期優良口碑與建築品質保證</li>
+      </ul>
+    </section>
 
-          <p class="footer-note">
-            資料截至 3rd Oct 2025，價格與供應以發展商及銷售現場為準，並可能隨時變動。
-          </p>
-        </div>
+    <section class="section">
+      <h2>經紀人聯絡資訊</h2>
+      <img src="./assets/img/property1-3.jpg" alt="經紀人照片">
+      <p>
+        <strong>王俊傑 Jacky Wang</strong><br>
+        專業房地產顧問<br>
+        📞 +65 9123 4567<br>
+        ✉️ jacky@property.sg
+      </p>
+    </section>
+  </main>
 
-        <div style="margin-top:16px;" class="card">
-          <h3 style="margin-top:0;color:var(--accent)">快速問答 FAQ</h3>
-          <ul style="color:var(--muted);line-height:1.8;">
-            <li><strong>Q：</strong>交樓日期？<br><strong>A：</strong>請洽銷售代表或直接到示範單位詢問最新排程。</li>
-            <li><strong>Q：</strong>是否可投資出租？<br><strong>A：</strong>地段佳、交通方便，出租與轉售需求穩定。</li>
-            <li><strong>Q：</strong>有何付款優惠？<br><strong>A：</strong>可與銷售代表討論首期方案與銀行按揭安排。</li>
-          </ul>
-        </div>
-      </div>
+  <!-- -------- 頁尾 -------- -->
+  <footer>
+    © 2025 PENRITH Real Estate. All Rights Reserved.
+  </footer>
 
-      <!-- RIGHT COLUMN: AGENT -->
-      <aside>
-        <div class="card agent" id="contact">
-          <img width=100% hight=80% src="./assets/img/property1-3.jpg" alt="Melody Lin 相片">
-          <h3>MELODY LIN</h3>
-          <p style="margin-top:6px;color:var(--muted);font-size:13px;">R072901A｜Huttons 官方行銷團隊</p>
-          <div class="phone">8078 9177</div>
-
-          <div style="margin-top:12px;">
-            <a class="btn" href="tel:80789177">立即致電預約</a>
-          </div>
-
-          <p class="footer-note" style="text-align:left;margin-top:12px;">
-            地址：PENRITH 銷售廳（6A Margaret Drive）<br>
-            歡迎預約專人導覽或索取樓書。
-          </p>
-        </div>
-
-      </aside>
-    </div>
-
-<a href="index.html" class="btn btn-outline-secondary mt-3">返回首頁</a>
-</div>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
