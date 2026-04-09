@@ -44489,22 +44489,24 @@ aj(){return new A.YT(A.aE(t.KP))}}
 A.YT.prototype={
 aD(){this.aR()
 this.z1()},
-z1(){var s=0,r=A.Q(t.H),q=1,p=[],o=[],n=this,m,l,k,j,i,h,g
+z1(){var s=0,r=A.Q(t.H),q=1,p=[],o=[],n=this,m,l,k,j,i,h,g,f,e
 var $async$z1=A.R(function(a,b){if(a===1){p.push(b)
 s=q}for(;;)switch(s){case 0:q=3
 m=A.dV("https://imelda-nondeferent-deformedly.ngrok-free.dev/app/heatmap/ura")
-i=t.N
+h=$.aGa
+l=B.c.p(h,"\u5c1a\u672a\u7d81\u5b9a")?"":h
+g=t.N
 s=6
-return A.U(A.Kj(m,A.S(["ngrok-skip-browser-warning","true","X-User-Phone",$.aGa],i,i)),$async$z1)
-case 6:l=b
-if(l.b===200){k=B.aP.dR(B.K.dR(l.w))
-if(J.f(J.bA(k,"status"),"success"))n.aeC(J.bA(k,"data"))}o.push(5)
+return A.U(A.Kj(m,A.S(["ngrok-skip-browser-warning","true","X-User-Phone",l],g,g)),$async$z1)
+case 6:k=b
+if(k.b===200){j=B.aP.dR(B.K.dR(k.w))
+if(J.f(J.bA(j,"status"),"success"))n.aeC(J.bA(j,"data"))}o.push(5)
 s=4
 break
 case 3:q=2
-g=p.pop()
-j=A.at(g)
-A.aFY("\u6293\u53d6\u71b1\u529b\u5716\u5931\u6557: "+A.n(j))
+e=p.pop()
+i=A.at(e)
+A.aFY("\u6293\u53d6\u71b1\u529b\u5716\u5931\u6557: "+A.n(i))
 o.push(5)
 s=4
 break
