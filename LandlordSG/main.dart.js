@@ -44603,8 +44603,8 @@ aj(){return new A.Xy()}}
 A.Xy.prototype={
 K(a){return new A.fw($.j0(),new A.aum(this),null,null,t.D0)}}
 A.aum.prototype={
-$3(a,b,c){var s,r=null,q=this.a,p=B.Q7[q.d],o=A.aCI(r,B.NY,b?"My Properties":"\u6211\u7684\u623f\u4ea7"),n=A.aCI(B.O1,B.O3,b?"Heatmap":"\u884c\u60c5\u5730\u56fe")
-o=A.d([o,n,A.aCI(r,B.NU,b?"Settings":"\u6211\u7684\u8bbe\u5b9a")],t.ur)
+$3(a,b,c){var s,r=null,q=this.a,p=B.Q7[q.d],o=A.aCI(r,B.NU,b?"Settings":"\u6211\u7684\u8bbe\u5b9a"),n=A.aCI(B.O1,B.O3,b?"Heatmap":"\u884c\u60c5\u5730\u56fe")
+o=A.d([o,n,A.aCI(r,B.NY,b?"My Properties":"\u6211\u7684\u623f\u4ea7")],t.ur)
 n=q.d
 s=A.a0(a)
 return A.wi(r,p,new A.zj(o,new A.aul(q),n,s.dx,r))},
