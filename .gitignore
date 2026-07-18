@@ -1,0 +1,77 @@
+# ── Python ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# ── 虛擬環境 ────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── 敏感資訊（絕不提交！）──────────────────────────
+trade/.env
+backend/*.db
+trade/*.db
+trade/Sinopac.pfx
+trade/WhatsApp_token.txt
+trade/URA_accessKey.txt
+trade/phoneID.txt
+backend/WhatsApp_token.txt
+backend/URA_accessKey.txt
+backend/phoneID.txt
+backend/SHA1.txt
+backend/FB.txt
+backend/GAS.txt
+
+# ── SQLite 資料庫 ────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# ── 日誌 ────────────────────────────────────────────
+*.log
+logs/
+
+# ── ngrok / 執行檔 ──────────────────────────────────
+trade/ngrok/
+*.exe
+*.dmg
+*.tar
+*.tar.gz
+
+# ── CSV 原始資料（體積太大）────────────────────────
+backend/*.csv
+trade/*.csv
+
+# ── 備份 / 暫存 ──────────────────────────────────────
+*.un~
+*.bak
+*~
+*.swp
+sync.ffs_db
+
+# ── 系統檔 ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Node（若日後使用）──────────────────────────────
+node_modules/
+.npm
+
+# ── IDE ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user

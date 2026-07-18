@@ -1,0 +1,470 @@
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+void main() {
+  runApp(const LandlordSGApp());
+}
+
+class LandlordSGApp extends StatelessWidget {
+  const LandlordSGApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'LandlordSG 新房東',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primaryColor: const Color(0xFF0A192F),
+        scaffoldBackgroundColor: Colors.white,
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0A192F), primary: const Color(0xFF0A192F)),
+        useMaterial3: true,
+      ),
+      home: const MainScreen(),
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _selectedIndex = 0;
+  static const List<Widget> _pages = <Widget>[MarketTrendPage(), MyPropertiesPage(), ProfilePage()];
+
+  void _onItemTapped(int index) => setState(() => _selectedIndex = index);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(child: _pages.elementAt(_selectedIndex)),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: '大盤走勢'),
+          BottomNavigationBarItem(icon: Icon(Icons.apartment), label: '我的房產'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: '我的'),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Theme.of(context).primaryColor,
+        onTap: _onItemTapped,
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 🌟 大盤走勢：整街宏觀模式 (Street-Level)
+// ==========================================
+class MarketTrendPage extends StatefulWidget {
+  const MarketTrendPage({super.key});
+  @override
+  State<MarketTrendPage> createState() => _MarketTrendPageState();
+}
+
+class _MarketTrendPageState extends State<MarketTrendPage> {
+  final _postalCodeController = TextEditingController();
+
+  bool _isLoading = false;
+  String _targetBuilding = "等待輸入...";
+  String _latestPrice = "--";
+  List<FlSpot> _pricePoints = [const FlSpot(0, 0)];
+  List<String> _transactionDates = [""];
+  double _xInterval = 1;
+  String _errorMessage = "";
+  List<Map<String, dynamic>> _recentTransactionsTable = [];
+
+  void _search() {
+    final postalCode = _postalCodeController.text.trim();
+    if (postalCode.isEmpty) { setState(() => _errorMessage = "請輸入郵遞區號"); return; }
+    setState(() {
+      _isLoading = true; _errorMessage = ""; _pricePoints = [const FlSpot(0, 0)];
+      _transactionDates = [""]; _recentTransactionsTable = []; _latestPrice = "--";
+      _targetBuilding = "連線至政府資料庫中...";
+    });
+    _fetchRealPropertyData(postalCode);
+  }
+
+  Future<void> _fetchRealPropertyData(String postalCode) async {
+    try {
+      final browserHeaders = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "application/json"
+      };
+
+      // --- 步驟一：呼叫 OneMap API 取得地址與 Block 號碼 ---
+      final onemapUrl = Uri.parse('https://www.onemap.gov.sg/api/common/elastic/search?searchVal=$postalCode&returnGeom=N&getAddrDetails=Y');
+      final onemapRes = await http.get(onemapUrl, headers: browserHeaders);
+      if (onemapRes.bodyBytes.isNotEmpty && onemapRes.bodyBytes[0] == 60) throw Exception("OneMap 防火牆阻擋了連線");
+      final onemapData = json.decode(utf8.decode(onemapRes.bodyBytes, allowMalformed: true));
+      if (onemapData['found'] == 0) throw Exception("OneMap 找不到此郵遞區號");
+
+      final addressData = onemapData['results'][0];
+      final buildingName = addressData['BUILDING'];
+      final roadName = addressData['ROAD_NAME'];
+      final blockNo = addressData['BLK_NO'];
+
+      bool isHdbFound = false;
+      List<Map<String, dynamic>> processedTrans = [];
+      String currentProjectName = "";
+
+      String getCoreStreet(String s) {
+        return s.toUpperCase()
+            .replaceAll(RegExp(r'\b(JALAN|JLN|ROAD|RD|STREET|ST|AVENUE|AVE|BUKIT|BT|LORONG|LOR|DRIVE|DR|CRESCENT|CRES|CLOSE|CL|WALK|WK|TERRACE|TER|PLACE|PL)\b'), '')
+            .trim();
+      }
+
+      // --- 🌟 步驟二：連線至您的 GAS API (現在只傳遞街道名稱，抓取整條街) ---
+      if (blockNo != 'NIL' && blockNo.isNotEmpty) {
+        try {
+          String coreStreet = getCoreStreet(roadName);
+
+          // 🔥 移除 block 參數，專注抓取整條街道的數據
+          final gasUrl = Uri.parse('https://script.google.com/macros/s/AKfycbwHZX_ybRqW6IaR1UADKK4zFnSA6RM-95yU0_5SU2Q96wygOz41CM6IXqYwqe82Ieb5/exec?street=${Uri.encodeComponent(coreStreet)}');
+
+          final gasRes = await http.get(gasUrl);
+
+          if (gasRes.statusCode == 200) {
+            final gasData = json.decode(utf8.decode(gasRes.bodyBytes, allowMalformed: true));
+
+            if (gasData['status'] == 'success') {
+              List<dynamic> records = gasData['records'] ?? [];
+
+              if (records.isNotEmpty) {
+                isHdbFound = true;
+                // 標題改為顯示整條街的名稱
+                currentProjectName = "$roadName (整街行情)";
+
+                DateTime now = DateTime.now();
+                DateTime threeYearsAgo = DateTime(now.year - 3, now.month);
+
+                for (var t in records) {
+                  String rawDate = t['month']?.toString() ?? "";
+                  int year = 2000;
+                  int month = 1;
+                  bool dateParsed = false;
+
+                  if (rawDate.contains('T')) {
+                    DateTime? d = DateTime.tryParse(rawDate);
+                    if (d != null) { year = d.year; month = d.month; dateParsed = true; }
+                  } else if (rawDate.length >= 7) {
+                    year = int.tryParse(rawDate.substring(0, 4)) ?? 2000;
+                    month = int.tryParse(rawDate.substring(5, 7)) ?? 1;
+                    dateParsed = true;
+                  }
+
+                  if (dateParsed) {
+                    DateTime tDate = DateTime(year, month);
+
+                    if (tDate.isAfter(threeYearsAgo) || tDate.isAtSameMomentAs(threeYearsAgo)) {
+                      processedTrans.add({
+                        'original': {
+                          'price': t['resale_price']?.toString() ?? "--",
+                          'contractDate': "${month.toString().padLeft(2, '0')}${year.toString().substring(2)}",
+                          // 🌟 新增抓取棟號與房型
+                          'block': t['block']?.toString() ?? "--",
+                          'flat_type': t['flat_type']?.toString() ?? "--",
+                        },
+                        'date': tDate,
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          print("⚠️ 自建後端連線失敗: $e");
+        }
+      }
+
+      // --- 步驟三：如果自建庫查無此 HDB，切換查詢 URA (私宅) 政府真實資料庫 ---
+      if (!isHdbFound) {
+        final String accessKey = "78bab9ae-c762-4c3d-8707-628138727c83";
+        final tokenUrl = Uri.parse("https://eservice.ura.gov.sg/uraDataService/insertNewToken/v1");
+        final tokenRes = await http.get(tokenUrl, headers: {...browserHeaders, "AccessKey": accessKey});
+        if (tokenRes.bodyBytes.isNotEmpty && tokenRes.bodyBytes[0] == 60) throw Exception("URA Token 伺服器被阻擋");
+        if (tokenRes.statusCode != 200) throw Exception("URA Token 獲取失敗，請檢查金鑰");
+        final token = json.decode(utf8.decode(tokenRes.bodyBytes, allowMalformed: true))['Result'];
+
+        Map<String, dynamic>? matchedProject;
+        for (int batch = 1; batch <= 4; batch++) {
+          final dataUrl = Uri.parse("https://eservice.ura.gov.sg/uraDataService/invokeUraDS/v1?service=PMI_Resi_Transaction&batch=$batch");
+          final dataRes = await http.get(dataUrl, headers: {...browserHeaders, "AccessKey": accessKey, "Token": token});
+
+          try {
+            if (dataRes.bodyBytes.isNotEmpty && dataRes.bodyBytes[0] == 60) continue;
+            String rawJson = utf8.decode(dataRes.bodyBytes, allowMalformed: true);
+            Map<String, dynamic> realData = json.decode(rawJson);
+            List<dynamic> projects = realData['Result'] ?? [];
+
+            for (var p in projects) {
+              String pName = (p['project'] ?? '').toUpperCase();
+              String pStreet = (p['street'] ?? '').toUpperCase();
+              if (buildingName != 'NIL' && pName.contains(buildingName)) { matchedProject = p; break; }
+              else if (roadName != 'NIL' && pStreet.contains(roadName)) { matchedProject = p; break; }
+            }
+            if (matchedProject != null) break;
+          } catch (e) { continue; }
+        }
+
+        if (matchedProject == null) throw Exception("全島資料庫皆未找到『$buildingName』或『$roadName』。");
+
+        List<dynamic> transactions = matchedProject['transaction'] ?? [];
+        if (transactions.isEmpty) throw Exception("該建案近期無交易紀錄");
+
+        currentProjectName = matchedProject['project'];
+
+        DateTime now = DateTime.now();
+        DateTime threeYearsAgo = DateTime(now.year - 3, now.month);
+
+        for (var t in transactions) {
+          String rawDate = t['contractDate'] ?? "";
+          if (rawDate.length == 4) {
+            int month = int.tryParse(rawDate.substring(0, 2)) ?? 1;
+            int year = 2000 + (int.tryParse(rawDate.substring(2, 4)) ?? 0);
+            DateTime tDate = DateTime(year, month);
+            if (tDate.isAfter(threeYearsAgo) || tDate.isAtSameMomentAs(threeYearsAgo)) {
+              processedTrans.add({
+                'original': {
+                  'price': t['price']?.toString() ?? "--",
+                  'contractDate': "${month.toString().padLeft(2, '0')}${year.toString().substring(2)}",
+                  // 私人住宅通常沒有像 HDB 這樣的棟號和房型分類，我們填入預設值
+                  'block': "私宅",
+                  'flat_type': "--",
+                },
+                'date': tDate
+              });
+            }
+          }
+        }
+        if (processedTrans.isEmpty) throw Exception("該私宅近三年內無交易紀錄");
+      }
+
+      // --- 🌟 步驟四：雙核共用的「製圖與製表」處理引擎 ---
+      processedTrans.sort((a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
+
+      List<FlSpot> newSpots = [];
+      List<String> newDates = [];
+
+      for (int i = 0; i < processedTrans.length; i++) {
+        var t = processedTrans[i]['original'];
+        double price = double.tryParse(t['price'].toString()) ?? 0;
+        newSpots.add(FlSpot(i.toDouble(), price));
+
+        String rawDate = t['contractDate'] ?? "";
+        if (rawDate.length == 4) {
+          newDates.add("${rawDate.substring(0, 2)}/${rawDate.substring(2, 4)}");
+        } else {
+          newDates.add(rawDate);
+        }
+      }
+
+      int tableCount = processedTrans.length > 10 ? 10 : processedTrans.length;
+      List<Map<String, dynamic>> tableData = processedTrans
+          .sublist(processedTrans.length - tableCount)
+          .reversed
+          .map((e) => e['original'] as Map<String, dynamic>)
+          .toList();
+
+      final String currentPrice = processedTrans.last['original']['price'].toString();
+
+      if (mounted) {
+        setState(() {
+          _targetBuilding = currentProjectName;
+          _latestPrice = "S\$ $currentPrice";
+          _pricePoints = newSpots;
+          _transactionDates = newDates;
+          _recentTransactionsTable = tableData;
+          _xInterval = newSpots.length > 15 ? (newSpots.length / 15).ceilToDouble() : 1;
+          _isLoading = false;
+        });
+      }
+
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll("Exception: ", "");
+          _isLoading = false;
+          _targetBuilding = "搜尋終止";
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() { _postalCodeController.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
+    double minY = 0, maxY = 100000;
+    if (_pricePoints.isNotEmpty && _pricePoints.first.y != 0) {
+      minY = _pricePoints.map((s) => s.y).reduce((a, b) => a < b ? a : b);
+      maxY = _pricePoints.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+      double padding = (maxY - minY) * 0.05;
+      if (padding == 0) padding = 100000;
+      minY -= padding; maxY += padding;
+    }
+    double maxX = (_pricePoints.length - 1).toDouble();
+    if (maxX <= 0) maxX = 1;
+
+    return Scaffold(
+      appBar: AppBar(title: Text('市場概況', style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)), backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Container(
+              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(30)),
+              child: Row(
+                children: [
+                  Expanded(child: TextField(controller: _postalCodeController, decoration: const InputDecoration(hintText: "郵遞區號 (例: 150037)", border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 16)), keyboardType: TextInputType.number)),
+                  _isLoading
+                      ? const Padding(padding: EdgeInsets.only(right: 16), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                      : Container(decoration: BoxDecoration(color: theme.primaryColor, borderRadius: BorderRadius.circular(30)), child: IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: _search)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_errorMessage.isNotEmpty) Text(_errorMessage, style: textTheme.bodyMedium?.copyWith(color: Colors.red, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+
+            SizedBox(
+              height: 420,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: theme.primaryColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))]),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("搜尋目標：$_targetBuilding", style: textTheme.bodyMedium?.copyWith(color: Colors.white70)),
+                    const SizedBox(height: 8),
+                    Text(_latestPrice, style: textTheme.headlineLarge?.copyWith(color: const Color(0xFF64FFDA), fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text("近三年整街交易總價走勢", style: textTheme.bodySmall?.copyWith(color: const Color(0xFF64FFDA))),
+                    const SizedBox(height: 30),
+                    Expanded(
+                      child: LineChart(
+                        LineChartData(
+                          gridData: const FlGridData(show: false), borderData: FlBorderData(show: false),
+                          minX: 0, maxX: maxX, minY: minY, maxY: maxY,
+                          titlesData: FlTitlesData(
+                            show: true,
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true, reservedSize: 46, interval: _xInterval,
+                                getTitlesWidget: (value, meta) {
+                                  int index = value.toInt();
+                                  if (index >= 0 && index < _transactionDates.length) {
+                                    return SideTitleWidget(meta: meta, space: 8, child: RotatedBox(quarterTurns: 3, child: Text(_transactionDates[index], style: const TextStyle(color: Colors.white70, fontSize: 11))));
+                                  }
+                                  return SideTitleWidget(meta: meta, child: const Text(''));
+                                },
+                              ),
+                            ),
+                            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)), topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)), rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          ),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: _pricePoints, isCurved: true, color: const Color(0xFF64FFDA), barWidth: 4, isStrokeCapRound: true, dotData: const FlDotData(show: true),
+                              belowBarData: BarAreaData(show: true, gradient: LinearGradient(colors: [const Color(0xFF64FFDA).withOpacity(0.3), const Color(0xFF64FFDA).withOpacity(0.0)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 🌟 更新的表格 UI：拿掉面積，加入棟號與房型
+            if (_recentTransactionsTable.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Align(alignment: Alignment.centerLeft, child: Text("最新 10 筆成交明細", style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor))),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: DataTable(
+                    columnSpacing: 15, headingRowColor: WidgetStateProperty.all(theme.primaryColor.withOpacity(0.05)),
+                    columns: const [
+                      DataColumn(label: Text('年月', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                      DataColumn(label: Text('棟號', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                      DataColumn(label: Text('房型', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                      DataColumn(label: Text('總價(S\$)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                    ],
+                    rows: _recentTransactionsTable.map((t) {
+                      String rawDate = t['contractDate'] ?? "";
+                      String formattedDate = rawDate.length == 4 ? "${rawDate.substring(0,2)}/${rawDate.substring(2,4)}" : rawDate;
+
+                      String block = t['block']?.toString() ?? "--";
+                      String flatType = t['flat_type']?.toString() ?? "--";
+                      String price = t['price']?.toString() ?? "--";
+
+                      return DataRow(cells: [
+                        DataCell(Text(formattedDate, style: const TextStyle(fontSize: 12))),
+                        DataCell(Text(block, style: const TextStyle(fontSize: 12))),
+                        DataCell(Text(flatType, style: const TextStyle(fontSize: 12))),
+                        DataCell(Text(price, style: TextStyle(fontWeight: FontWeight.bold, color: theme.primaryColor, fontSize: 12))),
+                      ]);
+                    }).toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MyPropertiesPage extends StatefulWidget {
+  const MyPropertiesPage({super.key});
+  @override
+  State<MyPropertiesPage> createState() => _MyPropertiesPageState();
+}
+
+class _MyPropertiesPageState extends State<MyPropertiesPage> {
+  final List<String> _properties = ["房產 A", "房產 B"];
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('我的房產')),
+      body: ListView.separated(itemCount: _properties.length, itemBuilder: (context, index) => ListTile(leading: const Icon(Icons.apartment), title: Text(_properties[index])), separatorBuilder: (context, index) => const Divider()),
+      floatingActionButton: FloatingActionButton(onPressed: () {}, child: const Icon(Icons.add)),
+    );
+  }
+}
+
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('我的設定')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            const CircleAvatar(radius: 50, backgroundColor: Colors.grey, child: Icon(Icons.person, size: 60, color: Colors.white)),
+            const SizedBox(height: 16), Text('使用者姓名', style: Theme.of(context).textTheme.headlineSmall), const SizedBox(height: 32),
+            ListTile(leading: const Icon(Icons.email), title: const Text('電子郵件設定'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
+            const Divider(),
+            ListTile(leading: const Icon(Icons.lock), title: const Text('更改密碼'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
+          ],
+        ),
+      ),
+    );
+  }
+}
