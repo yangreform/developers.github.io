@@ -283,7 +283,9 @@
     setRefreshDisabled(true);
     try {
       const url = API_BASE + '/api/get_heatmap_data?type=' + selType + '&metric=' + selMetric + '&year=' + selYear;
-      const resp = await fetch(url);
+      const resp = await fetch(url, {
+        headers: { 'ngrok-skip-browser-warning': '1' }
+      });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const json = await resp.json();
       if (json.status !== 'success') throw new Error(json.message || '伺服器錯誤');

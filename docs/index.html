@@ -155,6 +155,13 @@
     .badge-hdb{background:rgba(246,173,85,0.18);color:#f6ad55}
     .badge-ura{background:rgba(99,179,237,0.18);color:#63b3ed}
     .badge-up{background:rgba(72,187,120,0.15);color:var(--green)}
+    /* CAGR 漲幅 badges */
+    .cagr-up{color:#48bb78;font-weight:700}
+    .cagr-dn{color:#fc8181;font-weight:700}
+    .cagr-neu{color:var(--muted);font-weight:500}
+    .sparkline{display:inline-flex;align-items:flex-end;gap:2px;height:20px;vertical-align:middle;margin-left:4px}
+    .spark-bar{width:4px;border-radius:2px 2px 0 0;background:var(--accent);opacity:0.7;transition:opacity 0.2s}
+    .spark-bar:hover{opacity:1}
     .search-bar{
       display:flex;gap:10px;margin-bottom:18px;align-items:center;flex-wrap:wrap;
     }
@@ -313,15 +320,16 @@
             <tr>
               <th>#</th>
               <th>樓盤名稱</th>
-              <th>街道</th>
-              <th>成交筆數</th>
-              <th>平均成交價 (S$)</th>
-              <th>平均呎價 (S$/sqft)</th>
-              <th>類型</th>
+              <th>郵遞區號</th>
+              <th>最新均價 (S$)</th>
+              <th>均呎價 (S$)</th>
+              <th>年均漲幅</th>
+              <th>3年後預估價 (S$)</th>
+              <th>數據期間</th>
             </tr>
           </thead>
           <tbody id="ura-tbody">
-            <tr><td colspan="7" class="no-data">載入中...</td></tr>
+            <tr><td colspan="8" class="no-data">載入中...</td></tr>
           </tbody>
         </table>
       </div>
@@ -405,6 +413,10 @@
     if (cnt) cnt.textContent = q ? ('顯示 ' + vis + ' / ' + rows.length + ' 筆') : (rows.length + ' 筆資料');
   }
 
+  // ngrok bypass header（解決 ngrok 瀏覽器警告頁面問題）
+  var NGROK_HDR = { 'ngrok-skip-browser-warning': '1' };
+  var FETCH_OPTS = { headers: NGROK_HDR };
+
   // ── 格式化數字 ─────────────────────────────────────────────
   function fmtNum(n) {
     if (!n && n !== 0) return '—';
@@ -414,12 +426,12 @@
   // ── 載入 HDB 資料 ──────────────────────────────────────────
   async function loadHDBData() {
     try {
-      var resp = await fetch(API_BASE + '/api/get_heatmap_data?type=hdb&metric=price&year=all');
-      var json = await resp.json();
+      var resp  = await fetch(API_BASE + '/api/get_heatmap_data?type=hdb&metric=price&year=all', FETCH_OPTS);
+      var json  = await resp.json();
       if (json.status !== 'success') throw new Error(json.message);
 
       // 也要取得 count 資料
-      var respC = await fetch(API_BASE + '/heatmap/hdb');
+      var respC = await fetch(API_BASE + '/heatmap/hdb', FETCH_OPTS);
       var jsonC = await respC.json();
       var hdbMap = {};
       if (jsonC.status === 'success') {
@@ -453,47 +465,66 @@
     }
   }
 
-  // ── 載入 URA 資料 ──────────────────────────────────────────
+  // ── 載入 URA 漲幅 & 預估資料 ─────────────────────────────────
   async function loadURAData() {
     try {
-      var resp = await fetch(API_BASE + '/heatmap/ura');
+      // 呼叫新的 price trend API
+      var resp = await fetch(API_BASE + '/api/ura_price_trend?limit=500', FETCH_OPTS);
       var json = await resp.json();
-      if (json.status !== 'success') throw new Error(json.message);
+      if (json.status !== 'success') throw new Error(json.message || '資料載入失敗');
 
       var tbody = document.getElementById('ura-tbody');
-      var rows = (json.data && json.data.heatmap) ? json.data.heatmap : [];
-      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">暫無資料</td></tr>'; return; }
+      var rows = json.data || [];
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="no-data">暫無資料</td></tr>'; return; }
 
-      rows.sort(function(a,b){ return (b.avg_price||0)-(a.avg_price||0); });
-
+      // 已按 CAGR desc 排序（由後端處理）
       var html = '';
-      rows.slice(0,200).forEach(function(d, i) {
+      rows.forEach(function(d, i) {
+        // 年均漲幅顯示
+        var cagrCls = d.cagr > 3 ? 'cagr-up' : (d.cagr < -3 ? 'cagr-dn' : 'cagr-neu');
+        var cagrArrow = d.cagr > 0 ? '&#9650; ' : (d.cagr < 0 ? '&#9660; ' : '');
+        var cagrText  = cagrArrow + Math.abs(d.cagr).toFixed(1) + '% / 年';
+
+        // Sparkline（迷你年度趨勢）
+        var spark = '';
+        if (d.yearly && d.yearly.length >= 2) {
+          var prices = d.yearly.map(function(y) { return y.avg_price; });
+          var minP = Math.min.apply(null, prices);
+          var maxP = Math.max.apply(null, prices);
+          var rng  = maxP - minP || 1;
+          spark = '<span class="sparkline">';
+          prices.forEach(function(p) {
+            var h = Math.max(3, Math.round(((p - minP) / rng) * 18));
+            var clr = d.cagr > 0 ? '#48bb78' : '#fc8181';
+            spark += '<span class="spark-bar" title="S$' + p.toLocaleString() + '" style="height:' + h + 'px;background:' + clr + '"></span>';
+          });
+          spark += '</span>';
+        }
+
+        // 期間顯示
+        var period = d.earliest_yr + '–' + d.latest_yr + ' (' + d.n_years + '年)';
+
         html += '<tr data-row="1">'
               + '<td class="num">' + (i+1) + '</td>'
-              + '<td class="town">' + (d.project || '—') + '</td>'
+              + '<td class="town">' + (d.project || '—') + spark + '</td>'
               + '<td style="color:var(--muted);font-size:12px">' + (d.postal && d.postal !== 'NIL' ? d.postal : '—') + '</td>'
-              + '<td class="cnt">' + fmtNum(d.tx_count) + '</td>'
-              + '<td class="price">S$ ' + fmtNum(d.avg_price) + '</td>'
-              + '<td class="price">S$ ' + fmtNum(d.avg_psf) + '</td>'
-              + '<td><span class="badge badge-ura">URA</span></td>'
+              + '<td class="price">S$ ' + (d.latest_price ? d.latest_price.toLocaleString() : '—') + '</td>'
+              + '<td style="color:var(--muted)">' + (d.latest_psf ? 'S$ ' + d.latest_psf.toFixed(0) : '—') + '</td>'
+              + '<td class="' + cagrCls + '">' + cagrText + '</td>'
+              + '<td class="price" style="color:' + (d.cagr > 0 ? '#68d391' : '#fc8181') + '">S$ ' + (d.est_3yr ? d.est_3yr.toLocaleString() : '—') + '</td>'
+              + '<td style="font-size:11px;color:var(--muted)">' + period + '</td>'
               + '</tr>';
       });
       tbody.innerHTML = html;
-      document.getElementById('ura-count').textContent = rows.length + ' 筆資料（顯示前 200）';
+      document.getElementById('ura-count').textContent = rows.length + ' 筆樓盤（按年均漲幅排序）';
     } catch(e) {
-      document.getElementById('ura-tbody').innerHTML = '<tr><td colspan="7" class="no-data">無法載入：' + e.message + '</td></tr>';
+      document.getElementById('ura-tbody').innerHTML = '<tr><td colspan="8" class="no-data">無法載入：' + e.message + '</td></tr>';
     }
   }
 
   // ── 載入租賃資料 ──────────────────────────────────────────
   async function loadRentalData() {
-    // 使用 heatmap API 取得 HDB 租賃彙總
     try {
-      // 直接呼叫後端統計端點
-      var resp = await fetch(API_BASE + '/api/get_heatmap_data?type=hdb&metric=price&year=all');
-      var json = await resp.json();
-
-      // 使用靜態預載資料（租賃）
       var rentalData = [
         { town:'TAMPINES',     cnt:6532, avg:2980, max:5800, min:1500 },
         { town:'JURONG WEST',  cnt:5890, avg:2750, max:5200, min:1400 },

@@ -24,7 +24,26 @@ DB_NAME = os.path.join(BASE_DIR, "landlord_sg.db")
 print(f"📂 目前 API 綁定的資料庫路徑為：{DB_NAME}")
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+# ── 全域 CORS Header（確保 null origin / file:// / GitHub Pages 都能存取）──
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin']  = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-User-Phone, ngrok-skip-browser-warning'
+    return response
+
+@app.before_request
+def handle_options():
+    """全域處理 OPTIONS preflight request"""
+    if request.method == 'OPTIONS':
+        resp = app.make_default_options_response()
+        resp.headers['Access-Control-Allow-Origin']  = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-User-Phone, ngrok-skip-browser-warning'
+        resp.headers['Access-Control-Max-Age']       = '86400'
+        return resp
 
 
 
@@ -756,3 +775,127 @@ def get_hdb_heatmap():
         print(f"❌ [get_hdb_heatmap ERROR] {type(e).__name__}: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
+# ==========================================
+# 📈 URA 私宅樓盤 — 年均漲幅 & 3年預估價 API
+# GET /api/ura_price_trend
+# 可選 query param: limit (default 200)
+# ==========================================
+@app.route('/api/ura_price_trend', methods=['GET', 'OPTIONS'])
+def get_ura_price_trend():
+    limit = request.args.get('limit', 200, type=int)
+    limit = min(max(limit, 1), 1000)   # clamp 1~1000
+
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Step 1: 取每個樓盤各年度的平均成交價
+        # contractDate 格式 MMYY (4位), 年份 = SUBSTR(contractDate,3,2)
+        cursor.execute("""
+            SELECT
+                t.project,
+                c.postal,
+                CAST('20' || SUBSTR(t.contractDate,3,2) AS INTEGER) AS year,
+                AVG(t.price) AS avg_price,
+                AVG(t.price / NULLIF(t.area * 10.7639, 0)) AS avg_psf,
+                COUNT(*) AS tx_count
+            FROM ura_transactions t
+            JOIN ura_coordinates c ON t.project = c.project
+            WHERE t.price > 0
+              AND t.area  > 0
+              AND LENGTH(t.contractDate) = 4
+            GROUP BY t.project, year
+            HAVING tx_count >= 2
+            ORDER BY t.project, year
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        # Step 2: 整理成 project -> {year: avg_price} 的字典
+        from collections import defaultdict
+        project_years = defaultdict(dict)
+        project_postal = {}
+        project_psf    = defaultdict(dict)
+
+        for r in rows:
+            proj = r['project']
+            yr   = r['year']
+            project_years[proj][yr]  = r['avg_price']
+            project_psf[proj][yr]    = r['avg_psf'] if r['avg_psf'] else 0
+            project_postal[proj]     = r['postal']
+
+        # Step 3: 計算每個樓盤的 CAGR 及 3年預估價
+        CURRENT_YEAR = 2025   # 以 2025 為「當前」基準
+        CAGR_MIN = -30.0      # 過濾異常（整幢收購/清盤等極端值）
+        CAGR_MAX = +40.0
+        results = []
+
+        for proj, year_data in project_years.items():
+            years_sorted = sorted(year_data.keys())
+            if len(years_sorted) < 2:
+                continue
+
+            # 取最早年和最晚年（排除 2026 部分年資料）
+            years_full = [y for y in years_sorted if y <= CURRENT_YEAR]
+            if len(years_full) < 2:
+                years_full = years_sorted   # 若只有 2026 資料，仍計算
+
+            earliest_yr    = years_full[0]
+            latest_yr      = years_full[-1]
+            earliest_price = year_data[earliest_yr]
+            latest_price   = year_data[latest_yr]
+
+            n_years = latest_yr - earliest_yr
+            if n_years <= 0 or earliest_price <= 0:
+                continue
+
+            # CAGR = (latest/earliest)^(1/n) - 1
+            import math
+            cagr = (math.pow(latest_price / earliest_price, 1.0 / n_years) - 1) * 100
+
+            # 過濾異常值（例如整幢收購、清盤等極端交易）
+            if cagr < CAGR_MIN or cagr > CAGR_MAX:
+                continue
+            # 資料跨度太短（只有1年）不夠準確
+            if n_years < 2:
+                continue
+
+            # 3年後預估價（以 latest_price 為起點，用 CAGR 推算）
+            est_3yr = latest_price * math.pow(1 + cagr / 100, 3)
+
+            # 平均 PSF（最新年）
+            latest_psf = project_psf[proj].get(latest_yr, 0)
+
+            # 所有年度資料（供前端 sparkline）
+            yearly = [{'year': y, 'avg_price': round(year_data[y])} for y in years_sorted]
+
+            results.append({
+                'project':      proj,
+                'postal':       project_postal.get(proj, ''),
+                'earliest_yr':  earliest_yr,
+                'latest_yr':    latest_yr,
+                'earliest_price': round(earliest_price),
+                'latest_price': round(latest_price),
+                'latest_psf':   round(latest_psf, 1),
+                'cagr':         round(cagr, 2),          # 年均漲幅 %
+                'est_3yr':      round(est_3yr),          # 3年後預估價
+                'n_years':      n_years,
+                'yearly':       yearly
+            })
+
+        # 按 cagr 降序排序
+        results.sort(key=lambda x: x['cagr'], reverse=True)
+
+        return jsonify({
+            'status':  'success',
+            'count':   len(results),
+            'data':    results[:limit]
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"❌ [get_ura_price_trend ERROR] {type(e).__name__}: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
