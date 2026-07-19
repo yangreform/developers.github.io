@@ -1,25 +1,27 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LandlordSG · 新加坡房產熱力圖</title>
   <meta name="description" content="LandlordSG 新加坡房產成交熱力圖 — 即時視覺化 URA 私宅與 HDB 組屋的成交價格、呎價與交易量分佈" />
-  <script>
-    function onGoogleMapsReady() {
-      window._googleMapsReady = true;
-      if (window._pendingInit) window._pendingInit();
-    }
-  </script>
-  <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD5eBNcku81TVtXZJVBkPp0Bl8YFUrxIhs&libraries=visualization&callback=onGoogleMapsReady"></script>
+
+  <!-- Leaflet.js（免費地圖，無需 API Key） -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- leaflet-heat 熱力圖插件 -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
       --bg-dark:#0a0e1a;
-      --panel-bg:rgba(15,20,40,0.82);
+      --panel-bg:rgba(15,20,40,0.88);
       --panel-border:rgba(99,179,237,0.18);
       --accent:#63b3ed;
       --accent2:#f6ad55;
@@ -33,13 +35,17 @@
       --shadow-glow:0 0 24px rgba(99,179,237,0.15);
     }
     html,body{width:100%;height:100%;font-family:'Inter',sans-serif;background:var(--bg-dark);color:var(--text-primary);overflow:hidden}
-    #map{position:absolute;inset:0;width:100%;height:100%}
+
+    /* ── Map ── */
+    #map{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+
+    /* ── Top Bar ── */
     #topbar{
-      position:fixed;top:0;left:0;right:0;z-index:100;
+      position:fixed;top:0;left:0;right:0;z-index:1000;
       display:flex;align-items:center;gap:12px;padding:12px 20px;
       background:var(--panel-bg);border-bottom:1px solid var(--panel-border);
       backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-      box-shadow:var(--shadow-glow);
+      box-shadow:var(--shadow-glow);flex-wrap:wrap;
     }
     .logo-wrap{display:flex;align-items:center;gap:10px;flex-shrink:0}
     .logo-icon{
@@ -48,12 +54,8 @@
       display:flex;align-items:center;justify-content:center;
       font-size:18px;box-shadow:0 0 14px rgba(99,179,237,0.45);
     }
-    .logo-text{
-      font-size:17px;font-weight:700;letter-spacing:-0.3px;
-      background:linear-gradient(90deg,#63b3ed,#90cdf4);
-      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-    }
-    .logo-sub{font-size:11px;color:var(--text-muted);font-weight:400;margin-top:1px}
+    .logo-text{font-size:17px;font-weight:700;background:linear-gradient(90deg,#63b3ed,#90cdf4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .logo-sub{font-size:11px;color:var(--text-muted);margin-top:1px}
     .divider-v{width:1px;height:32px;background:var(--panel-border);flex-shrink:0}
     .ctrl-group{display:flex;flex-direction:column;gap:4px}
     .ctrl-label{font-size:10px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px}
@@ -74,7 +76,7 @@
       font-family:inherit;cursor:pointer;outline:none;transition:all 0.2s;
     }
     #year-select:hover,#year-select:focus{border-color:rgba(99,179,237,0.45);background:var(--btn-hover)}
-    #year-select option{background:#0f1428}
+    #year-select option{background:#0f1428;color:#e8f0fe}
     .spacer{flex:1}
     #btn-refresh{
       padding:7px 16px;border-radius:20px;border:1px solid rgba(99,179,237,0.4);
@@ -84,25 +86,34 @@
     }
     #btn-refresh:hover{background:linear-gradient(135deg,rgba(99,179,237,0.35),rgba(66,153,225,0.28));box-shadow:0 0 16px rgba(99,179,237,0.25)}
     #btn-refresh:disabled{opacity:0.45;cursor:not-allowed}
+
+    /* ── Back Button ── */
+    #btn-back{
+      padding:6px 14px;border-radius:20px;border:1px solid var(--panel-border);
+      background:transparent;color:var(--text-muted);font-size:12px;
+      cursor:pointer;font-family:inherit;transition:all 0.2s;text-decoration:none;
+      display:flex;align-items:center;gap:5px;
+    }
+    #btn-back:hover{background:var(--btn-hover);color:var(--text-primary)}
+
+    /* ── Loading ── */
     #loading{
-      position:fixed;inset:0;z-index:200;
+      position:fixed;inset:0;z-index:2000;
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
-      background:rgba(10,14,26,0.85);backdrop-filter:blur(8px);transition:opacity 0.4s ease;
+      background:rgba(10,14,26,0.9);backdrop-filter:blur(8px);transition:opacity 0.4s ease;
     }
     #loading.hidden{opacity:0;pointer-events:none}
-    .spinner{
-      width:52px;height:52px;
-      border:3px solid rgba(99,179,237,0.2);border-top-color:#63b3ed;
-      border-radius:50%;animation:spin 0.9s linear infinite;
-    }
+    .spinner{width:52px;height:52px;border:3px solid rgba(99,179,237,0.2);border-top-color:#63b3ed;border-radius:50%;animation:spin 0.9s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .loading-text{font-size:14px;color:var(--text-muted);font-weight:400}
+    .loading-text{font-size:14px;color:var(--text-muted)}
+
+    /* ── Stats Panel ── */
     #stats-panel{
-      position:fixed;bottom:28px;left:20px;z-index:100;
+      position:fixed;bottom:28px;left:20px;z-index:1000;
       background:var(--panel-bg);border:1px solid var(--panel-border);
       border-radius:16px;padding:16px 20px;
       backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-      box-shadow:var(--shadow-glow);min-width:220px;
+      box-shadow:var(--shadow-glow);min-width:200px;
     }
     .stats-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px}
     .stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
@@ -110,40 +121,46 @@
     .stat-key{font-size:12px;color:var(--text-muted)}
     .stat-val{font-size:13px;font-weight:600;color:var(--text-primary)}
     .stat-val.ura{color:#63b3ed}.stat-val.hdb{color:#f6ad55}
+
+    /* ── Legend ── */
     #legend{
-      position:fixed;bottom:28px;right:20px;z-index:100;
+      position:fixed;bottom:28px;right:20px;z-index:1000;
       background:var(--panel-bg);border:1px solid var(--panel-border);
       border-radius:16px;padding:16px 20px;
       backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
       box-shadow:var(--shadow-glow);
     }
     .legend-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px}
-    .legend-gradient{
-      width:160px;height:10px;border-radius:5px;margin-bottom:6px;
-      background:linear-gradient(to right,#0000ff,#00ffff 25%,#00ff00 50%,#ffff00 75%,#ff0000);
-    }
+    .legend-gradient{width:160px;height:10px;border-radius:5px;margin-bottom:6px;background:linear-gradient(to right,#0000ff,#00ffff 25%,#00ff00 50%,#ffff00 75%,#ff0000)}
     .legend-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted)}
-    #info-tip{
-      position:fixed;z-index:150;pointer-events:none;
-      background:var(--panel-bg);border:1px solid var(--panel-border);
-      border-radius:12px;padding:12px 16px;backdrop-filter:blur(16px);
-      font-size:13px;max-width:240px;box-shadow:0 8px 32px rgba(0,0,0,0.4);display:none;
+
+    /* ── Tooltip ── */
+    .leaflet-tooltip-custom{
+      background:var(--panel-bg)!important;
+      border:1px solid var(--panel-border)!important;
+      border-radius:12px!important;color:var(--text-primary)!important;
+      font-family:'Inter',sans-serif!important;font-size:13px!important;
+      padding:10px 14px!important;backdrop-filter:blur(16px)!important;
+      box-shadow:0 8px 32px rgba(0,0,0,0.4)!important;
     }
-    #info-tip .tip-name{font-weight:600;margin-bottom:6px;color:var(--text-primary)}
-    #info-tip .tip-val{color:var(--text-muted);font-size:12px}
-    #info-tip .tip-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-bottom:6px}
+    .tip-name{font-weight:600;margin-bottom:4px}
+    .tip-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-bottom:6px}
     .badge-ura{background:var(--tag-ura);color:#63b3ed}
     .badge-hdb{background:var(--tag-hdb);color:#f6ad55}
+    .tip-val{color:var(--text-muted);font-size:12px}
+
+    /* ── Toast ── */
     #toast{
-      position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);z-index:300;
+      position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);z-index:3000;
       background:rgba(229,62,62,0.9);color:#fff;padding:10px 20px;border-radius:8px;
       font-size:13px;opacity:0;transition:all 0.3s ease;pointer-events:none;
     }
     #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
     @media(max-width:640px){
-      #topbar{flex-wrap:wrap;gap:8px;padding:10px 14px}
+      #topbar{gap:8px;padding:10px 14px}
       .logo-sub,.divider-v{display:none}
-      #stats-panel{bottom:auto;top:72px;left:12px;min-width:0}
+      #stats-panel{bottom:auto;top:76px;left:12px;min-width:0}
       #legend{bottom:12px;right:12px}
     }
   </style>
@@ -160,24 +177,27 @@
     </div>
   </div>
   <div class="divider-v"></div>
+
   <div class="ctrl-group">
     <div class="ctrl-label">資料類型</div>
     <div class="btn-row" id="type-btns">
-      <button class="btn-pill type-ura active" data-type="ura">🏙️ URA 私宅</button>
-      <button class="btn-pill type-hdb" data-type="hdb">🏘️ HDB 組屋</button>
-      <button class="btn-pill type-all" data-type="all">🗺️ 全部</button>
+      <button class="btn-pill type-ura active" data-type="ura">&#127961;&#65039; URA 私宅</button>
+      <button class="btn-pill type-hdb" data-type="hdb">&#127968; HDB 組屋</button>
+      <button class="btn-pill type-all" data-type="all">&#128506;&#65039; 全部</button>
     </div>
   </div>
   <div class="divider-v"></div>
+
   <div class="ctrl-group">
     <div class="ctrl-label">指標</div>
     <div class="btn-row" id="metric-btns">
-      <button class="btn-pill active" data-metric="price">💰 成交價</button>
-      <button class="btn-pill" data-metric="psf">📐 呎價</button>
-      <button class="btn-pill" data-metric="count">📊 交易量</button>
+      <button class="btn-pill active" data-metric="price">&#128176; 成交價</button>
+      <button class="btn-pill" data-metric="psf">&#128208; 呎價</button>
+      <button class="btn-pill" data-metric="count">&#128202; 交易量</button>
     </div>
   </div>
   <div class="divider-v"></div>
+
   <div class="ctrl-group">
     <div class="ctrl-label">年份</div>
     <select id="year-select">
@@ -192,9 +212,13 @@
       <option value="2017">2017</option>
     </select>
   </div>
+
   <div class="spacer"></div>
+
+  <a href="index.html" id="btn-back">&#8592; 首頁</a>
+
   <button id="btn-refresh" onclick="loadHeatmap()">
-    <span id="refresh-icon">🔄</span> 更新地圖
+    <span id="refresh-icon">&#128260;</span> 更新地圖
   </button>
 </div>
 
@@ -206,23 +230,11 @@
 </div>
 
 <div id="stats-panel">
-  <div class="stats-title">📊 資料統計</div>
-  <div class="stat-row">
-    <span class="stat-key">資料筆數</span>
-    <span class="stat-val" id="stat-count">—</span>
-  </div>
-  <div class="stat-row">
-    <span class="stat-key">URA 私宅</span>
-    <span class="stat-val ura" id="stat-ura">—</span>
-  </div>
-  <div class="stat-row">
-    <span class="stat-key">HDB 組屋</span>
-    <span class="stat-val hdb" id="stat-hdb">—</span>
-  </div>
-  <div class="stat-row">
-    <span class="stat-key">最高權重</span>
-    <span class="stat-val" id="stat-max">—</span>
-  </div>
+  <div class="stats-title">&#128202; 資料統計</div>
+  <div class="stat-row"><span class="stat-key">資料筆數</span><span class="stat-val" id="stat-count">—</span></div>
+  <div class="stat-row"><span class="stat-key">URA 私宅</span><span class="stat-val ura" id="stat-ura">—</span></div>
+  <div class="stat-row"><span class="stat-key">HDB 組屋</span><span class="stat-val hdb" id="stat-hdb">—</span></div>
+  <div class="stat-row"><span class="stat-key">最高值</span><span class="stat-val" id="stat-max">—</span></div>
 </div>
 
 <div id="legend">
@@ -235,76 +247,37 @@
   </div>
 </div>
 
-<div id="info-tip">
-  <div class="tip-name" id="tip-name"></div>
-  <span class="tip-badge" id="tip-badge"></span>
-  <div class="tip-val" id="tip-val"></div>
-</div>
-
 <div id="toast"></div>
 
 <script>
-  // === 設定：後端 API 網址 ===
-  // 本機測試時改為 http://localhost:PORT
-  // GCP 部署後改為你的 GCP URL
-  // ⚙️  API 網址來源：讀取自 trade/.env 的 LANDLORD_API_BASE
-  // 若要修改，只需更新 trade/.env 的 NGROK_URL 即可，無需改此檔
+  // ── API 網址（後端 ngrok / GCP）──────────────────────────────
   const API_BASE = 'https://imelda-nondeferent-deformedly.ngrok-free.dev/app';
 
-  let map = null;
-  let heatmapLayer = null;
+  let map, heatLayer;
+  let markers = [];
   let currentData = [];
-  let markerList = [];
-  let selType = 'ura';
-  let selMetric = 'price';
-  let selYear = 'all';
+  let selType = 'ura', selMetric = 'price', selYear = 'all';
 
-  // ── 初始化 Google Maps ──────────────────────────────
+  // ── 初始化 Leaflet 地圖 ─────────────────────────────────────
   function initMap() {
-    map = new google.maps.Map(document.getElementById('map'), {
-      center: { lat: 1.3521, lng: 103.8198 },
+    map = L.map('map', {
+      center: [1.3521, 103.8198],
       zoom: 12,
-      mapTypeId: 'roadmap',
-      styles: darkMapStyle(),
-      disableDefaultUI: false,
       zoomControl: true,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
     });
 
-    heatmapLayer = new google.maps.visualization.HeatmapLayer({
-      data: [],
-      map: map,
-      radius: 40,
-      opacity: 0.75,
-      gradient: [
-        'rgba(0,0,255,0)',
-        'rgba(0,128,255,1)',
-        'rgba(0,255,200,1)',
-        'rgba(0,255,0,1)',
-        'rgba(200,255,0,1)',
-        'rgba(255,255,0,1)',
-        'rgba(255,128,0,1)',
-        'rgba(255,0,0,1)'
-      ]
-    });
-
-    map.addListener('click', () => {
-      document.getElementById('info-tip').style.display = 'none';
-    });
-
-    map.addListener('zoom_changed', () => {
-      const z = map.getZoom();
-      const r = Math.max(15, Math.min(80, (z - 10) * 12));
-      heatmapLayer.set('radius', r);
-    });
+    // 深色地圖底圖（CartoDB Dark Matter，免費、無需 API Key）
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(map);
 
     hideLoading();
     loadHeatmap();
   }
 
-  // ── 取得資料並渲染 ──────────────────────────────────
+  // ── 載入資料 ────────────────────────────────────────────────
   async function loadHeatmap() {
     showLoading('正在從伺服器取得資料...');
     setRefreshDisabled(true);
@@ -319,7 +292,7 @@
       updateStats(currentData, json.metric);
       updateLegendLabel(json.metric);
     } catch (err) {
-      showToast('❌ 無法載入資料：' + err.message);
+      showToast('無法載入資料：' + err.message);
       console.error('[HeatmapError]', err);
     } finally {
       hideLoading();
@@ -327,91 +300,101 @@
     }
   }
 
-  // ── 渲染熱力圖 ──────────────────────────────────────
+  // ── 渲染熱力圖 ──────────────────────────────────────────────
   function renderHeatmap(data, metric) {
-    if (!heatmapLayer || !data.length) {
-      if (heatmapLayer) heatmapLayer.setData([]);
-      return;
-    }
-    const maxW = Math.max.apply(null, data.map(function(d){ return d.weight || 0; })) || 1;
-    const points = data
-      .filter(function(d){ return d.lat && d.lng && d.weight > 0; })
-      .map(function(d){
-        return {
-          location: new google.maps.LatLng(d.lat, d.lng),
-          weight: d.weight / maxW
-        };
-      });
-    addInteractiveMarkers(data, metric);
-    heatmapLayer.setData(points);
-  }
+    // 移除舊 heatLayer 和 markers
+    if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+    markers.forEach(function(m) { map.removeLayer(m); });
+    markers = [];
 
-  // ── 互動 Marker ─────────────────────────────────────
-  function addInteractiveMarkers(data, metric) {
-    markerList.forEach(function(m){ m.setMap(null); });
-    markerList = [];
-    data.forEach(function(d){
+    if (!data || !data.length) return;
+
+    // 計算最大值（正規化用）
+    var maxW = 0;
+    data.forEach(function(d) { if ((d.weight || 0) > maxW) maxW = d.weight; });
+    if (maxW === 0) maxW = 1;
+
+    // leaflet-heat 格式：[[lat, lng, intensity], ...]
+    var heatPoints = [];
+    data.forEach(function(d) {
+      if (!d.lat || !d.lng || !d.weight) return;
+      var intensity = d.weight / maxW;  // 0~1
+      heatPoints.push([d.lat, d.lng, intensity]);
+    });
+
+    heatLayer = L.heatLayer(heatPoints, {
+      radius: 30,
+      blur: 20,
+      maxZoom: 17,
+      max: 1.0,
+      gradient: {
+        0.0: '#0000ff',
+        0.3: '#00ffff',
+        0.5: '#00ff00',
+        0.7: '#ffff00',
+        1.0: '#ff0000'
+      }
+    }).addTo(map);
+
+    // 建立透明 marker（用於 tooltip）
+    data.forEach(function(d) {
       if (!d.lat || !d.lng) return;
-      const marker = new google.maps.Marker({
-        position: { lat: d.lat, lng: d.lng },
-        map: map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: d.source === 'ura' ? '#63b3ed' : '#f6ad55',
-          fillOpacity: 0.01,
-          strokeWeight: 0
-        },
-        title: d.label
+      var icon = L.divIcon({ className: '', html: '', iconSize: [20, 20] });
+      var m = L.marker([d.lat, d.lng], { icon: icon, opacity: 0 });
+
+      var valText = '';
+      if (metric === 'count')       valText = '交易量：' + Math.round(d.weight).toLocaleString() + ' 筆';
+      else if (metric === 'psf')    valText = '平均呎價：S$ ' + Math.round(d.weight).toLocaleString();
+      else                          valText = '平均成交價：S$ ' + Math.round(d.weight).toLocaleString();
+
+      var badgeClass = d.source === 'ura' ? 'badge-ura' : 'badge-hdb';
+      var badgeText  = d.source === 'ura' ? 'URA 私宅' : 'HDB 組屋';
+      var html = '<div class="tip-name">' + (d.label || '') + '</div>'
+               + '<span class="tip-badge ' + badgeClass + '">' + badgeText + '</span><br>'
+               + '<div class="tip-val">' + valText + '</div>';
+
+      m.bindTooltip(html, {
+        className: 'leaflet-tooltip-custom',
+        direction: 'top',
+        offset: [0, -5]
       });
-      marker.addListener('click', function(evt){ showTooltip(evt, d, metric); });
-      markerList.push(marker);
+
+      m.addTo(map);
+      markers.push(m);
+    });
+
+    // 縮放時調整 radius
+    map.on('zoomend', function() {
+      if (!heatLayer) return;
+      var z = map.getZoom();
+      var r = Math.max(15, Math.min(60, (z - 10) * 10));
+      heatLayer.setOptions({ radius: r });
     });
   }
 
-  // ── Tooltip ─────────────────────────────────────────
-  function showTooltip(evt, d, metric) {
-    const tip = document.getElementById('info-tip');
-    document.getElementById('tip-name').textContent = d.label || '—';
-    const badge = document.getElementById('tip-badge');
-    badge.className = 'tip-badge ' + (d.source === 'ura' ? 'badge-ura' : 'badge-hdb');
-    badge.textContent = d.source === 'ura' ? 'URA 私宅' : 'HDB 組屋';
-    let valText = '';
-    if (metric === 'count') valText = '交易量：' + Math.round(d.weight).toLocaleString() + ' 筆';
-    else if (metric === 'psf') valText = '平均呎價：S$ ' + Math.round(d.weight).toLocaleString() + ' / sqft';
-    else valText = '平均成交價：S$ ' + Math.round(d.weight).toLocaleString();
-    document.getElementById('tip-val').textContent = valText;
-    const x = (evt.domEvent && evt.domEvent.clientX) || 0;
-    const y = (evt.domEvent && evt.domEvent.clientY) || 0;
-    tip.style.display = 'block';
-    tip.style.left = (x + 16) + 'px';
-    tip.style.top = (y - 10) + 'px';
-    const rect = tip.getBoundingClientRect();
-    if (rect.right > window.innerWidth - 20) {
-      tip.style.left = (x - rect.width - 16) + 'px';
-    }
-  }
-
-  // ── 統計 ─────────────────────────────────────────────
+  // ── 統計資訊 ────────────────────────────────────────────────
   function updateStats(data, metric) {
-    const uraCount = data.filter(function(d){ return d.source === 'ura'; }).length;
-    const hdbCount = data.filter(function(d){ return d.source === 'hdb'; }).length;
-    const maxW = data.length ? Math.max.apply(null, data.map(function(d){ return d.weight || 0; })) : 0;
+    var uraCount = 0, hdbCount = 0, maxW = 0;
+    data.forEach(function(d) {
+      if (d.source === 'ura') uraCount++;
+      else hdbCount++;
+      if ((d.weight || 0) > maxW) maxW = d.weight;
+    });
     document.getElementById('stat-count').textContent = data.length.toLocaleString();
-    document.getElementById('stat-ura').textContent = uraCount;
-    document.getElementById('stat-hdb').textContent = hdbCount;
-    const maxLabel = (metric === 'count')
+    document.getElementById('stat-ura').textContent   = uraCount;
+    document.getElementById('stat-hdb').textContent   = hdbCount;
+    var maxLabel = (metric === 'count')
       ? Math.round(maxW).toLocaleString() + ' 筆'
       : 'S$ ' + Math.round(maxW).toLocaleString();
     document.getElementById('stat-max').textContent = maxLabel;
   }
 
   function updateLegendLabel(metric) {
-    const labels = { price: '平均成交價', psf: '平均呎價(PSF)', count: '交易筆數' };
+    var labels = { price: '平均成交價', psf: '平均呎價(PSF)', count: '交易筆數' };
     document.getElementById('legend-metric-label').textContent = labels[metric] || metric;
   }
 
-  // ── UI 控制 ──────────────────────────────────────────
+  // ── UI 控制 ──────────────────────────────────────────────────
   function showLoading(msg) {
     document.getElementById('loading-text').textContent = msg || '載入中...';
     document.getElementById('loading').classList.remove('hidden');
@@ -421,65 +404,36 @@
   }
   function setRefreshDisabled(v) {
     document.getElementById('btn-refresh').disabled = v;
-    document.getElementById('refresh-icon').textContent = v ? '⏳' : '🔄';
+    document.getElementById('refresh-icon').textContent = v ? '\u23F3' : '\uD83D\uDD04';
   }
   function showToast(msg) {
-    const t = document.getElementById('toast');
+    var t = document.getElementById('toast');
     t.textContent = msg;
     t.classList.add('show');
-    setTimeout(function(){ t.classList.remove('show'); }, 4000);
+    setTimeout(function() { t.classList.remove('show'); }, 4000);
   }
 
-  // ── 按鈕事件 ─────────────────────────────────────────
-  document.querySelectorAll('#type-btns .btn-pill').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      document.querySelectorAll('#type-btns .btn-pill').forEach(function(b){ b.classList.remove('active'); });
+  // ── 按鈕事件 ─────────────────────────────────────────────────
+  document.querySelectorAll('#type-btns .btn-pill').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#type-btns .btn-pill').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       selType = btn.dataset.type;
     });
   });
-  document.querySelectorAll('#metric-btns .btn-pill').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      document.querySelectorAll('#metric-btns .btn-pill').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('#metric-btns .btn-pill').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#metric-btns .btn-pill').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       selMetric = btn.dataset.metric;
     });
   });
-  document.getElementById('year-select').addEventListener('change', function(e){
+  document.getElementById('year-select').addEventListener('change', function(e) {
     selYear = e.target.value;
   });
 
-  // ── Google Maps 深色主題 ─────────────────────────────
-  function darkMapStyle() {
-    return [
-      {elementType:'geometry',stylers:[{color:'#0d1117'}]},
-      {elementType:'labels.text.stroke',stylers:[{color:'#0d1117'}]},
-      {elementType:'labels.text.fill',stylers:[{color:'#6e7f9a'}]},
-      {featureType:'administrative',elementType:'geometry.stroke',stylers:[{color:'#1f2d45'}]},
-      {featureType:'landscape.natural',elementType:'geometry',stylers:[{color:'#0a1628'}]},
-      {featureType:'poi',elementType:'geometry',stylers:[{color:'#111d30'}]},
-      {featureType:'poi',elementType:'labels.text.fill',stylers:[{color:'#465670'}]},
-      {featureType:'poi.park',elementType:'geometry.fill',stylers:[{color:'#0a2018'}]},
-      {featureType:'poi.park',elementType:'labels.text.fill',stylers:[{color:'#3a7050'}]},
-      {featureType:'road',elementType:'geometry',stylers:[{color:'#1a2840'}]},
-      {featureType:'road.arterial',elementType:'geometry',stylers:[{color:'#1e3050'}]},
-      {featureType:'road.highway',elementType:'geometry',stylers:[{color:'#1e3a5f'}]},
-      {featureType:'road.highway',elementType:'geometry.stroke',stylers:[{color:'#2a4a70'}]},
-      {featureType:'road.local',elementType:'labels.text.fill',stylers:[{color:'#4a6080'}]},
-      {featureType:'transit',elementType:'geometry',stylers:[{color:'#0f1a2e'}]},
-      {featureType:'transit.station',elementType:'labels.text.fill',stylers:[{color:'#4a6080'}]},
-      {featureType:'water',elementType:'geometry',stylers:[{color:'#061020'}]},
-      {featureType:'water',elementType:'labels.text.fill',stylers:[{color:'#1a3050'}]},
-      {featureType:'water',elementType:'labels.text.stroke',stylers:[{color:'#061020'}]},
-    ];
-  }
-
-  // ── 啟動 ─────────────────────────────────────────────
-  if (window._googleMapsReady) {
-    initMap();
-  } else {
-    window._pendingInit = initMap;
-  }
+  // ── 啟動 ─────────────────────────────────────────────────────
+  window.addEventListener('load', initMap);
 </script>
 </body>
 </html>

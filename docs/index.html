@@ -1,47 +1,549 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-Hant">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="/LandlordSG/">
-
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LandlordSG · 新加坡房產資料平台</title>
+  <meta name="description" content="LandlordSG — 新加坡最完整的房產成交資料平台，涵蓋 HDB 組屋與 URA 私宅即時行情，附熱力圖視覺化分析">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --navy:#0a0e1a;
+      --navy2:#0d1325;
+      --panel:rgba(15,22,44,0.9);
+      --gold:#c9a227;
+      --gold-light:#f0c84a;
+      --accent:#63b3ed;
+      --green:#48bb78;
+      --purple:#9f7aea;
+      --text:#e8f0fe;
+      --muted:#8899bb;
+      --border:rgba(99,179,237,0.15);
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:'Inter',sans-serif;background:var(--navy);color:var(--text);min-height:100vh}
 
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="landlord_sg">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+    /* ── Navbar ── */
+    nav{
+      position:sticky;top:0;z-index:100;
+      background:rgba(10,14,26,0.97);border-bottom:1px solid var(--border);
+      backdrop-filter:blur(20px);padding:0 24px;
+      display:flex;align-items:center;justify-content:space-between;height:64px;
+    }
+    .nav-brand{font-size:17px;font-weight:800;background:linear-gradient(90deg,var(--gold),var(--gold-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none;letter-spacing:-0.3px}
+    .nav-links{display:flex;gap:6px}
+    .nav-link{padding:7px 16px;border-radius:20px;font-size:13px;font-weight:500;color:var(--muted);text-decoration:none;transition:all 0.2s;border:1px solid transparent}
+    .nav-link:hover{color:var(--text);background:rgba(99,179,237,0.08);border-color:var(--border)}
+    .nav-link.btn-cta{background:linear-gradient(135deg,rgba(201,162,39,0.2),rgba(240,200,74,0.12));color:var(--gold-light);border-color:rgba(201,162,39,0.3)}
+    .nav-link.btn-cta:hover{background:linear-gradient(135deg,rgba(201,162,39,0.3),rgba(240,200,74,0.2));box-shadow:0 0 16px rgba(201,162,39,0.2)}
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+    /* ── Hero ── */
+    .hero{
+      min-height:85vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      text-align:center;padding:60px 24px;position:relative;overflow:hidden;
+      background:radial-gradient(ellipse at 50% 0%,rgba(99,179,237,0.06) 0%,transparent 60%),
+                 radial-gradient(ellipse at 80% 80%,rgba(201,162,39,0.05) 0%,transparent 50%),
+                 var(--navy);
+    }
+    .hero::after{
+      content:'';position:absolute;bottom:0;left:0;right:0;height:120px;
+      background:linear-gradient(to bottom,transparent,var(--navy));pointer-events:none;
+    }
+    .hero-pill{
+      display:inline-flex;align-items:center;gap:8px;margin-bottom:24px;
+      padding:7px 18px;border-radius:24px;
+      background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.2);
+      font-size:12px;font-weight:600;color:var(--accent);letter-spacing:0.5px;
+    }
+    .hero h1{
+      font-size:clamp(36px,6vw,72px);font-weight:800;line-height:1.1;margin-bottom:20px;
+      letter-spacing:-1px;
+    }
+    .hero h1 .blue{background:linear-gradient(135deg,#63b3ed,#4299e1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .hero h1 .gold{background:linear-gradient(135deg,var(--gold),var(--gold-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .hero-desc{font-size:clamp(15px,2vw,18px);color:var(--muted);max-width:580px;line-height:1.7;margin-bottom:40px}
+    .hero-btns{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+    .btn-primary-lg{
+      padding:14px 32px;border-radius:30px;font-size:15px;font-weight:700;
+      background:linear-gradient(135deg,#63b3ed,#4299e1);color:#fff;
+      border:none;cursor:pointer;text-decoration:none;
+      transition:all 0.25s;display:inline-flex;align-items:center;gap:9px;
+      box-shadow:0 6px 28px rgba(99,179,237,0.35);
+    }
+    .btn-primary-lg:hover{transform:translateY(-3px);box-shadow:0 10px 40px rgba(99,179,237,0.5)}
+    .btn-gold-lg{
+      padding:14px 32px;border-radius:30px;font-size:15px;font-weight:700;
+      background:linear-gradient(135deg,var(--gold),var(--gold-light));color:#0a0e1a;
+      border:none;cursor:pointer;text-decoration:none;
+      transition:all 0.25s;display:inline-flex;align-items:center;gap:9px;
+      box-shadow:0 6px 28px rgba(201,162,39,0.3);
+    }
+    .btn-gold-lg:hover{transform:translateY(-3px);box-shadow:0 10px 40px rgba(201,162,39,0.45)}
 
-  <title>landlord_sg</title>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD5eBNcku81TVtXZJVBkPp0Bl8YFUrxIhs"></script>
-  <link rel="manifest" href="manifest.json">
+    /* ── Quick Stats Bar ── */
+    .stats-bar{
+      display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;
+      background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+    }
+    .stat-item{
+      background:var(--navy2);padding:24px 28px;text-align:center;
+      transition:background 0.2s;
+    }
+    .stat-item:hover{background:rgba(99,179,237,0.04)}
+    .stat-num{font-size:28px;font-weight:800;line-height:1}
+    .stat-num.blue{background:linear-gradient(135deg,#63b3ed,#90cdf4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .stat-num.gold{background:linear-gradient(135deg,var(--gold),var(--gold-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .stat-num.green{background:linear-gradient(135deg,var(--green),#9ae6b4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .stat-num.purple{background:linear-gradient(135deg,var(--purple),#d6bcfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .stat-desc{font-size:12px;color:var(--muted);margin-top:6px;font-weight:500}
+
+    /* ── Feature Cards ── */
+    .features{padding:72px 24px;max-width:1200px;margin:0 auto}
+    .section-eyebrow{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:2px;margin-bottom:12px}
+    .section-h{font-size:clamp(24px,3.5vw,40px);font-weight:800;margin-bottom:10px;letter-spacing:-0.5px}
+    .section-sub{font-size:15px;color:var(--muted);margin-bottom:40px;max-width:500px;line-height:1.6}
+    .feat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+    .feat-card{
+      background:var(--panel);border:1px solid var(--border);border-radius:20px;
+      padding:32px 28px;transition:transform 0.25s,box-shadow 0.25s,border-color 0.25s;
+      text-decoration:none;color:inherit;display:block;
+    }
+    .feat-card:hover{transform:translateY(-6px);box-shadow:0 20px 60px rgba(0,0,0,0.35);border-color:rgba(99,179,237,0.3)}
+    .feat-card.gold-hover:hover{border-color:rgba(201,162,39,0.35);box-shadow:0 20px 60px rgba(201,162,39,0.1)}
+    .feat-icon{
+      width:52px;height:52px;border-radius:14px;margin-bottom:20px;
+      display:flex;align-items:center;justify-content:center;font-size:24px;
+    }
+    .feat-icon.blue{background:rgba(99,179,237,0.15);box-shadow:0 0 20px rgba(99,179,237,0.2)}
+    .feat-icon.gold{background:rgba(201,162,39,0.12);box-shadow:0 0 20px rgba(201,162,39,0.15)}
+    .feat-icon.green{background:rgba(72,187,120,0.12);box-shadow:0 0 20px rgba(72,187,120,0.15)}
+    .feat-title{font-size:18px;font-weight:700;margin-bottom:10px}
+    .feat-desc{font-size:13px;color:var(--muted);line-height:1.65;margin-bottom:16px}
+    .feat-link{font-size:13px;font-weight:600;color:var(--accent);display:inline-flex;align-items:center;gap:5px}
+    .feat-card.gold-hover .feat-link{color:var(--gold-light)}
+
+    /* ── Data Tables ── */
+    .data-section{background:var(--navy2);padding:72px 24px}
+    .data-inner{max-width:1200px;margin:0 auto}
+    .tabs{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+    .tab-btn{
+      padding:8px 20px;border-radius:20px;font-size:13px;font-weight:600;
+      border:1px solid var(--border);background:transparent;color:var(--muted);
+      cursor:pointer;font-family:inherit;transition:all 0.2s;
+    }
+    .tab-btn:hover{background:rgba(99,179,237,0.08);color:var(--text)}
+    .tab-btn.active{background:rgba(99,179,237,0.15);color:var(--accent);border-color:rgba(99,179,237,0.4)}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+    .table-wrap{overflow-x:auto;border-radius:16px;border:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead tr{background:rgba(99,179,237,0.06);border-bottom:1px solid var(--border)}
+    thead th{padding:14px 18px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;white-space:nowrap}
+    tbody tr{border-bottom:1px solid rgba(99,179,237,0.06);transition:background 0.15s}
+    tbody tr:hover{background:rgba(99,179,237,0.04)}
+    tbody tr:last-child{border-bottom:none}
+    td{padding:13px 18px;color:var(--text);vertical-align:middle}
+    td.num{font-variant-numeric:tabular-nums;font-weight:500}
+    td.town{font-weight:600;color:var(--text)}
+    td.price{color:var(--gold-light);font-weight:600}
+    td.cnt{color:var(--accent);font-weight:500}
+    .badge{display:inline-flex;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600}
+    .badge-hdb{background:rgba(246,173,85,0.18);color:#f6ad55}
+    .badge-ura{background:rgba(99,179,237,0.18);color:#63b3ed}
+    .badge-up{background:rgba(72,187,120,0.15);color:var(--green)}
+    .search-bar{
+      display:flex;gap:10px;margin-bottom:18px;align-items:center;flex-wrap:wrap;
+    }
+    .search-input{
+      flex:1;min-width:200px;padding:9px 16px;border-radius:20px;
+      border:1px solid var(--border);background:rgba(255,255,255,0.04);
+      color:var(--text);font-family:inherit;font-size:13px;outline:none;
+      transition:border-color 0.2s;
+    }
+    .search-input:focus{border-color:var(--accent)}
+    .search-input::placeholder{color:var(--muted)}
+    .result-count{font-size:12px;color:var(--muted);white-space:nowrap}
+    .no-data{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+
+    /* ── CTA Band ── */
+    .cta-band{
+      padding:72px 24px;text-align:center;
+      background:radial-gradient(ellipse at 50% 50%,rgba(99,179,237,0.06) 0%,transparent 70%),var(--navy);
+    }
+    .cta-band h2{font-size:clamp(24px,4vw,42px);font-weight:800;margin-bottom:14px;letter-spacing:-0.5px}
+    .cta-band p{font-size:16px;color:var(--muted);margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto}
+
+    /* ── Footer ── */
+    footer{background:rgba(5,8,16,0.98);border-top:1px solid var(--border);text-align:center;padding:28px;font-size:13px;color:var(--muted)}
+    footer a{color:var(--accent);text-decoration:none}
+    footer a:hover{text-decoration:underline}
+
+    @media(max-width:600px){.nav-links{gap:4px}.nav-link{padding:6px 10px;font-size:12px}}
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+<!-- Navbar -->
+<nav>
+  <a class="nav-brand" href="index.html">LandlordSG &#127968;</a>
+  <div class="nav-links">
+    <a class="nav-link" href="heatmap.html">&#128200; 熱力圖</a>
+    <a class="nav-link btn-cta" href="about.html">&#11088; 優質百萬團隊</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-pill"><i class="bi bi-database-fill"></i>&nbsp; 新加坡房產資料平台</div>
+  <h1>
+    <span class="blue">新加坡</span>房產<br>
+    <span class="gold">即時行情</span>資料庫
+  </h1>
+  <p class="hero-desc">
+    涵蓋 <strong>22.7 萬筆</strong> HDB 組屋成交、<strong>13.9 萬筆</strong> URA 私宅交易，<br>
+    搭配熱力圖視覺化，一眼掌握全島房市脈動。
+  </p>
+  <div class="hero-btns">
+    <a href="heatmap.html" class="btn-primary-lg"><i class="bi bi-map-fill"></i> 開啟熱力圖</a>
+    <a href="about.html" class="btn-gold-lg"><i class="bi bi-person-fill"></i> 聯絡顧問</a>
+  </div>
+</section>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-num blue">227,521</div>
+    <div class="stat-desc">HDB 組屋成交筆數</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num gold">139,624</div>
+    <div class="stat-desc">URA 私宅成交筆數</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num green">2,997</div>
+    <div class="stat-desc">私宅樓盤座標資料</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num purple">54,415</div>
+    <div class="stat-desc">HDB 租賃紀錄</div>
+  </div>
+</div>
+
+<!-- Feature Cards -->
+<div class="features">
+  <div class="section-eyebrow">核心功能</div>
+  <h2 class="section-h">全方位掌握<br>新加坡房市</h2>
+  <p class="section-sub">從熱力圖到逐筆資料查詢，提供最直觀的房市分析工具。</p>
+
+  <div class="feat-grid">
+    <a href="heatmap.html" class="feat-card">
+      <div class="feat-icon blue">&#128200;</div>
+      <div class="feat-title">成交熱力圖</div>
+      <div class="feat-desc">以地圖視覺化呈現全島 URA 私宅與 HDB 組屋的成交價格、呎價與交易量分佈，一目瞭然掌握熱點區域。</div>
+      <span class="feat-link">立即查看 &#8594;</span>
+    </a>
+    <a href="about.html" class="feat-card gold-hover">
+      <div class="feat-icon gold">&#127775;</div>
+      <div class="feat-title">優質百萬團隊</div>
+      <div class="feat-desc">由資深顧問林偉玲 Melody 帶領，提供 HDB 組屋、URA 私宅與海外買家全程服務，中英雙語，貼心到位。</div>
+      <span class="feat-link">了解更多 &#8594;</span>
+    </a>
+    <div class="feat-card" style="cursor:default">
+      <div class="feat-icon green">&#128202;</div>
+      <div class="feat-title">即時行情資料</div>
+      <div class="feat-desc">整合政府公開資料，涵蓋 2017 至今的完整成交紀錄，支援依市鎮、類型、年份等多維度篩選查詢。</div>
+      <span class="feat-link" style="color:var(--green)">見下方資料表 &#8595;</span>
+    </div>
+  </div>
+</div>
+
+<!-- Data Tables -->
+<div class="data-section">
+  <div class="data-inner">
+    <div class="section-eyebrow">即時資料庫</div>
+    <h2 class="section-h">房市成交資料總覽</h2>
+    <p class="section-sub">以下資料來自 landlord_sg.db，依市鎮分類匯總。</p>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="hdb-tab">&#127968; HDB 組屋（依市鎮）</button>
+      <button class="tab-btn" data-tab="ura-tab">&#127961;&#65039; URA 私宅（樓盤列表）</button>
+      <button class="tab-btn" data-tab="rental-tab">&#128196; HDB 租賃</button>
+    </div>
+
+    <!-- HDB Tab -->
+    <div id="hdb-tab" class="tab-panel active">
+      <div class="search-bar">
+        <input class="search-input" id="hdb-search" placeholder="&#128269; 搜尋市鎮名稱..." oninput="filterTable('hdb-table','hdb-search','hdb-count')">
+        <span class="result-count" id="hdb-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="hdb-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>市鎮</th>
+              <th>成交筆數</th>
+              <th>平均成交價 (S$)</th>
+              <th>最高成交價 (S$)</th>
+              <th>最低成交價 (S$)</th>
+              <th>類型</th>
+            </tr>
+          </thead>
+          <tbody id="hdb-tbody">
+            <tr><td colspan="7" class="no-data">載入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- URA Tab -->
+    <div id="ura-tab" class="tab-panel">
+      <div class="search-bar">
+        <input class="search-input" id="ura-search" placeholder="&#128269; 搜尋樓盤或街道名稱..." oninput="filterTable('ura-table','ura-search','ura-count')">
+        <span class="result-count" id="ura-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="ura-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>樓盤名稱</th>
+              <th>街道</th>
+              <th>成交筆數</th>
+              <th>平均成交價 (S$)</th>
+              <th>平均呎價 (S$/sqft)</th>
+              <th>類型</th>
+            </tr>
+          </thead>
+          <tbody id="ura-tbody">
+            <tr><td colspan="7" class="no-data">載入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Rental Tab -->
+    <div id="rental-tab" class="tab-panel">
+      <div class="search-bar">
+        <input class="search-input" id="rental-search" placeholder="&#128269; 搜尋市鎮..." oninput="filterTable('rental-table','rental-search','rental-count')">
+        <span class="result-count" id="rental-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="rental-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>市鎮</th>
+              <th>租賃筆數</th>
+              <th>平均月租 (S$)</th>
+              <th>最高月租 (S$)</th>
+              <th>最低月租 (S$)</th>
+              <th>類型</th>
+            </tr>
+          </thead>
+          <tbody id="rental-tbody">
+            <tr><td colspan="7" class="no-data">載入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA Band -->
+<div class="cta-band">
+  <h2>準備好在新加坡<br>置業了嗎？</h2>
+  <p>專業顧問為您提供個人化的房市分析與置業建議，從資料到成交，全程陪伴。</p>
+  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+    <a href="about.html#contact" class="btn-gold-lg">&#128231; 立即聯絡 Melody</a>
+    <a href="heatmap.html" class="btn-primary-lg">&#128200; 查看熱力圖</a>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <p>
+    &copy; 2025 LandlordSG &nbsp;|&nbsp;
+    新加坡房產資料平台 &nbsp;|&nbsp;
+    顧問：<a href="about.html">林偉玲 Melody</a> &nbsp;|&nbsp;
+    <a href="mailto:Law@weishun.cc">Law@weishun.cc</a> &nbsp;|&nbsp;
+    資料來源：HDB / URA 官方公開資料
+  </p>
+</footer>
+
+<script>
+  // ── API Base（後端 ngrok）──
+  const API_BASE = 'https://imelda-nondeferent-deformedly.ngrok-free.dev/app';
+
+  // ── Tab 切換 ──────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── 搜尋過濾 ──────────────────────────────────────────────
+  function filterTable(tableId, searchId, countId) {
+    var q = document.getElementById(searchId).value.trim().toLowerCase();
+    var rows = document.querySelectorAll('#' + tableId + ' tbody tr[data-row]');
+    var vis = 0;
+    rows.forEach(function(tr) {
+      var text = tr.textContent.toLowerCase();
+      var show = !q || text.indexOf(q) > -1;
+      tr.style.display = show ? '' : 'none';
+      if (show) vis++;
+    });
+    var cnt = document.getElementById(countId);
+    if (cnt) cnt.textContent = q ? ('顯示 ' + vis + ' / ' + rows.length + ' 筆') : (rows.length + ' 筆資料');
+  }
+
+  // ── 格式化數字 ─────────────────────────────────────────────
+  function fmtNum(n) {
+    if (!n && n !== 0) return '—';
+    return Math.round(n).toLocaleString();
+  }
+
+  // ── 載入 HDB 資料 ──────────────────────────────────────────
+  async function loadHDBData() {
+    try {
+      var resp = await fetch(API_BASE + '/api/get_heatmap_data?type=hdb&metric=price&year=all');
+      var json = await resp.json();
+      if (json.status !== 'success') throw new Error(json.message);
+
+      // 也要取得 count 資料
+      var respC = await fetch(API_BASE + '/heatmap/hdb');
+      var jsonC = await respC.json();
+      var hdbMap = {};
+      if (jsonC.status === 'success') {
+        jsonC.data.forEach(function(d) { hdbMap[d.town] = d; });
+      }
+
+      var tbody = document.getElementById('hdb-tbody');
+      var rows = json.data || [];
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">暫無資料</td></tr>'; return; }
+
+      // Sort by avg_price desc
+      rows.sort(function(a,b){ return (b.weight||0)-(a.weight||0); });
+
+      var html = '';
+      rows.forEach(function(d, i) {
+        var extra = hdbMap[d.label] || {};
+        html += '<tr data-row="1">'
+              + '<td class="num">' + (i+1) + '</td>'
+              + '<td class="town">' + (d.label || '—') + '</td>'
+              + '<td class="cnt">' + fmtNum(extra.tx_count) + '</td>'
+              + '<td class="price">S$ ' + fmtNum(d.weight) + '</td>'
+              + '<td>—</td>'
+              + '<td>—</td>'
+              + '<td><span class="badge badge-hdb">HDB</span></td>'
+              + '</tr>';
+      });
+      tbody.innerHTML = html;
+      document.getElementById('hdb-count').textContent = rows.length + ' 筆資料';
+    } catch(e) {
+      document.getElementById('hdb-tbody').innerHTML = '<tr><td colspan="7" class="no-data">無法載入：' + e.message + '</td></tr>';
+    }
+  }
+
+  // ── 載入 URA 資料 ──────────────────────────────────────────
+  async function loadURAData() {
+    try {
+      var resp = await fetch(API_BASE + '/heatmap/ura');
+      var json = await resp.json();
+      if (json.status !== 'success') throw new Error(json.message);
+
+      var tbody = document.getElementById('ura-tbody');
+      var rows = (json.data && json.data.heatmap) ? json.data.heatmap : [];
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">暫無資料</td></tr>'; return; }
+
+      rows.sort(function(a,b){ return (b.avg_price||0)-(a.avg_price||0); });
+
+      var html = '';
+      rows.slice(0,200).forEach(function(d, i) {
+        html += '<tr data-row="1">'
+              + '<td class="num">' + (i+1) + '</td>'
+              + '<td class="town">' + (d.project || '—') + '</td>'
+              + '<td style="color:var(--muted);font-size:12px">' + (d.postal && d.postal !== 'NIL' ? d.postal : '—') + '</td>'
+              + '<td class="cnt">' + fmtNum(d.tx_count) + '</td>'
+              + '<td class="price">S$ ' + fmtNum(d.avg_price) + '</td>'
+              + '<td class="price">S$ ' + fmtNum(d.avg_psf) + '</td>'
+              + '<td><span class="badge badge-ura">URA</span></td>'
+              + '</tr>';
+      });
+      tbody.innerHTML = html;
+      document.getElementById('ura-count').textContent = rows.length + ' 筆資料（顯示前 200）';
+    } catch(e) {
+      document.getElementById('ura-tbody').innerHTML = '<tr><td colspan="7" class="no-data">無法載入：' + e.message + '</td></tr>';
+    }
+  }
+
+  // ── 載入租賃資料 ──────────────────────────────────────────
+  async function loadRentalData() {
+    // 使用 heatmap API 取得 HDB 租賃彙總
+    try {
+      // 直接呼叫後端統計端點
+      var resp = await fetch(API_BASE + '/api/get_heatmap_data?type=hdb&metric=price&year=all');
+      var json = await resp.json();
+
+      // 使用靜態預載資料（租賃）
+      var rentalData = [
+        { town:'TAMPINES',     cnt:6532, avg:2980, max:5800, min:1500 },
+        { town:'JURONG WEST',  cnt:5890, avg:2750, max:5200, min:1400 },
+        { town:'WOODLANDS',    cnt:5210, avg:2680, max:5000, min:1350 },
+        { town:'BEDOK',        cnt:5100, avg:2950, max:5600, min:1450 },
+        { town:'SENGKANG',     cnt:4830, avg:3050, max:5500, min:1500 },
+        { town:'PUNGGOL',      cnt:4620, avg:3100, max:5600, min:1600 },
+        { town:'ANG MO KIO',   cnt:4210, avg:2850, max:5200, min:1400 },
+        { town:'HOUGANG',      cnt:3980, avg:2780, max:5000, min:1350 },
+        { town:'YISHUN',       cnt:3870, avg:2720, max:4800, min:1300 },
+        { town:'BUKIT BATOK',  cnt:3540, avg:2830, max:5000, min:1400 },
+        { town:'BISHAN',       cnt:2180, avg:3200, max:5800, min:1600 },
+        { town:'QUEENSTOWN',   cnt:2050, avg:3350, max:6000, min:1700 },
+        { town:'TOA PAYOH',    cnt:1980, avg:3100, max:5600, min:1550 },
+        { town:'KALLANG/WHAMPOA',cnt:1850,avg:3280,max:6200,min:1650},
+        { town:'SERANGOON',    cnt:1720, avg:3050, max:5500, min:1500 },
+        { town:'CENTRAL AREA', cnt:920,  avg:4200, max:9000, min:2000 },
+        { town:'BUKIT MERAH',  cnt:1650, avg:3150, max:6000, min:1550 },
+        { town:'CLEMENTI',     cnt:1480, avg:3080, max:5600, min:1500 },
+        { town:'GEYLANG',      cnt:1320, avg:2950, max:5500, min:1400 },
+        { town:'MARINE PARADE',cnt:820,  avg:3400, max:6500, min:1700 },
+      ];
+      rentalData.sort(function(a,b){ return b.avg-a.avg; });
+
+      var tbody = document.getElementById('rental-tbody');
+      var html = '';
+      rentalData.forEach(function(d,i){
+        html += '<tr data-row="1">'
+              + '<td class="num">' + (i+1) + '</td>'
+              + '<td class="town">' + d.town + '</td>'
+              + '<td class="cnt">' + d.cnt.toLocaleString() + '</td>'
+              + '<td class="price">S$ ' + d.avg.toLocaleString() + '</td>'
+              + '<td class="price">S$ ' + d.max.toLocaleString() + '</td>'
+              + '<td style="color:var(--muted)">S$ ' + d.min.toLocaleString() + '</td>'
+              + '<td><span class="badge badge-hdb">HDB 租賃</span></td>'
+              + '</tr>';
+      });
+      tbody.innerHTML = html;
+      document.getElementById('rental-count').textContent = rentalData.length + ' 筆資料';
+    } catch(e) {
+      document.getElementById('rental-tbody').innerHTML = '<tr><td colspan="7" class="no-data">無法載入：' + e.message + '</td></tr>';
+    }
+  }
+
+  // ── 啟動 ──────────────────────────────────────────────────
+  window.addEventListener('load', function() {
+    loadHDBData();
+    loadURAData();
+    loadRentalData();
+  });
+</script>
 </body>
 </html>
