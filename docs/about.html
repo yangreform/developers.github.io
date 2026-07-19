@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>優質百萬團隊 - 林偉玲 Melody · 新加坡房產顧問</title>
-  <meta name="description" content="林偉玲 Melody — 新加坡專業房產經紀人，提供 HDB 組屋與 URA 私宅交易服務，英語服務可用">
+  <title>優質百萬團隊 - 台灣小伶 Melody · 新加坡房產顧問</title>
+  <meta name="description" content="台灣小伶 Melody — 新加坡專業房產經紀人，提供 HDB 組屋與 URA 私宅交易服務，英語服務可用">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -177,7 +177,7 @@
 <!-- Hero -->
 <section class="hero">
   <div class="hero-badge"><i class="bi bi-award-fill"></i> 優質百萬成交團隊</div>
-  <img src="https://images.unsplash.com/photo-1589571894960-20bbe2828d0a?auto=format&fit=crop&w=400&q=80" class="hero-avatar" alt="林偉玲 Melody">
+  <img src="https://images.unsplash.com/photo-1589571894960-20bbe2828d0a?auto=format&fit=crop&w=400&q=80" class="hero-avatar" alt="台灣小伶 Melody">
   <h1>林偉玲 <span class="gold">Melody</span><br>Lin, Wei-ling</h1>
   <p class="hero-sub">專業新加坡房產顧問 · 協助您在獅城安居置業 · English Service Available</p>
   <div class="hero-cta">
@@ -310,7 +310,7 @@
 </div>
 
 <footer>
-  <p>&copy; 2025 林偉玲 Melody Lin, Wei-ling &nbsp;|&nbsp; 新加坡房產顧問 &nbsp;|&nbsp;
+  <p>&copy; 2026 台灣小伶 Melody Lin, Wei-ling &nbsp;|&nbsp; 新加坡房產顧問 &nbsp;|&nbsp;
   <a href="mailto:Law@weishun.cc">Law@weishun.cc</a> &nbsp;|&nbsp;
   <a href="heatmap.html">&#128200; 熱力圖</a> &nbsp;|&nbsp;
   <a href="index.html">&#127968; 首頁</a></p>
@@ -326,9 +326,29 @@
     var msg   = document.getElementById('form-msg').value.trim();
     if (!name || !email || !msg) return;
 
-    // 可串接後端 /leads API
-    // fetch(API_BASE + '/leads', { method:'POST', headers:{'Content-Type':'application/json'},
-    //   body: JSON.stringify({ phone: phone, building: name, price: 0 }) });
+    // ==========================================
+    // 🔗 串接 Google Form (背景隱藏送出)
+    // ==========================================
+    // 請替換下方的 URL 為您的 Google Form "formResponse" 連結
+    const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse';
+    
+    // 建立 FormData 並填入您的 entry ID (請至您的 Google 表單原始碼中尋找 "entry.xxxxx")
+    const formData = new FormData();
+    formData.append('entry.111111111', name);   // 替換為「姓名」的 entry ID
+    formData.append('entry.222222222', email);  // 替換為「Email」的 entry ID
+    formData.append('entry.333333333', phone);  // 替換為「電話」的 entry ID
+    formData.append('entry.444444444', msg);    // 替換為「訊息」的 entry ID
+
+    // 使用 no-cors 模式偷偷送出，不會跳轉頁面
+    fetch(GOOGLE_FORM_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: formData
+    }).then(() => {
+      console.log('Google Form submitted implicitly.');
+    }).catch(err => {
+      console.error('Form submission error:', err);
+    });
 
     document.getElementById('contact-form').style.opacity = '0.3';
     document.getElementById('form-success').style.display = 'block';
