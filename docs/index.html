@@ -290,13 +290,65 @@
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab-btn active" data-tab="hdb-tab">&#127968; HDB 組屋（依市鎮）</button>
-      <button class="tab-btn" data-tab="ura-tab">&#127961;&#65039; URA 私宅（樓盤列表）</button>
+      <button class="tab-btn active" data-tab="ura-tab">&#127961;&#65039; URA 私宅（樓盤列表）</button>
+      <button class="tab-btn" data-tab="hdb-tab">&#127968; HDB 組屋（依市鎮）</button>
       <button class="tab-btn" data-tab="rental-tab">&#128196; HDB 租賃</button>
     </div>
 
     <!-- HDB Tab -->
-    <div id="hdb-tab" class="tab-panel active">
+    <div id="ura-tab" class="tab-panel active">
+      <div class="search-bar">
+        <input class="search-input" id="ura-search" placeholder="&#128269; 搜尋樓盤或街道名稱..." oninput="filterTable('ura-table','ura-search','ura-count')">
+        <span class="result-count" id="ura-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="ura-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>樓盤名稱</th>
+              <th>郵遞區號</th>
+              <th>最新均價 (S$)</th>
+              <th>均呎價 (S$)</th>
+              <th>年均漲幅</th>
+              <th>3年後預估價 (S$)</th>
+              <th>數據期間</th>
+            </tr>
+          </thead>
+          <tbody id="ura-tbody">
+            <tr><td colspan="8" class="no-data">載入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Rental Tab -->
+    <div id="rental-tab" class="tab-panel active">
+      <div class="search-bar">
+        <input class="search-input" id="rental-search" placeholder="&#128269; 搜尋市鎮..." oninput="filterTable('rental-table','rental-search','rental-count')">
+        <span class="result-count" id="rental-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="rental-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>市鎮</th>
+              <th>租賃筆數</th>
+              <th>平均月租 (S$)</th>
+              <th>最高月租 (S$)</th>
+              <th>最低月租 (S$)</th>
+              <th>類型</th>
+            </tr>
+          </thead>
+          <tbody id="rental-tbody">
+            <tr><td colspan="7" class="no-data">載入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+    <div id="hdb-tab" class="tab-panel">
       <div class="search-bar">
         <input class="search-input" id="hdb-search" placeholder="&#128269; 搜尋市鎮名稱..." oninput="filterTable('hdb-table','hdb-search','hdb-count')">
         <span class="result-count" id="hdb-count"></span>
@@ -349,6 +401,31 @@
     </div>
 
     <!-- Rental Tab -->
+    <div id="rental-tab" class="tab-panel">
+      <div class="search-bar">
+        <input class="search-input" id="rental-search" placeholder="&#128269; 搜尋市鎮..." oninput="filterTable('rental-table','rental-search','rental-count')">
+        <span class="result-count" id="rental-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="rental-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>市鎮</th>
+              <th>租賃筆數</th>
+              <th>平均月租 (S$)</th>
+              <th>最高月租 (S$)</th>
+              <th>最低月租 (S$)</th>
+              <th>類型</th>
+            </tr>
+          </thead>
+          <tbody id="rental-tbody">
+            <tr><td colspan="7" class="no-data">載入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
     <div id="rental-tab" class="tab-panel">
       <div class="search-bar">
         <input class="search-input" id="rental-search" placeholder="&#128269; 搜尋市鎮..." oninput="filterTable('rental-table','rental-search','rental-count')">
@@ -706,10 +783,53 @@ window.addEventListener('load', function() {
       }
     }
 
-    let existingChart = Chart.getChart(ctx);
+    let existingChart = Chart.getChart('macroChart');
     if (existingChart) {
       existingChart.destroy();
     }
+
+    
+    // === Add CAGR Table ===
+    let cagrTable = document.getElementById('cagrTable');
+    if (!cagrTable) {
+      cagrTable = document.createElement('div');
+      cagrTable.id = 'cagrTable';
+      cagrTable.style.cssText = 'margin-top:15px; padding:15px; background:var(--navy); border-radius:8px; border:1px solid var(--border); overflow-x:auto;';
+      chartContainer.appendChild(cagrTable);
+    }
+    
+    function calcCagr(startVal, endVal, years) {
+      if(years <= 0 || !startVal) return '0.0%';
+      const rate = (Math.pow(endVal / startVal, 1 / years) - 1) * 100;
+      return (rate > 0 ? '+' : '') + rate.toFixed(1) + '%';
+    }
+    
+    const yearsDiff = eYear - sYear;
+    const ccrCagr = calcCagr(100.0, ccrData[ccrData.length-1], yearsDiff);
+    const rcrCagr = calcCagr(100.0, rcrData[rcrData.length-1], yearsDiff);
+    const ocrCagr = calcCagr(100.0, ocrData[ocrData.length-1], yearsDiff);
+    const fdCagr = calcCagr(100.0, fdData[fdData.length-1], yearsDiff);
+    const cpiCagr = calcCagr(100.0, cpiData[cpiData.length-1], yearsDiff);
+    
+    cagrTable.innerHTML = `
+      <h4 style="margin:0 0 10px 0; color:var(--text); font-size:14px;">區間平均年化複合增長率 (CAGR): ${sYear} ~ ${eYear}</h4>
+      <table style="width:100%; text-align:center; font-size:13px; border-collapse:collapse;">
+        <tr style="border-bottom:1px solid var(--border); color:var(--muted);">
+          <th style="padding:5px;">CCR (核心中央區)</th>
+          <th style="padding:5px;">RCR (中央區以外)</th>
+          <th style="padding:5px;">OCR (中央區外圍)</th>
+          <th style="padding:5px;">定存利率</th>
+          <th style="padding:5px;">通貨膨脹</th>
+        </tr>
+        <tr>
+          <td style="padding:8px; font-weight:bold; color:#a0aec0;">${ccrCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#f0c84a;">${rcrCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#9f7aea;">${ocrCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#63b3ed;">${fdCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#fc8181;">${cpiCagr}</td>
+        </tr>
+      </table>
+    `;
 
     macroChartInstance = new Chart(ctx, {
       type: 'line',

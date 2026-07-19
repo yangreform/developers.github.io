@@ -330,14 +330,14 @@
     // 🔗 串接 Google Form (背景隱藏送出)
     // ==========================================
     // 請替換下方的 URL 為您的 Google Form "formResponse" 連結
-    const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse';
+    const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfGbeQpRYOG_D2p9O77kjEDcu6OR8bo9Fby4etsG9PP5N2ltQ/formResponse';
     
     // 建立 FormData 並填入您的 entry ID (請至您的 Google 表單原始碼中尋找 "entry.xxxxx")
     const formData = new FormData();
-    formData.append('entry.111111111', name);   // 替換為「姓名」的 entry ID
-    formData.append('entry.222222222', email);  // 替換為「Email」的 entry ID
-    formData.append('entry.333333333', phone);  // 替換為「電話」的 entry ID
-    formData.append('entry.444444444', msg);    // 替換為「訊息」的 entry ID
+    formData.append('entry.388183165', name);   // 替換為「姓名」的 entry ID
+    formData.append('entry.1534663245', email);  // 替換為「Email」的 entry ID
+    formData.append('entry.1160830898', phone);  // 替換為「電話」的 entry ID
+    formData.append('entry.871062696', msg);    // 替換為「訊息」的 entry ID
 
     // 使用 no-cors 模式偷偷送出，不會跳轉頁面
     fetch(GOOGLE_FORM_URL, {
