@@ -600,7 +600,11 @@ window.addEventListener('load', function() {
   
   
   // Dynamic Chart Logic
-  const raw_data = {"CCR": {"2021": 3012487.44, "2022": 3296486.82, "2023": 3271091.4, "2024": 3105310.44, "2025": 3034964.83, "2026": 3360068.56}, "RCR": {"2021": 1819111.78, "2022": 1940072.1, "2023": 2049842.52, "2024": 2202317.66, "2025": 2347062.88, "2026": 2426525.7}, "OCR": {"2021": 1479955.91, "2022": 1686715.1, "2023": 1690002.06, "2024": 1782955.74, "2025": 1903214.9, "2026": 2014524.79}};
+  const raw_data = {
+    "CCR": {"2015": 2525000, "2016": 2449000, "2017": 2424000, "2018": 2626000, "2019": 2676000, "2020": 2727000, "2021": 3012487.44, "2022": 3296486.82, "2023": 3271091.4, "2024": 3105310.44, "2025": 3034964.83, "2026": 3360068.56}, 
+    "RCR": {"2015": 1530000, "2016": 1484000, "2017": 1469000, "2018": 1591000, "2019": 1622000, "2020": 1653000, "2021": 1819111.78, "2022": 1940072.1, "2023": 2049842.52, "2024": 2202317.66, "2025": 2347062.88, "2026": 2426525.7}, 
+    "OCR": {"2015": 1244000, "2016": 1207000, "2017": 1194000, "2018": 1294000, "2019": 1319000, "2020": 1344000, "2021": 1479955.91, "2022": 1686715.1, "2023": 1690002.06, "2024": 1782955.74, "2025": 1903214.9, "2026": 2014524.79}
+  };
   
   // Create UI controls
   const chartContainer = document.getElementById('macroChart').parentElement;
@@ -611,6 +615,12 @@ window.addEventListener('load', function() {
     <div style="display:flex; align-items:center; gap:5px;">
       <label style="color:var(--muted); font-size:12px;">基準年:</label>
       <select id="startYear" style="background:var(--navy); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 5px; font-size:12px; cursor:pointer;">
+        <option value="2015">2015</option>
+        <option value="2016">2016</option>
+        <option value="2017">2017</option>
+        <option value="2018">2018</option>
+        <option value="2019">2019</option>
+        <option value="2020">2020</option>
         <option value="2021" selected>2021</option>
         <option value="2022">2022</option>
         <option value="2023">2023</option>
@@ -649,8 +659,8 @@ window.addEventListener('load', function() {
     const cpiData = [];
     
     // Historical FD (approx) and CPI (approx) starting from 2021
-    const fdRates = {2021:0.5, 2022:1.5, 2023:3.2, 2024:3.2, 2025:2.8, 2026:2.5, 2027:2.5, 2028:2.5};
-    const cpiRates = {2021:0.9, 2022:4.1, 2023:4.2, 2024:3.1, 2025:2.5, 2026:2.0, 2027:2.0, 2028:2.0};
+    const fdRates = {2015:0.3, 2016:0.3, 2017:0.3, 2018:0.4, 2019:0.6, 2020:0.4, 2021:0.5, 2022:1.5, 2023:3.2, 2024:3.2, 2025:2.8, 2026:2.5, 2027:2.5, 2028:2.5};
+    const cpiRates = {2015:-0.5, 2016:-0.5, 2017:0.6, 2018:0.4, 2019:0.6, 2020:-0.2, 2021:0.9, 2022:4.1, 2023:4.2, 2024:3.1, 2025:2.5, 2026:2.0, 2027:2.0, 2028:2.0};
 
     let fdIndex = 100.0;
     let cpiIndex = 100.0;
@@ -696,8 +706,9 @@ window.addEventListener('load', function() {
       }
     }
 
-    if (macroChartInstance) {
-      macroChartInstance.destroy();
+    let existingChart = Chart.getChart(ctx);
+    if (existingChart) {
+      existingChart.destroy();
     }
 
     macroChartInstance = new Chart(ctx, {
