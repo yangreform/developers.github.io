@@ -4,6 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LandlordSG · 新加坡房產熱力圖</title>
+
+  <!-- PWA & Mobile Meta -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0e1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LandlordSG">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- SEO & Open Graph (Social Preview) -->
+  <meta name="description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。提供 HDB 與 URA 最新成交資料。">
+  <meta property="og:title" content="LandlordSG - 新加坡房產即時資料庫">
+  <meta property="og:description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。">
+  <meta property="og:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="LandlordSG - 新加坡房產即時資料庫">
+  <meta name="twitter:description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。">
+  <meta name="twitter:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
+
   <meta name="description" content="LandlordSG 新加坡房產成交熱力圖 — 即時視覺化 URA 私宅與 HDB 組屋的成交價格、呎價與交易量分佈" />
 
   <!-- Leaflet.js（免費地圖，無需 API Key） -->
@@ -463,5 +483,17 @@
   // ── 啟動 ─────────────────────────────────────────────────────
   window.addEventListener('load', initMap);
 </script>
+
+  <script>
+    // 註冊 PWA Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('ServiceWorker 註冊成功，範圍:', reg.scope))
+          .catch(err => console.log('ServiceWorker 註冊失敗:', err));
+      });
+    }
+  </script>
+
 </body>
 </html>

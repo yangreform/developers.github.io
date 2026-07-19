@@ -4,6 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LandlordSG · 新加坡房產資料平台</title>
+
+  <!-- PWA & Mobile Meta -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0e1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LandlordSG">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- SEO & Open Graph (Social Preview) -->
+  <meta name="description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。提供 HDB 與 URA 最新成交資料。">
+  <meta property="og:title" content="LandlordSG - 新加坡房產即時資料庫">
+  <meta property="og:description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。">
+  <meta property="og:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="LandlordSG - 新加坡房產即時資料庫">
+  <meta name="twitter:description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。">
+  <meta name="twitter:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
+
   <meta name="keywords" content="LANDED HOUSING DEVELOPMENT, NORMANTON PARK, PARC CLEMATIS, PARKTOWN RESIDENCE, TREASURE AT TAMPINES, SPRINGLEAF RESIDENCE, GRAND DUNMAN, CHUAN PARK, EMERALD OF KATONG, THE FLORENCE RESIDENCES, AURELLE OF TAMPINES, THE ORIE, THE RESERVE RESIDENCES, THE CONTINUUM, CANNINGHILL PIERS, SKYE AT HOLLAND, COPEN GRAND, TEMBUSU GRAND, LENTOR MODERN, ZYON GRAND, TENET, NORTH GAIA, RIVERFRONT RESIDENCES, LENTOR HILLS RESIDENCES, ONE MARINA GARDENS, COASTAL CABANA, OTTO PLACE, AFFINITY AT SERANGOON, IRWELL HILL RESIDENCES, LEEDON GREEN, AVENUE SOUTH RESIDENCE, SOL ACRES, PINERY RESIDENCES, PASIR RIS 8, NAVA GROVE, LENTOR MANSION, RIVELLE TAMPINES, PINETREE HILL, THE WATERGARDENS AT CANBERRA, LUMINA GRAND, NOVO PLACE, MIDWOOD, PARC GREENWICH, RIVER GREEN, LENTOR CENTRAL RESIDENCES, HILLOCK GREEN, PARC ESTA, PENRITH, SERANGOON GARDEN ESTATE, SENGKANG GRAND RESIDENCES, DAIRY FARM RESIDENCES, STIRLING RESIDENCES, KI RESIDENCES AT BROOKVALE, D'LEEDON, PICCADILLY GRAND, RIVER MODERN, PROMENADE PEAK, PROVENCE RESIDENCE, ONE PEARL BANK, HIGH PARK RESIDENCES, AMO RESIDENCE, THE BOTANY AT DAIRY FARM, KINGSFORD WATERBAY, ELTA, THE WOODLEIGH RESIDENCES, THE MYST, FABER RESIDENCE, THE TOPIARY, RIVIERE, JADESCAPE, ALTURA, SIMS URBAN OASIS, ONE BERNAM, J'DEN, REFLECTIONS AT KEPPEL BAY, PENROSE, LYNDENWOODS, HILLHAVEN, FORETT@BUKIT TIMAH, AMBER PARK, HYLL ON HOLLAND, CANBERRA CRESCENT RESIDENCES, CLAVON, THE AVENIR, LIV @ MB, BELLEWATERS, PARC RIVIERA, NORWOOD GRAND, THE MINTON, OLA, EIGHT RIVERSUITES, THE LAKEGARDEN RESIDENCES, THE LANDMARK, THE TRE VER, BLOOMSBURY RESIDENCES, PULLMAN RESIDENCES NEWTON, FOURTH AVENUE RESIDENCES, THE TERRACE, RESIDENTIAL APARTMENTS, THE VISIONAIRE">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <meta name="description" content="LandlordSG — 新加坡最完整的房產成交資料平台，涵蓋 HDB 組屋與 URA 私宅即時行情，附熱力圖視覺化分析">
@@ -216,13 +236,13 @@
     涵蓋 <strong>22.7 萬筆</strong> HDB 組屋成交、<strong>13.9 萬筆</strong> URA 私宅交易，<br>
     搭配熱力圖視覺化，一眼掌握全島房市脈動。
   </p>
-  <div class="hero-btns">
+  <!--div class="hero-btns">
     <a href="heatmap.html" class="btn-primary-lg"><i class="bi bi-map-fill"></i> 開啟熱力圖</a>
     <a href="about.html" class="btn-gold-lg"><i class="bi bi-person-fill"></i> 聯絡顧問</a>
-  </div>
+  </div-->
 </section>
 
-<!-- Stats Bar -->
+<!-- Stats Bar>
 <div class="stats-bar">
   <div class="stat-item">
     <div class="stat-num blue">227,521</div>
@@ -242,7 +262,6 @@
   </div>
 </div>
 
-<!-- Feature Cards -->
 <div class="features">
   <div class="section-eyebrow">核心功能</div>
   <h2 class="section-h">全方位掌握<br>新加坡房市</h2>
@@ -268,7 +287,7 @@
       <span class="feat-link" style="color:var(--green)">見下方資料表 &#8595;</span>
     </div>
   </div>
-</div>
+</div-->
 
 
 <!-- Macro Chart -->
@@ -951,6 +970,18 @@ window.addEventListener('load', function() {
   });
 });
 </script>
+
+
+  <script>
+    // 註冊 PWA Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('ServiceWorker 註冊成功，範圍:', reg.scope))
+          .catch(err => console.log('ServiceWorker 註冊失敗:', err));
+      });
+    }
+  </script>
 
 </body>
 </html>

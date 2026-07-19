@@ -4,6 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>優質百萬團隊 - 台灣小伶 Melody · 新加坡房產顧問</title>
+
+  <!-- PWA & Mobile Meta -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0e1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LandlordSG">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- SEO & Open Graph (Social Preview) -->
+  <meta name="description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。提供 HDB 與 URA 最新成交資料。">
+  <meta property="og:title" content="LandlordSG - 新加坡房產即時資料庫">
+  <meta property="og:description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。">
+  <meta property="og:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="LandlordSG - 新加坡房產即時資料庫">
+  <meta name="twitter:description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。">
+  <meta name="twitter:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
+
   <meta name="description" content="台灣小伶 Melody — 新加坡專業房產經紀人，提供 HDB 組屋與 URA 私宅交易服務，英語服務可用">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -178,7 +198,7 @@
 <section class="hero">
   <div class="hero-badge"><i class="bi bi-award-fill"></i> 優質百萬成交團隊</div>
   <img src="https://images.unsplash.com/photo-1589571894960-20bbe2828d0a?auto=format&fit=crop&w=400&q=80" class="hero-avatar" alt="台灣小伶 Melody">
-  <h1>林偉玲 <span class="gold">Melody</span><br>Lin, Wei-ling</h1>
+  <h1>台灣小伶 <span class="gold">Melody</span><br>Lin, Wei-ling</h1>
   <p class="hero-sub">專業新加坡房產顧問 · 協助您在獅城安居置業 · English Service Available</p>
   <div class="hero-cta">
     <a href="#contact" class="btn-gold"><i class="bi bi-envelope-fill"></i> 立即聯絡</a>
@@ -190,10 +210,10 @@
 <div style="background:var(--navy2)">
 <div class="section">
   <div class="section-title">關於我</div>
-  <h2 class="section-h2">超過十年新加坡<br>房地產實戰經驗</h2>
+  <!--h2 class="section-h2">超過十年新加坡<br>房地產實戰經驗</h2-->
   <p class="section-lead">專注於 HDB 組屋轉售、URA 私宅交易與海外投資者置業顧問，為每一位客戶提供精準的市場分析與全程貼心服務。</p>
 
-  <div class="stats-row">
+  <!--div class="stats-row">
     <div class="stat-card">
       <div class="stat-num">10+</div>
       <div class="stat-label">年資深經驗</div>
@@ -210,7 +230,7 @@
       <div class="stat-num">98%</div>
       <div class="stat-label">客戶滿意度</div>
     </div>
-  </div>
+  </div-->
 
   <div class="services-grid">
     <div class="service-card">
@@ -269,7 +289,7 @@
         <span class="contact-icon">&#127758;</span>
         <div>
           <div class="contact-label">服務語言</div>
-          <div class="contact-value">中文 · English · 台灣中文</div>
+          <div class="contact-value">中文 · English</div>
         </div>
       </div>
       <div class="contact-item">
@@ -359,5 +379,17 @@
     }, 4000);
   });
 </script>
+
+  <script>
+    // 註冊 PWA Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('ServiceWorker 註冊成功，範圍:', reg.scope))
+          .catch(err => console.log('ServiceWorker 註冊失敗:', err));
+      });
+    }
+  </script>
+
 </body>
 </html>
