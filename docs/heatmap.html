@@ -293,6 +293,16 @@
       renderHeatmap(currentData, json.metric);
       updateStats(currentData, json.metric);
       updateLegendLabel(json.metric);
+
+      // 如果 URL 中有 project 參數，自動縮放
+      const urlParams = new URLSearchParams(window.location.search);
+      const proj = urlParams.get('project');
+      if (proj && currentData.length) {
+         const target = currentData.find(d => d.label === proj);
+         if (target && target.lat && target.lng) {
+             map.setView([target.lat, target.lng], 16);
+         }
+      }
     } catch (err) {
       showToast('無法載入資料：' + err.message);
       console.error('[HeatmapError]', err);
@@ -311,10 +321,9 @@
 
     if (!data || !data.length) return;
 
-    // 計算最大值（正規化用）
-    var maxW = 0;
-    data.forEach(function(d) { if ((d.weight || 0) > maxW) maxW = d.weight; });
-    if (maxW === 0) maxW = 1;
+    // 計算 95% 分位數作為最大值（避免極端值導致整體顏色偏冷）
+    var weights = data.map(function(d){ return d.weight || 0; }).sort(function(a,b){return a-b;});
+    var maxW = weights[Math.floor(weights.length * 0.95)] || 1;
 
     // leaflet-heat 格式：[[lat, lng, intensity], ...]
     var heatPoints = [];
@@ -338,11 +347,28 @@
       }
     }).addTo(map);
 
-    // 建立透明 marker（用於 tooltip）
+    // 建立同比例熱度顏色圓點（並綁定 tooltip）
+    function getColor(intensity) {
+      if (intensity > 0.8) return '#ff0000';
+      if (intensity > 0.6) return '#ffff00';
+      if (intensity > 0.4) return '#00ff00';
+      if (intensity > 0.2) return '#00ffff';
+      return '#0000ff';
+    }
+
     data.forEach(function(d) {
       if (!d.lat || !d.lng) return;
-      var icon = L.divIcon({ className: '', html: '', iconSize: [20, 20] });
-      var m = L.marker([d.lat, d.lng], { icon: icon, opacity: 0 });
+      
+      var intensity = (d.weight || 0) / maxW;
+      if (intensity > 1) intensity = 1;
+
+      var m = L.circleMarker([d.lat, d.lng], {
+        radius: 4,
+        color: '#0a0e1a', // Dark border for contrast
+        fillColor: getColor(intensity),
+        fillOpacity: 0.8,
+        weight: 1
+      });
 
       var valText = '';
       if (metric === 'count')       valText = '交易量：' + Math.round(d.weight).toLocaleString() + ' 筆';
