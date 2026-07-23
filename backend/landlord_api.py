@@ -844,10 +844,12 @@ def get_ura_price_trend():
                 years_full = years_sorted   # 若只有 2026 資料，仍計算
 
             earliest_yr    = years_full[0]
-            latest_yr      = years_full[-1]
+            actual_latest_yr = years_full[-1]
             earliest_price = year_data[earliest_yr]
-            latest_price   = year_data[latest_yr]
+            latest_price   = year_data[actual_latest_yr]
 
+            # 依據使用者需求，不管最新交易是哪一年，永遠將結束年份設為今年 (CURRENT_YEAR)
+            latest_yr = CURRENT_YEAR
             n_years = latest_yr - earliest_yr
             if n_years <= 0 or earliest_price <= 0:
                 continue
@@ -866,8 +868,8 @@ def get_ura_price_trend():
             # 3年後預估價（以 latest_price 為起點，用 CAGR 推算）
             est_3yr = latest_price * math.pow(1 + cagr / 100, 3)
 
-            # 平均 PSF（最新年）
-            latest_psf = project_psf[proj].get(latest_yr, 0)
+            # 平均 PSF（最新交易年）
+            latest_psf = project_psf[proj].get(actual_latest_yr, 0)
 
             # 所有年度資料（供前端 sparkline）
             yearly = [{'year': y, 'avg_price': round(year_data[y])} for y in years_sorted]
