@@ -807,7 +807,7 @@ def get_ura_price_trend():
               AND t.area  > 0
               AND LENGTH(t.contractDate) = 4
             GROUP BY t.project, year
-            HAVING tx_count >= 2
+            HAVING tx_count >= 1
             ORDER BY t.project, year
         """)
         rows = cursor.fetchall()
@@ -827,7 +827,8 @@ def get_ura_price_trend():
             project_postal[proj]     = r['postal']
 
         # Step 3: 計算每個樓盤的 CAGR 及 3年預估價
-        CURRENT_YEAR = 2025   # 以 2025 為「當前」基準
+        import datetime
+        CURRENT_YEAR = datetime.date.today().year
         CAGR_MIN = -30.0      # 過濾異常（整幢收購/清盤等極端值）
         CAGR_MAX = +40.0
         results = []
@@ -859,7 +860,7 @@ def get_ura_price_trend():
             if cagr < CAGR_MIN or cagr > CAGR_MAX:
                 continue
             # 資料跨度太短（只有1年）不夠準確
-            if n_years < 2:
+            if n_years < 1:
                 continue
 
             # 3年後預估價（以 latest_price 為起點，用 CAGR 推算）
