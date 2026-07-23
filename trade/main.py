@@ -217,8 +217,46 @@ def webhook():
             trade = api.place_order(contract, order)
             logger.info(f"送信國內委託: {target_code} {action} {quantity}口")
             
-            # 🌟 修正了這裡的 SyntaxError，使用 f-string 將 trade 變數放入字串中
-            return jsonify({'status': 'success', 'message': f'這次有下單，狀態: {trade}'}), 200
+            # 等待 Shioaji 委託狀態更新 (IOC 單通常很快)
+            end_time = time.time() + 3
+            while trade.status.status.name in ['PendingSubmit', 'Submitted', 'PreSubmitted'] and time.time() < end_time:
+                time.sleep(0.1)
+
+            sj_status = trade.status.status.name
+            
+            # 從 deals 中計算成交量與均價
+            filled_qty = sum(d.quantity for d in trade.status.deals)
+            remain_qty = quantity - filled_qty
+            
+            if filled_qty > 0:
+                avg_price = sum(d.price * d.quantity for d in trade.status.deals) / filled_qty
+            else:
+                avg_price = 0.0
+
+            # ======== IOC 三種結果判斷 ========
+            if sj_status == 'Filled' or (filled_qty == quantity):
+                msg = f'全數成交 {filled_qty}口 @ {avg_price:.2f}'
+                result_status = 'success'
+            elif sj_status in ('Cancelled', 'Inactive', 'Failed') and filled_qty > 0:
+                msg = f'部分成交 {filled_qty}/{quantity}口 @ {avg_price:.2f}，剩餘{remain_qty}口因 IOC 取消'
+                result_status = 'partial'
+            else:
+                msg = f'完全未成交，狀態: {sj_status}'
+                result_status = 'cancelled'
+
+            logger.info(f"Shioaji 國內下單結果: {msg}")
+
+            # ======== 加入 message 欄位供 GAS 擷取 ========
+            return jsonify({
+                'status': result_status,
+                'shioaji': {
+                    'result': sj_status,
+                    'filled': filled_qty,
+                    'remaining': remain_qty,
+                    'avg_price': avg_price,
+                },
+                'message': f'這次有下單，{msg}'
+            }), 200
             
         except Exception as e:
             logger.error(f"國內下單發生異常: {e}")
@@ -233,38 +271,39 @@ def webhook():
             client_id = random.randint(100, 999) 
             ib.connect(IB_HOST, IB_PORT, clientId=client_id, timeout=10)
 
+            # 2. 建立合約別名轉換表 (Symbol Alias Mapping)
+            # 確保 Webhook 傳來的代號 (Key) 能對應到 IBKR 正確的 Symbol (Value)
+            # ⚠️ 必須在庫存檢查前先做轉換，否則 XC→YC 後查不到部位
+            alias_map = {
+                "MNG": "MHNG",   # 天然氣代碼為 NG
+                "XC": "YC"       # 玉米 mini 在 IBKR 的 symbol 為 YC
+            }
+            # 轉換代碼（後續查庫存、建合約都使用 actual_symbol）
+            actual_symbol = alias_map.get(symbol.upper(), symbol.upper())
+
             # ======== 1. 檢查特定商品與庫存狀況 ========
             CHECK_SYMBOLS = ['TMF','1OZ','MBT','MJY','M6E','MHNG','MHG','M2K','MES','MNQ']    #long only
             #CHECK_SYMBOLS = ['VXM']    #add
             if symbol in CHECK_SYMBOLS:
-                current_pos = get_current_position(ib, symbol)
-                logger.info(f"{symbol} 目前庫存口數: {current_pos}")
+                current_pos = get_current_position(ib, actual_symbol)
+                logger.info(f"{symbol}({actual_symbol}) 目前庫存口數: {current_pos}")
                 if action == 'BUY' and current_pos >= -1:
                     ib.disconnect()
                     return jsonify({'status': 'skip', 'message': '庫存為-1，這次不下單'}), 200
             CHECK_SYMBOLS = ['XC','MCL']    #long only
             if symbol in CHECK_SYMBOLS:
-                current_pos = get_current_position(ib, symbol)
-                logger.info(f"{symbol} 目前庫存口數: {current_pos}")
+                # XC 在 IBKR 實際 symbol 為 YC，需用 actual_symbol 查詢
+                current_pos = get_current_position(ib, actual_symbol)
+                logger.info(f"{symbol}({actual_symbol}) 目前庫存口數: {current_pos}")
                 if action == 'SELL' and current_pos <= 1:
                     ib.disconnect()
                     return jsonify({'status': 'skip', 'message': '庫存為+1，這次不下單'}), 200
             # ============================================
-
-            # 2. 建立合約 (自動化配置版)
-            # 1. 建立合約別名轉換表 (Symbol Alias Mapping)
-            # 確保 Webhook 傳來的代號 (Key) 能對應到 IBKR 正確的 Symbol (Value)
-            alias_map = {
-                "MNG": "MHNG",   # 天然氣代碼為 NG
-                "XC": "YC"
-            }
-            # 轉換代碼
-            actual_symbol = alias_map.get(symbol.upper(), symbol.upper())
             # 2. 建立合約
             # 定義各期貨商品的交易所對應表
             exchange_map = {
                 "MBT": "CME", "M2K": "CME", "MES": "CME", "MNQ": "CME", "M6E": "CME", "MJY": "CME",
-                "MHG": "COMEX", "1OZ": "COMEX",
+                "MHG": "COMEX", "1OZ": "COMEX", "MGC": "COMEX",
                 "MHNG": "NYMEX", "MCL": "NYMEX",
                 "MYM": "CBOT", "YC": "CBOT",
                 "VXM": "CFE"
@@ -276,7 +315,7 @@ def webhook():
                 # 預設對照表
                 mapping = {
                     "MBT": "202608", "VXM": "202608",
-                    "1OZ": "202608", "MHNG": "202609", "MNG": "202609", "MCL": "202609",
+                    "1OZ": "202608", "MGC": "202608", "MHNG": "202609", "MNG": "202609", "MCL": "202609",
                     "MNQ": "202609", "MES": "202609", "M2K": "202609", "M6E": "202609", "MJY": "202609", "MYM": "202609", "MHG": "202609", "YC": "202609"
                 }
                 
@@ -293,8 +332,8 @@ def webhook():
                 #if sym == "MHG":
                 #    return "202607" if act == "BUY" else "202609"
 
-                if sym == "MBT":
-                    return "202607" if act == "BUY" else "202608"
+                #if sym == "MBT":
+                #    return "202607" if act == "BUY" else "202608"
                 #if sym == "VXM":
                 #    return "202608" if act == "BUY" else "202607"
                 #if sym == "MHNG":
@@ -323,12 +362,27 @@ def webhook():
 
             # 4. 訂單邏輯
             is_rth = is_regular_trading_hours()
+
+            # CBOT 農產品期貨（YC=玉米）在美股正規時段外不支援 IOC MarketOrder，
+            # 需改用 GTC LimitOrder，避免被 PreSubmitted→Cancelled
+            CBOT_FUTURES = {'YC', 'MYM'}  # CBOT 交易所的期貨品種
             
             if is_future:
-                # 期貨一律用 MarketOrder
-                order = MarketOrder(action, quantity)
-                order.tif = 'IOC'
-                order.outsideRth = True
+                if not is_rth and actual_symbol in CBOT_FUTURES:
+                    # CBOT 盤外：改用 GTC 限價單（略偏掛單方向確保成交）
+                    if mkt_price and mkt_price > 0:
+                        lmt_price = round(mkt_price * (1.02 if action == 'BUY' else 0.98), 2)
+                        order = LimitOrder(action, quantity, lmt_price)
+                        order.tif = 'GTC'
+                        order.outsideRth = True
+                        logger.info(f"[CBOT盤外] 使用 GTC LimitOrder @ {lmt_price}")
+                    else:
+                        raise Exception(f"[CBOT盤外] 無法獲取市價，無法下單")
+                else:
+                    # 其他期貨（CME/NYMEX/COMEX/CFE）或盤中：用 IOC MarketOrder
+                    order = MarketOrder(action, quantity)
+                    order.tif = 'IOC'
+                    order.outsideRth = True
             else:
                 # 股票/其他邏輯
                 if is_rth:
@@ -350,11 +404,38 @@ def webhook():
             while not trade.isDone() and time.time() < end_time:
                 ib.sleep(0.5)
             
-            ib_status = trade.orderStatus.status
-            logger.info(f"IB 委託送出成功，狀態: {ib_status}")
-            
+            ib_status   = trade.orderStatus.status
+            filled_qty  = trade.orderStatus.filled      # 實際成交口數
+            remain_qty  = trade.orderStatus.remaining   # 未成交口數
+            avg_price   = trade.orderStatus.avgFillPrice
+
+            # ======== IOC 三種結果判斷 ========
+            # Filled          : 全數成交 ✅
+            # Cancelled + filled>0: IOC 部分成交（流動性不足，剩餘被取消）⚠️
+            # Cancelled + filled==0: 完全未成交（市場未開盤或無流動性）❌
+            if ib_status == 'Filled':
+                msg = f'全數成交 {filled_qty}口 @ {avg_price}'
+                result_status = 'success'
+            elif ib_status in ('Cancelled', 'Inactive') and filled_qty > 0:
+                msg = f'部分成交 {filled_qty}/{int(filled_qty + remain_qty)}口 @ {avg_price}，剩餘{remain_qty}口因 IOC 取消（流動性不足）'
+                result_status = 'partial'
+            else:
+                msg = f'完全未成交，狀態: {ib_status}（市場未開盤或流動性不足）'
+                result_status = 'cancelled'
+
+            logger.info(f"IB 下單結果: {msg}")
+
             # ======== 加入 message 欄位供 GAS 擷取 ========
-            return jsonify({'status': 'success','ib': {'result': ib_status},'message': f'這次有下單，狀態: {ib_status}'}), 200
+            return jsonify({
+                'status': result_status,
+                'ib': {
+                    'result': ib_status,
+                    'filled': filled_qty,
+                    'remaining': remain_qty,
+                    'avg_price': avg_price,
+                },
+                'message': f'這次有下單，{msg}',
+            }), 200
 
         except Exception as e:
             logger.error(f"IB 下單發生異常: {e}")

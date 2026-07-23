@@ -358,7 +358,7 @@ function renderGroup(g) {
     ${g.closed ? '<div class="muted">⏳ 未開盤，暫停對沖</div>' : ''}
     ${g.mute
       ? `<div class="row"><span class="muted">🔕 缺乏報價，安全鎖啟動</span></span></div>`
-      : `<div class="row"><span>目前 Δ ${fmt(g.total_delta,3)}</span><span>目前 θ ${fmt(g.total_theta,3)}</span><span>單邊估計點數 ${fmt(g.ref_points,0)}</span></div>`
+      : `<div class="row"><span>目前 Δ ${fmt(g.total_delta,3)}</span><span>目前 γ ${fmt(g.total_gamma,3)}</span><span>單邊估計點數 ${fmt(g.ref_points,0)}</span></div>`
     }
     ${renderPositions(g.positions)}
     <div class="form-row">
@@ -385,7 +385,6 @@ async function refresh() {
     let accHtml = "<h2>帳戶</h2>";
     accHtml += `<div class="row"><span>IB 淨值</span><span>${acc.net_liq ?? "-"}</span></div>`;
     accHtml += `<div class="row"><span>IB 可用金</span><span>${acc.avail ?? "-"}</span></div>`;
-    accHtml += `<div class="row"><span>全帳戶 θ 加總</span><span>${fmt(acc.total_theta, 2)}</span></div>`;
     if (shioaji && shioaji.equity !== undefined) {
       accHtml += `<div class="row"><span>永豐權益</span><span>${fmt(shioaji.equity,0)}</span></div>`;
       accHtml += `<div class="row"><span>永豐可出金</span><span>${fmt(shioaji.available,0)}</span></div>`;
@@ -1089,7 +1088,7 @@ def main():
                                 break
 
                 group_greeks = {
-                    k: {'delta': 0.0, 'gamma': 0.0, 'theta': 0.0, 'underlying_price': group_underlying[k]}
+                    k: {'delta': 0.0, 'gamma': 0.0, 'underlying_price': group_underlying[k]}
                     for k in HEDGE_CONFIG.keys()
                 }
 
@@ -1170,25 +1169,6 @@ def main():
                                             pos_delta = d * qty * micro_ratio
                                             pos_theta = t * qty * micro_ratio
                                             pos_gamma = g * qty * micro_ratio * 100.0
-                        else:
-                            if sec_type in ['FOP', 'OPT']:
-                                strike = float(item.get('strike', 0))
-                                opt_mkt_price = float(item['marketPrice'])
-                                option_contract = item.get('contract')
-                                contract_multiplier = float(item.get('multiplier', 1.0))
-                                
-                                if opt_mkt_price > 0 and strike > 0 and option_contract:
-                                    ib_greeks = get_ib_option_greeks(
-                                        ib_client=ib,
-                                        contract=option_contract,
-                                        wait_seconds=IB_GREEKS_WAIT_SECONDS,
-                                    )
-                                    if ib_greeks:
-                                        d, t, g, greek_source = ib_greeks
-                                        item['greek_source'] = greek_source
-                                        pos_delta = d * qty * contract_multiplier
-                                        pos_theta = t * qty * contract_multiplier
-                                        pos_gamma = g * qty * contract_multiplier
                     except Exception as e:
                         print(f"⚠️ Greek 計算失敗: {sym_disp}, error={e}")
 
@@ -1200,7 +1180,6 @@ def main():
                         grouped_data[my_group_name].append(item)
                         group_greeks[my_group_name]['delta'] += pos_delta
                         group_greeks[my_group_name]['gamma'] += pos_gamma
-                        group_greeks[my_group_name]['theta'] += pos_theta
                     else:
                         grouped_data['未分類(Other)'].append(item)
 
@@ -1256,7 +1235,7 @@ def main():
                             print(
                                 f"🎯 [{g_name}] 單邊估計={ref_points:.0f}點 "
                                 f"🎯上限={u_th:.2f}，下限={l_th:.2f} | "
-                                f"當前 {HEDGE_CONFIG[g_name]['hedge_sym']} Δ={group_greeks[g_name]['delta']:.2f} θ={group_greeks[g_name]['theta']:.2f}"
+                                f"當前 {HEDGE_CONFIG[g_name]['hedge_sym']} Δ={group_greeks[g_name]['delta']:.2f}"
                             )
 
                         dashboard_groups.append({
@@ -1264,7 +1243,6 @@ def main():
                             "hedge_sym": HEDGE_CONFIG[g_name]['hedge_sym'],
                             "total_delta": group_greeks[g_name]['delta'],
                             "total_gamma": group_greeks[g_name]['gamma'],
-                            "total_theta": group_greeks[g_name]['theta'],
                             "upper_threshold": HEDGE_CONFIG[g_name]['upper_threshold'],
                             "lower_threshold": HEDGE_CONFIG[g_name]['lower_threshold'],
                             "ref_points": ref_points,
@@ -1276,9 +1254,8 @@ def main():
                         dashboard_groups.append({
                             "name": g_name,
                             "hedge_sym": "-",
-                            "total_delta": sum(p['delta'] for p in group_positions_snapshot),
-                            "total_gamma": sum(p['gamma'] for p in group_positions_snapshot),
-                            "total_theta": sum(p['theta'] for p in group_positions_snapshot),
+                            "total_delta": 0.0,
+                            "total_gamma": 0.0,
                             "upper_threshold": None,
                             "lower_threshold": None,
                             "ref_points": None,
@@ -1338,7 +1315,6 @@ def main():
 
                     total_portfolio_delta_tmf = 0.0
                     total_portfolio_gamma_tmf = 0.0
-                    total_portfolio_theta_tmf = 0.0
                     tmf_mute_flag = False
 
                     if positions:
@@ -1350,8 +1326,6 @@ def main():
                             position_delta_tmf = 0.0
                             gamma = 0.0
                             position_gamma_tmf = 0.0
-                            theta = 0.0
-                            position_theta_tmf = 0.0
 
                             is_future = p.code.startswith(("TXF", "MTX", "TMF", "MXF"))
                             if is_future:
@@ -1385,10 +1359,8 @@ def main():
                                             ratio = 5.0
                                             position_delta_tmf = delta * qty * ratio
                                             position_gamma_tmf = gamma * qty * ratio * 100.0
-                                            position_theta_tmf = theta * qty * ratio
                                             total_portfolio_delta_tmf += position_delta_tmf
                                             total_portfolio_gamma_tmf += position_gamma_tmf
-                                            total_portfolio_theta_tmf += position_theta_tmf
                                         except Exception:
                                             delta = 0.0
                                     else:
@@ -1402,7 +1374,6 @@ def main():
                                 "pnl": format_price(p.pnl, 0),
                                 "Δ": f"{position_delta_tmf:.5f}",
                                 "γ": f"{position_gamma_tmf:.5f}",
-                                "θ": f"{position_theta_tmf:.5f}",
                             })
 
                         print(pd.DataFrame(df_list).to_string(index=False))
@@ -1422,7 +1393,7 @@ def main():
                             print(
                                 f"🎯 [台指(TMF)] 單邊門檻估計={tmf_ref_points:.0f}點 "
                                 f"🎯上限={u_th:.2f}，下限={l_th:.2f} "
-                                f"🎯當前 TMF Δ={total_portfolio_delta_tmf:.2f} θ={total_portfolio_theta_tmf:.2f}"
+                                f"🎯當前 TMF Δ={total_portfolio_delta_tmf:.2f}"
                             )
                             evaluate_and_trigger_hedge(
                                 group_name='台指(TMF)',
@@ -1442,7 +1413,6 @@ def main():
                             "hedge_sym": tmf_config['hedge_sym'],
                             "total_delta": total_portfolio_delta_tmf,
                             "total_gamma": total_portfolio_gamma_tmf,
-                            "total_theta": total_portfolio_theta_tmf,
                             "upper_threshold": u_th,
                             "lower_threshold": l_th,
                             "ref_points": tmf_ref_points,
@@ -1458,7 +1428,7 @@ def main():
                                     "pnl": d["pnl"],
                                     "total_value": None,
                                     "delta": float(d["Δ"]),
-                                    "theta": float(d["θ"]),
+                                    "theta": None,
                                     "gamma": float(d["γ"]),
                                     "expiry": "",
                                 }
@@ -1469,14 +1439,6 @@ def main():
                     print(f"⚠️ 永豐/台指區段略過: {e}")
 
             # --- 彙整並更新手機面板快照 ---
-            total_all_theta = 0.0
-            for g in dashboard_groups:
-                if g['name'] == '台指(TMF)':
-                    total_all_theta += g.get('total_theta', 0.0) / 32.5
-                else:
-                    total_all_theta += g.get('total_theta', 0.0)
-            dashboard_account["total_theta"] = total_all_theta
-            
             update_snapshot({
                 "updated_at": now_dt.strftime('%Y-%m-%d %H:%M:%S'),
                 "account": dashboard_account,
