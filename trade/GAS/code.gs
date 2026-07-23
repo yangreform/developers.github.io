@@ -1,3 +1,4 @@
+
 // ================= 設定區 =================
 const NGROK_URL = 'https://imelda-nondeferent-deformedly.ngrok-free.dev/webhook';
 const USER_ID = 'U974efcbaa3f4df1caff9b48e04a8d9e0'; 
@@ -6,7 +7,9 @@ const USER_ID = 'U974efcbaa3f4df1caff9b48e04a8d9e0';
 const LINE_TOKENS = [
   'QHYd/p7erDBwt5JSv1mGEbsEwrhSX0poQ5rY9PJATrm37zCVuIH+I7Wl8uioLdnn84wXTpnmAbbxcMSjAoYdl3M81naXFhHRL5rRbo+1LQL4kBmeYFHnmjf9N7KNkjLuICwt8jDTqNpTFrIzxACIsgdB04t89/1O/w1cDnyilFU=', 
   '9NrIGW3Faov9BVp4WzhJ61+ldqXtDJV2J7aC5NeE9+7x3MmuMUBfmVb4/g9Ww4Xtcp/IZbTsiFTKkYUHH7Og2Ks6Z+FCyl8nhTR3cHnSfSm2G4Hx1H7DzABdo2u77IOJobyH1oq8s3Frzh7bqJWElAdB04t89/1O/w1cDnyilFU=', 
-  'FCp+BYIkkZnMU35ByxHe3CG4lGDrKXw2zkM4Mc2naXrSUcdomGzOf10CbmgmkNeSckMvUMxJKutRqIuP4Jy9Wwi+vIADVPVG6dVFcWPwU1GDPMZBtkTeU6yD+d9kXF3CGs1KjaGdK+0kC+L5OQQJ7QdB04t89/1O/w1cDnyilFU='  
+  'FCp+BYIkkZnMU35ByxHe3CG4lGDrKXw2zkM4Mc2naXrSUcdomGzOf10CbmgmkNeSckMvUMxJKutRqIuP4Jy9Wwi+vIADVPVG6dVFcWPwU1GDPMZBtkTeU6yD+d9kXF3CGs1KjaGdK+0kC+L5OQQJ7QdB04t89/1O/w1cDnyilFU=',
+  'nalX/ax//FnaN+4m59acghkXKuAtvEQAJ3EWNVa+CpSn+uGlPLHh4uPJo/LugkTBN6VocHtSmY1fO5E4zDctZZUS8UoojlH+RWQjERWdZG+T0Nx8IdjQuvorb6vLKXtGon5WOnYFeDtOJM1aI/dWIQdB04t89/1O/w1cDnyilFU=',
+  'iYPqSdfErvsqSm99irxjTPNwURueqgMXnLX4VHNNnpOttsQL/nnJiSOTjdexFyinB5X5grVq4DTRhTmxzPTXICytgvrYQIhCDtK8qmBvJmF/HYF171+8dSE9xe/nmBMomBiRrYiJDejuL/PE6YWo2gdB04t89/1O/w1cDnyilFU='
 ];
 // ==========================================
 
@@ -51,8 +54,18 @@ function forwardToNgrok(payloadString) {
             responseData.message === "這次有下單，但下單失敗" ||
             responseData.message.startsWith("這次有下單，狀態:")) { // <=== ✨ 新增這一行
             
+            let symbolStr = "";
+            try {
+              let payloadObj = JSON.parse(payloadString);
+              if (payloadObj.symbol) {
+                symbolStr = payloadObj.symbol + " ";
+              }
+            } catch (e) {
+              // ignore
+            }
+            
             // 觸發條件，推播給 LINE (加入 \n 換行讓排版更好看)
-            sendPushMessage(`${responseData.message}\n\n原始訊號：\n${payloadString}`);
+            sendPushMessage(`${symbolStr}${responseData.message}\n\n原始訊號：\n${payloadString}`);
         }
       }
       return true;

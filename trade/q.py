@@ -340,7 +340,7 @@ function renderPositions(rows) {
       <td>${fmt(r.market_price, r.decimals ?? 2)}</td>
       <td class="${cls(r.pnl)}">${fmt(r.pnl,2)}</td>
       <td>${fmt(r.delta,4)}</td>
-      <td>${fmt(r.theta,4)}</td>
+      <td>${fmt(r.theta,0)}</td>
       <td>${fmt(r.gamma,4)}</td>
     </tr>`;
   }
@@ -358,7 +358,7 @@ function renderGroup(g) {
     ${g.closed ? '<div class="muted">⏳ 未開盤，暫停對沖</div>' : ''}
     ${g.mute
       ? `<div class="row"><span class="muted">🔕 缺乏報價，安全鎖啟動</span></span></div>`
-      : `<div class="row"><span>目前 Δ ${fmt(g.total_delta,3)}</span><span>目前 θ ${fmt(g.total_theta,3)}</span><span>單邊估計點數 ${fmt(g.ref_points,0)}</span></div>`
+      : `<div class="row"><span>目前 Δ ${fmt(g.total_delta,3)}</span><span>目前 θ ${fmt(g.total_theta,0)}</span><span>單邊估計點數 ${fmt(g.ref_points,0)}</span></div>`
     }
     ${renderPositions(g.positions)}
     <div class="form-row">
@@ -385,7 +385,7 @@ async function refresh() {
     let accHtml = "<h2>帳戶</h2>";
     accHtml += `<div class="row"><span>IB 淨值</span><span>${acc.net_liq ?? "-"}</span></div>`;
     accHtml += `<div class="row"><span>IB 可用金</span><span>${acc.avail ?? "-"}</span></div>`;
-    accHtml += `<div class="row"><span>全帳戶 θ 加總</span><span>${fmt(acc.total_theta, 2)}</span></div>`;
+    accHtml += `<div class="row"><span>全帳戶 θ 加總</span><span>${fmt(acc.total_theta, 0)}</span></div>`;
     if (shioaji && shioaji.equity !== undefined) {
       accHtml += `<div class="row"><span>永豐權益</span><span>${fmt(shioaji.equity,0)}</span></div>`;
       accHtml += `<div class="row"><span>永豐可出金</span><span>${fmt(shioaji.available,0)}</span></div>`;
@@ -1161,14 +1161,14 @@ def main():
                                             if S > 0 and future_price > 0:
                                                 future_notional = future_price * target_micro_mult
                                                 pos_delta = (d * qty * contract_multiplier * S) / future_notional
-                                                pos_theta = (t * qty * contract_multiplier * S) / future_notional
+                                                pos_theta = t * qty * contract_multiplier
                                                 pos_gamma = (g * qty * contract_multiplier * S) / future_notional * 100.0
                                             else:
                                                 group_mute_flag[my_group_name] = True
                                                 print(f"🎯 [{my_group_name}] 🔕 {sym_disp} 缺乏標的/對沖標的報價，安全鎖啟動！")
                                         else:
                                             pos_delta = d * qty * micro_ratio
-                                            pos_theta = t * qty * micro_ratio
+                                            pos_theta = t * qty * contract_multiplier
                                             pos_gamma = g * qty * micro_ratio * 100.0
                         else:
                             if sec_type in ['FOP', 'OPT']:
@@ -1193,7 +1193,7 @@ def main():
                         print(f"⚠️ Greek 計算失敗: {sym_disp}, error={e}")
 
                     item['disp_delta'] = f"{pos_delta:.5f}" if abs(pos_delta) > 0.00001 else "0.0000"
-                    item['disp_theta'] = f"{pos_theta:.5f}" if abs(pos_theta) > 0.00001 else "0.0000"
+                    item['disp_theta'] = f"{pos_theta:.0f}" if abs(pos_theta) > 0.00001 else "0"
                     item['disp_gamma'] = f"{pos_gamma:.5f}" if abs(pos_gamma) > 0.00001 else "0.0000"
 
                     if my_group_name:
@@ -1256,7 +1256,7 @@ def main():
                             print(
                                 f"🎯 [{g_name}] 單邊估計={ref_points:.0f}點 "
                                 f"🎯上限={u_th:.2f}，下限={l_th:.2f} | "
-                                f"當前 {HEDGE_CONFIG[g_name]['hedge_sym']} Δ={group_greeks[g_name]['delta']:.2f} θ={group_greeks[g_name]['theta']:.2f}"
+                                f"當前 {HEDGE_CONFIG[g_name]['hedge_sym']} Δ={group_greeks[g_name]['delta']:.2f} θ={group_greeks[g_name]['theta']:.0f}"
                             )
 
                         dashboard_groups.append({
@@ -1385,7 +1385,7 @@ def main():
                                             ratio = 5.0
                                             position_delta_tmf = delta * qty * ratio
                                             position_gamma_tmf = gamma * qty * ratio * 100.0
-                                            position_theta_tmf = theta * qty * ratio
+                                            position_theta_tmf = theta * qty * 50.0
                                             total_portfolio_delta_tmf += position_delta_tmf
                                             total_portfolio_gamma_tmf += position_gamma_tmf
                                             total_portfolio_theta_tmf += position_theta_tmf
@@ -1402,7 +1402,7 @@ def main():
                                 "pnl": format_price(p.pnl, 0),
                                 "Δ": f"{position_delta_tmf:.5f}",
                                 "γ": f"{position_gamma_tmf:.5f}",
-                                "θ": f"{position_theta_tmf:.5f}",
+                                "θ": f"{position_theta_tmf:.0f}",
                             })
 
                         print(pd.DataFrame(df_list).to_string(index=False))
@@ -1422,7 +1422,7 @@ def main():
                             print(
                                 f"🎯 [台指(TMF)] 單邊門檻估計={tmf_ref_points:.0f}點 "
                                 f"🎯上限={u_th:.2f}，下限={l_th:.2f} "
-                                f"🎯當前 TMF Δ={total_portfolio_delta_tmf:.2f} θ={total_portfolio_theta_tmf:.2f}"
+                                f"🎯當前 TMF Δ={total_portfolio_delta_tmf:.2f} θ={total_portfolio_theta_tmf:.0f}"
                             )
                             evaluate_and_trigger_hedge(
                                 group_name='台指(TMF)',
@@ -1471,9 +1471,7 @@ def main():
             # --- 彙整並更新手機面板快照 ---
             total_all_theta = 0.0
             for g in dashboard_groups:
-                if g['name'] == '台指(TMF)':
-                    total_all_theta += g.get('total_theta', 0.0) / 32.5
-                else:
+                if g['name'] != '台指(TMF)':
                     total_all_theta += g.get('total_theta', 0.0)
             dashboard_account["total_theta"] = total_all_theta
             

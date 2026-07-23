@@ -590,7 +590,7 @@
       var html = '';
       rows.forEach(function(d, i) {
         var extra = hdbMap[d.label] || {};
-        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick="window.location.href=\'heatmap.html?project=\' + encodeURIComponent(d.project)" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
+        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick=\"window.location.href=\'heatmap.html?project=" + encodeURIComponent(d.project || d.label || d.town || "") + "\'\" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
               + '<td class="num">' + (i+1) + '</td>'
               + '<td class="town">' + (d.label || '—') + '</td>'
               + '<td class="cnt">' + fmtNum(extra.tx_count) + '</td>'
@@ -646,7 +646,7 @@
         // 期間顯示
         var period = d.earliest_yr + '–' + d.latest_yr + ' (' + d.n_years + '年)';
 
-        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick="window.location.href=\'heatmap.html?project=\' + encodeURIComponent(d.project)" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
+        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick=\"window.location.href=\'heatmap.html?project=" + encodeURIComponent(d.project || d.label || d.town || "") + "\'\" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
               + '<td class="num">' + (i+1) + '</td>'
               + '<td class="town">' + (d.project || '—') + spark + '</td>'
               + '<td style="color:var(--muted);font-size:12px">' + (d.postal && d.postal !== 'NIL' ? d.postal : '—') + '</td>'
@@ -694,7 +694,7 @@
       var tbody = document.getElementById('rental-tbody');
       var html = '';
       rentalData.forEach(function(d,i){
-        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick="window.location.href=\'heatmap.html?project=\' + encodeURIComponent(d.project)" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
+        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick=\"window.location.href=\'heatmap.html?project=" + encodeURIComponent(d.project || d.label || d.town || "") + "\'\" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
               + '<td class="num">' + (i+1) + '</td>'
               + '<td class="town">' + d.town + '</td>'
               + '<td class="cnt">' + d.cnt.toLocaleString() + '</td>'
@@ -835,10 +835,9 @@ window.addEventListener('load', function() {
       }
     }
 
-    let existingChart = Chart.getChart('macroChart');
-    if (existingChart) {
-      existingChart.destroy();
-    }
+    if (macroChartInstance) {
+  macroChartInstance.destroy();
+}
 
     
     // === Add CAGR Table ===
