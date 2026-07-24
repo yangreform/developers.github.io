@@ -649,6 +649,7 @@
         html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick=\"window.location.href=\'heatmap.html?project=" + encodeURIComponent(d.project || d.label || d.town || "") + "\'\" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
               + '<td class="num">' + (i+1) + '</td>'
               + '<td class="town">' + (d.project || '—') + spark + '</td>'
+              + '<td style="color:var(--muted);font-size:12px">' + (d.developer || '—') + '</td>'
               + '<td style="color:var(--muted);font-size:12px">' + (d.postal && d.postal !== 'NIL' ? d.postal : '—') + '</td>'
               + '<td class="price">S$ ' + (d.latest_price ? d.latest_price.toLocaleString() : '—') + '</td>'
               + '<td style="color:var(--muted)">' + (d.latest_psf ? 'S$ ' + d.latest_psf.toFixed(0) : '—') + '</td>'

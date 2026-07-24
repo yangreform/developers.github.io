@@ -315,6 +315,10 @@ def get_ura_heatmap():
         conn = sqlite3.connect(DB_NAME)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
+        
+        # Ensure developers table exists so query doesn't crash before first sync
+        cursor.execute("CREATE TABLE IF NOT EXISTS ura_developers (project TEXT PRIMARY KEY, developer_name TEXT)")
+
         print("[DEBUG] 1. 资料库连线成功")
     except Exception as e:
         print(f"❌ [ERROR] 1. 资料库连线失败: {e}")
@@ -557,6 +561,10 @@ def get_heatmap_data():
         conn = sqlite3.connect(DB_NAME)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
+        
+        # Ensure developers table exists so query doesn't crash before first sync
+        cursor.execute("CREATE TABLE IF NOT EXISTS ura_developers (project TEXT PRIMARY KEY, developer_name TEXT)")
+
 
         results = []
 
@@ -708,6 +716,10 @@ def get_hdb_heatmap():
         conn = sqlite3.connect(DB_NAME)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
+        
+        # Ensure developers table exists so query doesn't crash before first sync
+        cursor.execute("CREATE TABLE IF NOT EXISTS ura_developers (project TEXT PRIMARY KEY, developer_name TEXT)")
+
 
         cursor.execute("""
             SELECT
@@ -790,6 +802,10 @@ def get_ura_price_trend():
         conn = sqlite3.connect(DB_NAME)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
+        
+        # Ensure developers table exists so query doesn't crash before first sync
+        cursor.execute("CREATE TABLE IF NOT EXISTS ura_developers (project TEXT PRIMARY KEY, developer_name TEXT)")
+
 
         # Step 1: 取每个楼盘各年度的平均成交价
         # contractDate 格式 MMYY (4位), 年份 = SUBSTR(contractDate,3,2)
@@ -797,12 +813,14 @@ def get_ura_price_trend():
             SELECT
                 t.project,
                 c.postal,
+                d.developer_name,
                 CAST('20' || SUBSTR(t.contractDate,3,2) AS INTEGER) AS year,
                 AVG(t.price) AS avg_price,
                 AVG(t.price / NULLIF(t.area * 10.7639, 0)) AS avg_psf,
                 COUNT(*) AS tx_count
             FROM ura_transactions t
             JOIN ura_coordinates c ON t.project = c.project
+            LEFT JOIN ura_developers d ON t.project = d.project
             WHERE t.price > 0
               AND t.area  > 0
               AND LENGTH(t.contractDate) = 4
@@ -817,6 +835,7 @@ def get_ura_price_trend():
         from collections import defaultdict
         project_years = defaultdict(dict)
         project_postal = {}
+        project_developer = {}
         project_psf    = defaultdict(dict)
 
         for r in rows:
@@ -825,6 +844,7 @@ def get_ura_price_trend():
             project_years[proj][yr]  = r['avg_price']
             project_psf[proj][yr]    = r['avg_psf'] if r['avg_psf'] else 0
             project_postal[proj]     = r['postal']
+            project_developer[proj]  = r['developer_name'] if r['developer_name'] else '—'
 
         # Step 3: 计算每个楼盘的 CAGR 及 3年预估价
         import datetime
@@ -877,6 +897,7 @@ def get_ura_price_trend():
             results.append({
                 'project':      proj,
                 'postal':       project_postal.get(proj, ''),
+                'developer':    project_developer.get(proj, '—'),
                 'earliest_yr':  earliest_yr,
                 'latest_yr':    latest_yr,
                 'earliest_price': round(earliest_price),

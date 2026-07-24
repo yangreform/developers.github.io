@@ -211,9 +211,47 @@ def fetch_ura_data():
             cursor.executemany("INSERT INTO ura_rentals (project, street, leaseDate, flat_type, rent, area) VALUES (?, ?, ?, ?, ?, ?)", rent_records)
             total_rents += len(rent_records)
         except Exception as e:
-            pass
-        time.sleep(1) 
+            print(f"   ⚠️ 解析季別 {ref} 失敗: {e}")
+            
+    print(f"✅ URA 出租資料下載完成！共存入 {total_rents} 筆。")
+
+    # 3. 開發商名稱 (Developer Sales)
+    print("\n🚀 [URA] 開始下載 開發商資料 (近3年)...")
+    months = []
+    dy = datetime.date.today().year
+    dm = datetime.date.today().month
+    for _ in range(36):
+        months.append(f"{dm:02d}{str(dy)[-2:]}")
+        dm -= 1
+        if dm == 0:
+            dm = 12
+            dy -= 1
+
+    cursor.execute("CREATE TABLE IF NOT EXISTS ura_developers (project TEXT PRIMARY KEY, developer_name TEXT)")
+    
+    total_devs = 0
+    for ref in months:
+        print(f"   ⏳ 正在下載開發商資料 (月份 {ref})...")
+        url = f"https://eservice.ura.gov.sg/uraDataService/invokeUraDS/v1?service=PMI_Resi_Developer_Sales&refPeriod={ref}"
+        res = requests.get(url, headers=headers)
+        if res.text.startswith('<'): continue
         
+        try:
+            data = res.json().get('Result', [])
+            dev_records = []
+            for project in data:
+                p_name = project.get('project', '')
+                d_name = project.get('developerName', '')
+                if p_name and d_name:
+                    dev_records.append((p_name, d_name))
+            
+            cursor.executemany("INSERT OR REPLACE INTO ura_developers (project, developer_name) VALUES (?, ?)", dev_records)
+            total_devs += len(dev_records)
+        except Exception as e:
+            pass
+            
+    print(f"✅ 開發商資料更新完成！")
+
     conn.commit()
     conn.close()
     print(f"✅ URA 出租資料下載完成！共存入 {total_rents} 筆。")
