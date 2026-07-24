@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LandlordSG · 新加坡房產熱力圖</title>
+  <title>LandlordSG · 新加坡房产热力图</title>
 
   <!-- PWA & Mobile Meta -->
   <link rel="manifest" href="manifest.json">
@@ -14,22 +14,22 @@
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- SEO & Open Graph (Social Preview) -->
-  <meta name="description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。提供 HDB 與 URA 最新成交資料。">
-  <meta property="og:title" content="LandlordSG - 新加坡房產即時資料庫">
-  <meta property="og:description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。">
+  <meta name="description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。提供 HDB 与 URA 最新成交资料。">
+  <meta property="og:title" content="LandlordSG - 新加坡房产即时资料库">
+  <meta property="og:description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。">
   <meta property="og:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="LandlordSG - 新加坡房產即時資料庫">
-  <meta name="twitter:description" content="全島私宅熱力圖與行情分析，掌握新加坡房市與宏觀指標趨勢。">
+  <meta name="twitter:title" content="LandlordSG - 新加坡房产即时资料库">
+  <meta name="twitter:description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。">
   <meta name="twitter:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
 
-  <meta name="description" content="LandlordSG 新加坡房產成交熱力圖 — 即時視覺化 URA 私宅與 HDB 組屋的成交價格、呎價與交易量分佈" />
+  <meta name="description" content="LandlordSG 新加坡房产成交热力图 — 即时视觉化 URA 私宅与 HDB 组屋的成交价格、呎价与交易量分布" />
 
-  <!-- Leaflet.js（免費地圖，無需 API Key） -->
+  <!-- Leaflet.js（免费地图，无需 API Key） -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- leaflet-heat 熱力圖插件 -->
+  <!-- leaflet-heat 热力图插件 -->
   <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
   <!-- Google Fonts -->
@@ -193,26 +193,26 @@
     <div class="logo-icon">&#127968;</div>
     <div>
       <div class="logo-text">LandlordSG</div>
-      <div class="logo-sub">新加坡房產熱力圖</div>
+      <div class="logo-sub">新加坡房产热力图</div>
     </div>
   </div>
   <div class="divider-v"></div>
 
   <div class="ctrl-group">
-    <div class="ctrl-label">資料類型</div>
+    <div class="ctrl-label">资料类型</div>
     <div class="btn-row" id="type-btns">
       <button class="btn-pill type-ura active" data-type="ura">&#127961;&#65039; URA 私宅</button>
-      <button class="btn-pill type-hdb" data-type="hdb">&#127968; HDB 組屋</button>
+      <button class="btn-pill type-hdb" data-type="hdb">&#127968; HDB 组屋</button>
       <button class="btn-pill type-all" data-type="all">&#128506;&#65039; 全部</button>
     </div>
   </div>
   <div class="divider-v"></div>
 
   <div class="ctrl-group">
-    <div class="ctrl-label">指標</div>
+    <div class="ctrl-label">指标</div>
     <div class="btn-row" id="metric-btns">
-      <button class="btn-pill active" data-metric="price">&#128176; 成交價</button>
-      <button class="btn-pill" data-metric="psf">&#128208; 呎價</button>
+      <button class="btn-pill active" data-metric="price">&#128176; 成交价</button>
+      <button class="btn-pill" data-metric="psf">&#128208; 呎价</button>
       <button class="btn-pill" data-metric="count">&#128202; 交易量</button>
     </div>
   </div>
@@ -235,10 +235,10 @@
 
   <div class="spacer"></div>
 
-  <a href="index.html" id="btn-back">&#8592; 首頁</a>
+  <a href="index.html" id="btn-back">&#8592; 首页</a>
 
   <button id="btn-refresh" onclick="loadHeatmap()">
-    <span id="refresh-icon">&#128260;</span> 更新地圖
+    <span id="refresh-icon">&#128260;</span> 更新地图
   </button>
 </div>
 
@@ -246,23 +246,23 @@
 
 <div id="loading">
   <div class="spinner"></div>
-  <div class="loading-text" id="loading-text">正在載入地圖...</div>
+  <div class="loading-text" id="loading-text">正在载入地图...</div>
 </div>
 
 <div id="stats-panel">
-  <div class="stats-title">&#128202; 資料統計</div>
-  <div class="stat-row"><span class="stat-key">資料筆數</span><span class="stat-val" id="stat-count">—</span></div>
+  <div class="stats-title">&#128202; 资料统计</div>
+  <div class="stat-row"><span class="stat-key">资料笔数</span><span class="stat-val" id="stat-count">—</span></div>
   <div class="stat-row"><span class="stat-key">URA 私宅</span><span class="stat-val ura" id="stat-ura">—</span></div>
-  <div class="stat-row"><span class="stat-key">HDB 組屋</span><span class="stat-val hdb" id="stat-hdb">—</span></div>
+  <div class="stat-row"><span class="stat-key">HDB 组屋</span><span class="stat-val hdb" id="stat-hdb">—</span></div>
   <div class="stat-row"><span class="stat-key">最高值</span><span class="stat-val" id="stat-max">—</span></div>
 </div>
 
 <div id="legend">
-  <div class="legend-title">熱度指標</div>
+  <div class="legend-title">热度指标</div>
   <div class="legend-gradient"></div>
   <div class="legend-labels">
     <span>低</span>
-    <span id="legend-metric-label">平均成交價</span>
+    <span id="legend-metric-label">平均成交价</span>
     <span>高</span>
   </div>
 </div>
@@ -270,7 +270,7 @@
 <div id="toast"></div>
 
 <script>
-  // ── API 網址（後端 ngrok / GCP）──────────────────────────────
+  // ── API 网址（后端 ngrok / GCP）──────────────────────────────
   const API_BASE = 'https://imelda-nondeferent-deformedly.ngrok-free.dev/app';
 
   let map, heatLayer;
@@ -278,7 +278,7 @@
   let currentData = [];
   let selType = 'ura', selMetric = 'price', selYear = 'all';
 
-  // ── 初始化 Leaflet 地圖 ─────────────────────────────────────
+  // ── 初始化 Leaflet 地图 ─────────────────────────────────────
   function initMap() {
     map = L.map('map', {
       center: [1.3521, 103.8198],
@@ -286,7 +286,7 @@
       zoomControl: true,
     });
 
-    // 深色地圖底圖（CartoDB Dark Matter，免費、無需 API Key）
+    // 深色地图底图（CartoDB Dark Matter，免费、无需 API Key）
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       subdomains: 'abcd',
@@ -297,9 +297,9 @@
     loadHeatmap();
   }
 
-  // ── 載入資料 ────────────────────────────────────────────────
+  // ── 载入资料 ────────────────────────────────────────────────
   async function loadHeatmap() {
-    showLoading('正在從伺服器取得資料...');
+    showLoading('正在从伺服器取得资料...');
     setRefreshDisabled(true);
     try {
       const url = API_BASE + '/api/get_heatmap_data?type=' + selType + '&metric=' + selMetric + '&year=' + selYear;
@@ -308,13 +308,13 @@
       });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const json = await resp.json();
-      if (json.status !== 'success') throw new Error(json.message || '伺服器錯誤');
+      if (json.status !== 'success') throw new Error(json.message || '伺服器错误');
       currentData = json.data || [];
       renderHeatmap(currentData, json.metric);
       updateStats(currentData, json.metric);
       updateLegendLabel(json.metric);
 
-      // 如果 URL 中有 project 參數，自動縮放
+      // 如果 URL 中有 project 参数，自动缩放
       const urlParams = new URLSearchParams(window.location.search);
       const proj = urlParams.get('project');
       if (proj && currentData.length) {
@@ -324,7 +324,7 @@
          }
       }
     } catch (err) {
-      showToast('無法載入資料：' + err.message);
+      showToast('无法载入资料：' + err.message);
       console.error('[HeatmapError]', err);
     } finally {
       hideLoading();
@@ -332,16 +332,16 @@
     }
   }
 
-  // ── 渲染熱力圖 ──────────────────────────────────────────────
+  // ── 渲染热力图 ──────────────────────────────────────────────
   function renderHeatmap(data, metric) {
-    // 移除舊 heatLayer 和 markers
+    // 移除旧 heatLayer 和 markers
     if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
     markers.forEach(function(m) { map.removeLayer(m); });
     markers = [];
 
     if (!data || !data.length) return;
 
-    // 計算 95% 分位數作為最大值（避免極端值導致整體顏色偏冷）
+    // 计算 95% 分位数作为最大值（避免极端值导致整体颜色偏冷）
     var weights = data.map(function(d){ return d.weight || 0; }).sort(function(a,b){return a-b;});
     var maxW = weights[Math.floor(weights.length * 0.95)] || 1;
 
@@ -367,7 +367,7 @@
       }
     }).addTo(map);
 
-    // 建立同比例熱度顏色圓點（並綁定 tooltip）
+    // 建立同比例热度颜色圆点（并绑定 tooltip）
     function getColor(intensity) {
       if (intensity > 0.8) return '#ff0000';
       if (intensity > 0.6) return '#ffff00';
@@ -391,12 +391,12 @@
       });
 
       var valText = '';
-      if (metric === 'count')       valText = '交易量：' + Math.round(d.weight).toLocaleString() + ' 筆';
-      else if (metric === 'psf')    valText = '平均呎價：S$ ' + Math.round(d.weight).toLocaleString();
-      else                          valText = '平均成交價：S$ ' + Math.round(d.weight).toLocaleString();
+      if (metric === 'count')       valText = '交易量：' + Math.round(d.weight).toLocaleString() + ' 笔';
+      else if (metric === 'psf')    valText = '平均呎价：S$ ' + Math.round(d.weight).toLocaleString();
+      else                          valText = '平均成交价：S$ ' + Math.round(d.weight).toLocaleString();
 
       var badgeClass = d.source === 'ura' ? 'badge-ura' : 'badge-hdb';
-      var badgeText  = d.source === 'ura' ? 'URA 私宅' : 'HDB 組屋';
+      var badgeText  = d.source === 'ura' ? 'URA 私宅' : 'HDB 组屋';
       var html = '<div class="tip-name">' + (d.label || '') + '</div>'
                + '<span class="tip-badge ' + badgeClass + '">' + badgeText + '</span><br>'
                + '<div class="tip-val">' + valText + '</div>';
@@ -411,7 +411,7 @@
       markers.push(m);
     });
 
-    // 縮放時調整 radius
+    // 缩放时调整 radius
     map.on('zoomend', function() {
       if (!heatLayer) return;
       var z = map.getZoom();
@@ -420,7 +420,7 @@
     });
   }
 
-  // ── 統計資訊 ────────────────────────────────────────────────
+  // ── 统计资讯 ────────────────────────────────────────────────
   function updateStats(data, metric) {
     var uraCount = 0, hdbCount = 0, maxW = 0;
     data.forEach(function(d) {
@@ -432,19 +432,19 @@
     document.getElementById('stat-ura').textContent   = uraCount;
     document.getElementById('stat-hdb').textContent   = hdbCount;
     var maxLabel = (metric === 'count')
-      ? Math.round(maxW).toLocaleString() + ' 筆'
+      ? Math.round(maxW).toLocaleString() + ' 笔'
       : 'S$ ' + Math.round(maxW).toLocaleString();
     document.getElementById('stat-max').textContent = maxLabel;
   }
 
   function updateLegendLabel(metric) {
-    var labels = { price: '平均成交價', psf: '平均呎價(PSF)', count: '交易筆數' };
+    var labels = { price: '平均成交价', psf: '平均呎价(PSF)', count: '交易笔数' };
     document.getElementById('legend-metric-label').textContent = labels[metric] || metric;
   }
 
   // ── UI 控制 ──────────────────────────────────────────────────
   function showLoading(msg) {
-    document.getElementById('loading-text').textContent = msg || '載入中...';
+    document.getElementById('loading-text').textContent = msg || '载入中...';
     document.getElementById('loading').classList.remove('hidden');
   }
   function hideLoading() {
@@ -461,7 +461,7 @@
     setTimeout(function() { t.classList.remove('show'); }, 4000);
   }
 
-  // ── 按鈕事件 ─────────────────────────────────────────────────
+  // ── 按钮事件 ─────────────────────────────────────────────────
   document.querySelectorAll('#type-btns .btn-pill').forEach(function(btn) {
     btn.addEventListener('click', function() {
       document.querySelectorAll('#type-btns .btn-pill').forEach(function(b) { b.classList.remove('active'); });
@@ -480,17 +480,17 @@
     selYear = e.target.value;
   });
 
-  // ── 啟動 ─────────────────────────────────────────────────────
+  // ── 启动 ─────────────────────────────────────────────────────
   window.addEventListener('load', initMap);
 </script>
 
   <script>
-    // 註冊 PWA Service Worker
+    // 注册 PWA Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js')
-          .then(reg => console.log('ServiceWorker 註冊成功，範圍:', reg.scope))
-          .catch(err => console.log('ServiceWorker 註冊失敗:', err));
+          .then(reg => console.log('ServiceWorker 注册成功，范围:', reg.scope))
+          .catch(err => console.log('ServiceWorker 注册失败:', err));
       });
     }
   </script>

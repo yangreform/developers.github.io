@@ -1,4 +1,5 @@
 
+
 // ================= 設定區 =================
 const NGROK_URL = 'https://imelda-nondeferent-deformedly.ngrok-free.dev/webhook';
 const USER_ID = 'U974efcbaa3f4df1caff9b48e04a8d9e0'; 
@@ -51,8 +52,7 @@ function forwardToNgrok(payloadString) {
       if (responseData.message) {
         if (responseData.message === "庫存為+1，這次不下單" || 
             responseData.message === "庫存為-1，這次不下單" || 
-            responseData.message === "這次有下單，但下單失敗" ||
-            responseData.message.startsWith("這次有下單，狀態:")) { // <=== ✨ 新增這一行
+            responseData.message.startsWith("這次有下單")) {
             
             let symbolStr = "";
             try {
@@ -153,3 +153,8 @@ function sendPushMessage(messageText) {
   }
   return false;
 }
+
+function test() {
+  sendPushMessage("jacky")
+}
+

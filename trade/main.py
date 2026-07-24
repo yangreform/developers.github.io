@@ -352,10 +352,12 @@ def webhook():
             
             ib.qualifyContracts(contract)
 
+            # 獲取合約的最小跳動點 (minTick) 以避免報價不符規範 (Warning 110)
+            details = ib.reqContractDetails(contract)
+            min_tick = details[0].minTick if details and getattr(details[0], 'minTick', 0) > 0 else 0.01
+
             # 3. 獲取市價
             mkt_price = float(tv_price)
-
-
 
             # 使用 isinstance 檢查 contract 是 Future 還是 Stock，這比依賴變數更安全
             is_future = isinstance(contract, Future)
@@ -363,44 +365,43 @@ def webhook():
             # 4. 訂單邏輯
             is_rth = is_regular_trading_hours()
 
-            # CBOT 農產品期貨（YC=玉米）在美股正規時段外不支援 IOC MarketOrder，
-            # 需改用 GTC LimitOrder，避免被 PreSubmitted→Cancelled
+            if not mkt_price or mkt_price <= 0:
+                raise Exception("無法獲取市價，無法計算 Adaptive Algo 的限價天花板")
+
+            # 統一計算限價天花板 (買單 +1%，賣單 -1%)，並根據 minTick 四捨五入
+            raw_limit_price = mkt_price * (1.01 if action == 'BUY' else 0.99)
+            limit_price = round(round(raw_limit_price / min_tick) * min_tick, 5)
+
+            # 建立限價單
+            order = LimitOrder(action, quantity, limit_price)
+            order.outsideRth = True
+
+            # 🌟 2. 掛上 IBKR Adaptive Algo 外掛 (魔法在這裡)
+            # ==========================================
+            order.algoStrategy = 'Adaptive'
+            order.algoParams = [TagValue('adaptivePriority', 'Normal')]
+
+            # CBOT 農產品期貨（YC=玉米）在美股正規時段外
             CBOT_FUTURES = {'YC', 'MYM'}  # CBOT 交易所的期貨品種
             
             if is_future:
                 if not is_rth and actual_symbol in CBOT_FUTURES:
-                    # CBOT 盤外：改用 GTC 限價單（略偏掛單方向確保成交）
-                    if mkt_price and mkt_price > 0:
-                        lmt_price = round(mkt_price * (1.02 if action == 'BUY' else 0.98), 2)
-                        order = LimitOrder(action, quantity, lmt_price)
-                        order.tif = 'GTC'
-                        order.outsideRth = True
-                        logger.info(f"[CBOT盤外] 使用 GTC LimitOrder @ {lmt_price}")
-                    else:
-                        raise Exception(f"[CBOT盤外] 無法獲取市價，無法下單")
+                    order.tif = 'GTC'
+                    logger.info(f"[CBOT盤外] 使用 GTC LimitOrder @ {limit_price}")
                 else:
-                    # 其他期貨（CME/NYMEX/COMEX/CFE）或盤中：用 IOC MarketOrder
-                    order = MarketOrder(action, quantity)
-                    order.tif = 'IOC'
-                    order.outsideRth = True
+                    # Adaptive Algo 不適合 IOC，改用 GTC
+                    order.tif = 'GTC'
             else:
                 # 股票/其他邏輯
                 if is_rth:
-                    order = MarketOrder(action, quantity)
                     order.tif = 'DAY'
                 else:
-                    if mkt_price and mkt_price > 0:
-                        lmt_price = round(mkt_price * (1.05 if action == 'BUY' else 0.95), 2) 
-                        order = LimitOrder(action, quantity, lmt_price)
-                        order.tif = 'GTC'
-                        order.outsideRth = True
-                    else:
-                        raise Exception("無法獲取市價，盤後無法下單")
+                    order.tif = 'GTC'
 
             # 5. 執行與確認
             trade = ib.placeOrder(contract, order)
             
-            end_time = time.time() + 3
+            end_time = time.time() + 15  # Adaptive Algo 需要較多時間，延長至 5 秒
             while not trade.isDone() and time.time() < end_time:
                 ib.sleep(0.5)
             
@@ -409,18 +410,27 @@ def webhook():
             remain_qty  = trade.orderStatus.remaining   # 未成交口數
             avg_price   = trade.orderStatus.avgFillPrice
 
-            # ======== IOC 三種結果判斷 ========
-            # Filled          : 全數成交 ✅
-            # Cancelled + filled>0: IOC 部分成交（流動性不足，剩餘被取消）⚠️
-            # Cancelled + filled==0: 完全未成交（市場未開盤或無流動性）❌
+            # ======== 委託結果判斷 ========
+            error_msg = ""
+            for log_entry in trade.log:
+                if getattr(log_entry, 'errorCode', 0) != 0 or 'Error' in getattr(log_entry, 'message', '') or 'rejected' in getattr(log_entry, 'message', '').lower():
+                    error_msg = getattr(log_entry, 'message', '').replace('<br>', ' ')
+                    break
+
             if ib_status == 'Filled':
                 msg = f'全數成交 {filled_qty}口 @ {avg_price}'
                 result_status = 'success'
+            elif ib_status in ('Submitted', 'PreSubmitted'):
+                msg = f'委託運作中 (Adaptive Algo)，目前狀態: {ib_status}，已成交 {filled_qty}口'
+                result_status = 'submitted'
             elif ib_status in ('Cancelled', 'Inactive') and filled_qty > 0:
-                msg = f'部分成交 {filled_qty}/{int(filled_qty + remain_qty)}口 @ {avg_price}，剩餘{remain_qty}口因 IOC 取消（流動性不足）'
+                msg = f'部分成交 {filled_qty}/{int(filled_qty + remain_qty)}口 @ {avg_price}，剩餘{remain_qty}口因故取消'
                 result_status = 'partial'
             else:
-                msg = f'完全未成交，狀態: {ib_status}（市場未開盤或流動性不足）'
+                if error_msg:
+                    msg = f'完全未成交，發生錯誤: {error_msg}'
+                else:
+                    msg = f'完全未成交，狀態: {ib_status}（市場未開盤或流動性不足）'
                 result_status = 'cancelled'
 
             logger.info(f"IB 下單結果: {msg}")
