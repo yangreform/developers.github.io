@@ -68,7 +68,7 @@ def fetch_hdb_data(resource_id, table_name, columns):
     cursor = conn.cursor()
     
     offset = 0
-    limit = 30000 # 每次抓 3 萬筆
+    limit = 5000 # 每次抓 5000 筆，避免 HTTP 413
     total_inserted = 0
     
     while True:
