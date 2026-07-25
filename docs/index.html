@@ -326,12 +326,13 @@
             <tr>
               <th>#</th>
               <th>楼盘名称</th>
+            <th style="width:120px; text-align:left">开发商</th>
               <th>邮递区号</th>
               <th>最新均价 (S$)</th>
               <th>均呎价 (S$)</th>
               <th>年均涨幅</th>
               <th>3年后预估价 (S$)</th>
-              <th>数据期间</th>
+              <th>数据开始年份</th>
             </tr>
           </thead>
           <tbody id="ura-tbody">
@@ -404,12 +405,13 @@
             <tr>
               <th>#</th>
               <th>楼盘名称</th>
+            <th style="width:120px; text-align:left">开发商</th>
               <th>邮递区号</th>
               <th>最新均价 (S$)</th>
               <th>均呎价 (S$)</th>
               <th>年均涨幅</th>
               <th>3年后预估价 (S$)</th>
-              <th>数据期间</th>
+              <th>数据开始年份</th>
             </tr>
           </thead>
           <tbody id="ura-tbody">
@@ -644,7 +646,7 @@
         }
 
         // 期间显示
-        var period = d.earliest_yr + '–' + d.latest_yr + ' (' + d.n_years + '年)';
+        var period = d.earliest_yr + ' (' + d.n_years + '年)';
 
         html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick=\"window.location.href=\'heatmap.html?project=" + encodeURIComponent(d.project || d.label || d.town || "") + "\'\" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
               + '<td class="num">' + (i+1) + '</td>'
