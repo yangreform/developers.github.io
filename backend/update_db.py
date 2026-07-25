@@ -241,7 +241,7 @@ def fetch_ura_data():
             dev_records = []
             for project in data:
                 p_name = project.get('project', '')
-                d_name = project.get('developerName', '')
+                d_name = project.get('developer', '')
                 if p_name and d_name:
                     dev_records.append((p_name, d_name))
             
