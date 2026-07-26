@@ -160,6 +160,20 @@ def main():
                 # Broaden next button search
                 valid_next = None
                 
+                # Method 0: URA specific custom pagination (.panel-heading a:has(.glyphicon-triangle-right))
+                if not valid_next:
+                    try:
+                        btns = driver.find_elements(By.XPATH, "//div[contains(@class, 'panel-heading')]//a[.//span[contains(@class, 'glyphicon-triangle-right')]]")
+                        for btn in btns:
+                            try: parent = btn.find_element(By.XPATH, '..')
+                            except: parent = None
+                            
+                            p_class = parent.get_attribute('class') if parent else ''
+                            if 'disabled' not in p_class and 'disabled' not in (btn.get_attribute('class') or ''):
+                                valid_next = btn
+                                break
+                    except: pass
+                
                 # Method 1: DataTables generic _next ID
                 try:
                     btn = driver.find_element(By.XPATH, "//*[contains(@id, '_next')]")
