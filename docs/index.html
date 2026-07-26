@@ -858,7 +858,7 @@ window.addEventListener('load', function() {
         var cagrColor = d.avg_cagr >= 0 ? 'color-up' : 'color-down';
         var cagrArrow = d.avg_cagr >= 0 ? '&#9650;' : '&#9660;';
         
-        html += '<tr style="cursor:pointer; transition: background 0.2s;" onclick="showDevProjects(\'' + d.developer.replace(/'/g, "\\'") + '\')" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">';
+        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick="showDevProjects(\'' + d.developer.replace(/'/g, "\\'") + '\')" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">';
         html += '<td>' + (index + 1) + '</td>';
         html += '<td><strong>' + d.developer + '</strong></td>';
         html += '<td>' + d.total_projects + '</td>';
