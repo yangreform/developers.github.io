@@ -718,7 +718,7 @@ def get_heatmap_data():
 @app.route('/api/ura_price_trend', methods=['GET', 'OPTIONS'])
 def get_ura_price_trend():
     limit = request.args.get('limit', 200, type=int)
-    limit = min(max(limit, 1), 1000)   # clamp 1~1000
+    limit = min(max(limit, 1), 10000)   # clamp 1~1000
 
     try:
         conn = sqlite3.connect(DB_NAME)
@@ -832,7 +832,7 @@ def get_ura_price_trend():
             })
 
         # 按 cagr 降序排序
-        results.sort(key=lambda x: x['cagr'], reverse=True)
+        results.sort(key=lambda x: x['cagr'] if x['cagr'] is not None else -999, reverse=True)
 
         return jsonify({
             'status':  'success',
@@ -963,6 +963,20 @@ def get_commercial_transactions():
         conn = sqlite3.connect(DB_NAME)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ura_commercial_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_name TEXT,
+                street_name TEXT,
+                property_type TEXT,
+                tenure TEXT,
+                area_sqm REAL,
+                price_sgd REAL,
+                psf_sgd REAL,
+                contract_date TEXT,
+                UNIQUE(project_name, property_type, area_sqm, price_sgd, contract_date)
+            )
+        """)
         
         # We fetch all columns, sorted by price_sgd DESC as requested by user
         cursor.execute("""

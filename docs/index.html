@@ -309,13 +309,13 @@
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab-btn active" data-tab="ura-tab">&#127961;&#65039; 🏙️ 私宅：依楼盘</button>
-      <button class="tab-btn" data-tab="dev-tab">&#127968; 🏠 私宅：依开发商</button>
+      <button class="tab-btn active" data-tab="dev-tab">&#127968; 🏠 私宅：依开发商</button>
+      <button class="tab-btn" data-tab="ura-tab">&#127961;&#65039; 🏙️ 私宅：依楼盘</button>
       <button class="tab-btn" data-tab="commercial-tab">&#127980; 🏢 商办 / 店面</button>
     </div>
 
     <!-- URA Tab -->
-    <div id="ura-tab" class="tab-panel active">
+    <div id="ura-tab" class="tab-panel">
       <div class="search-bar">
         <input class="search-input" id="ura-search" placeholder="&#128269; 搜寻楼盘或街道名称..." oninput="filterTable('ura-table','ura-search','ura-count')">
         <span class="result-count" id="ura-count"></span>
@@ -343,7 +343,7 @@
     </div>
 
     <!-- DEV Tab -->
-    <div id="dev-tab" class="tab-panel">
+    <div id="dev-tab" class="tab-panel active">
       <div class="search-bar">
         <input class="search-input" id="dev-search" placeholder="&#128269; 搜寻开发商名称..." oninput="filterTable('dev-table','dev-search','dev-count')">
         <span class="result-count" id="dev-count"></span>
