@@ -977,6 +977,17 @@ def get_commercial_transactions():
                 UNIQUE(project_name, property_type, area_sqm, price_sgd, contract_date)
             )
         """)
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ura_coordinates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project TEXT,
+                street TEXT,
+                lat REAL,
+                lon REAL,
+                UNIQUE(project)
+            )
+        ''')
         
         # We fetch all columns, sorted by price_sgd DESC as requested by user
         cursor.execute("""
