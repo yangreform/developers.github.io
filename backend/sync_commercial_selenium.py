@@ -157,20 +157,73 @@ def main():
             
             # Check for next page
             try:
-                # Common DataTables next button structure
-                next_btns = driver.find_elements(By.XPATH, "//*[contains(@class, 'next')]")
+                # Broaden next button search
                 valid_next = None
-                for btn in next_btns:
-                    if btn.tag_name == 'li' and 'disabled' not in btn.get_attribute('class'):
-                        valid_next = btn.find_element(By.TAG_NAME, 'a')
-                        break
-                    elif btn.tag_name == 'a':
-                        parent = btn.find_element(By.XPATH, '..')
-                        if 'disabled' not in parent.get_attribute('class') and 'disabled' not in btn.get_attribute('class'):
+                
+                # Method 1: DataTables generic _next ID
+                try:
+                    btn = driver.find_element(By.XPATH, "//*[contains(@id, '_next')]")
+                    if 'disabled' not in btn.get_attribute('class'):
+                        if btn.tag_name == 'li':
+                            valid_next = btn.find_element(By.TAG_NAME, 'a')
+                        else:
+                            valid_next = btn
+                except:
+                    pass
+                
+                # Method 2: Contains 'next' class
+                if not valid_next:
+                    next_btns = driver.find_elements(By.XPATH, "//*[contains(translate(@class, 'NEXT', 'next'), 'next')]")
+                    for btn in next_btns:
+                        if btn.tag_name == 'li' and 'disabled' not in btn.get_attribute('class'):
+                            valid_next = btn.find_element(By.TAG_NAME, 'a')
+                            break
+                        elif btn.tag_name == 'a':
+                            try: parent = btn.find_element(By.XPATH, '..')
+                            except: parent = None
+                            
+                            p_class = parent.get_attribute('class') if parent else ''
+                            if 'disabled' not in p_class and 'disabled' not in (btn.get_attribute('class') or ''):
+                                valid_next = btn
+                                break
+                
+                # Method 3: Contains 'Next' text
+                if not valid_next:
+                    next_btns = driver.find_elements(By.XPATH, "//a[contains(translate(text(), 'NEXT', 'next'), 'next')]")
+                    for btn in next_btns:
+                        try: parent = btn.find_element(By.XPATH, '..')
+                        except: parent = None
+                        
+                        p_class = parent.get_attribute('class') if parent else ''
+                        if 'disabled' not in p_class and 'disabled' not in (btn.get_attribute('class') or ''):
                             valid_next = btn
                             break
                             
-                if valid_next:
+                if not valid_next:
+                    # Try using JS directly if it's a datatable
+                    js_next = '''
+                        var tables = $.fn.dataTable.tables();
+                        if (tables.length > 0) {
+                            var api = $(tables[0]).DataTable();
+                            var info = api.page.info();
+                            if (info.page < info.pages - 1) {
+                                api.page('next').draw('page');
+                                return true;
+                            }
+                        }
+                        return false;
+                    '''
+                    try:
+                        success = driver.execute_script(js_next)
+                        if success:
+                            valid_next = "JS_TRIGGERED"
+                    except:
+                        pass
+                        
+                if valid_next == "JS_TRIGGERED":
+                    print("Clicking 'Next' page via DataTables JS API...")
+                    time.sleep(3)
+                elif valid_next:
                     print("Clicking 'Next' page...")
                     driver.execute_script("arguments[0].click();", valid_next)
                     time.sleep(3)
