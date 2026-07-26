@@ -88,7 +88,7 @@
     .btn-pill:hover{background:var(--btn-hover);color:var(--text-primary);border-color:rgba(99,179,237,0.35)}
     .btn-pill.active{background:var(--btn-active);color:var(--accent);border-color:rgba(99,179,237,0.55);box-shadow:0 0 10px rgba(99,179,237,0.2)}
     .btn-pill.type-ura.active{background:var(--tag-ura);color:#63b3ed;border-color:rgba(99,179,237,0.5)}
-    .btn-pill.type-hdb.active{background:var(--tag-hdb);color:#f6ad55;border-color:rgba(246,173,85,0.5)}
+    .btn-pill.type-commercial.active{background:var(--tag-hdb);color:#f6ad55;border-color:rgba(246,173,85,0.5)}
     .btn-pill.type-all.active{background:var(--tag-all);color:#9acd32;border-color:rgba(154,205,50,0.5)}
     #year-select{
       padding:5px 10px;border-radius:20px;border:1px solid var(--panel-border);
@@ -140,7 +140,7 @@
     .stat-row:last-child{margin-bottom:0}
     .stat-key{font-size:12px;color:var(--text-muted)}
     .stat-val{font-size:13px;font-weight:600;color:var(--text-primary)}
-    .stat-val.ura{color:#63b3ed}.stat-val.hdb{color:#f6ad55}
+    .stat-val.ura{color:#63b3ed}.stat-val.commercial{color:#f6ad55}
 
     /* ── Legend ── */
     #legend{
@@ -166,7 +166,7 @@
     .tip-name{font-weight:600;margin-bottom:4px}
     .tip-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-bottom:6px}
     .badge-ura{background:var(--tag-ura);color:#63b3ed}
-    .badge-hdb{background:var(--tag-hdb);color:#f6ad55}
+    .badge-commercial{background:var(--tag-hdb);color:#f6ad55}
     .tip-val{color:var(--text-muted);font-size:12px}
 
     /* ── Toast ── */
@@ -202,7 +202,7 @@
     <div class="ctrl-label">资料类型</div>
     <div class="btn-row" id="type-btns">
       <button class="btn-pill type-ura active" data-type="ura">&#127961;&#65039; URA 私宅</button>
-      <button class="btn-pill type-hdb" data-type="hdb">&#127968; HDB 组屋</button>
+      <button class="btn-pill type-commercial" data-type="commercial">&#127980; 商办 / 店面</button>
       <button class="btn-pill type-all" data-type="all">&#128506;&#65039; 全部</button>
     </div>
   </div>

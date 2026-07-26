@@ -357,7 +357,7 @@ def get_ura_heatmap():
         #print("[DEBUG] 7. 准备执行热力图 SQL 查询...")
         query = """
             SELECT 
-                c.project, c.lat, c.lng, c.postal,
+                c.project, c.lat, c.lng, 
                 COUNT(*) as tx_count,
                 AVG(t.price) as avg_price,
                 AVG(t.price / (t.area * 10.7639)) as avg_psf
@@ -608,15 +608,43 @@ def get_heatmap_data():
                     'source': 'ura'
                 })
 
-        # ─── HDB 组屋（使用 ura_coordinates 里最近的座标） ──
-        if data_type in ('hdb', 'all'):
-            # HDB month 格式 "YYYY-MM"
-            year_filter_hdb = ""
+                # ─── 商办 / 店面 ────────────────────────────────────────
+        if data_type in ('commercial', 'all'):
+            year_filter = ""
             if year != 'all':
-                try:
-                    year_filter_hdb = f"AND h.month LIKE '{year}%'"
-                except Exception:
-                    pass
+                year_filter = f"AND contract_date LIKE '%{year}%'"
+
+            if metric == 'count':
+                weight_expr = "COUNT(*)"
+            elif metric == 'psf':
+                weight_expr = "AVG(psf_sgd)"
+            else:
+                weight_expr = "AVG(price_sgd)"
+
+            com_query = f"""
+                SELECT 
+                    c.lat,
+                    c.lng,
+                    t.project_name AS label,
+                    {weight_expr} AS weight
+                FROM ura_commercial_transactions t
+                JOIN ura_coordinates c ON (t.project_name = c.project OR t.street_name = c.street)
+                WHERE c.lat IS NOT NULL {year_filter}
+                GROUP BY t.project_name
+                HAVING weight > 0
+            """
+            try:
+                cursor.execute(com_query)
+                for row in cursor.fetchall():
+                    results.append({
+                        'lat':    row['lat'],
+                        'lng':    row['lng'],
+                        'label':  row['label'] + " (商办/店面)",
+                        'weight': float(row['weight']) if row['weight'] else 0,
+                        'source': 'commercial'
+                    })
+            except Exception:
+                pass
 
             if metric == 'count':
                 hdb_weight_expr = "COUNT(*)"
@@ -734,7 +762,7 @@ def get_ura_price_trend():
         cursor.execute("""
             SELECT
                 t.project,
-                c.postal,
+                
                 d.developer_name,
                 CAST('20' || SUBSTR(t.contractDate,3,2) AS INTEGER) AS year,
                 AVG(t.price) AS avg_price,
@@ -980,12 +1008,10 @@ def get_commercial_transactions():
 
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS ura_coordinates (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project TEXT,
+                project TEXT PRIMARY KEY,
                 street TEXT,
                 lat REAL,
-                lon REAL,
-                UNIQUE(project)
+                lng REAL
             )
         ''')
         
