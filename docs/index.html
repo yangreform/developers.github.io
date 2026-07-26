@@ -494,7 +494,7 @@
   async function loadURAData() {
     try {
       // 呼叫新的 price trend API
-      var resp = await fetch(API_BASE + '/api/ura_price_trend?limit=500', FETCH_OPTS);
+      var resp = await fetch(API_BASE + '/api/ura_price_trend?limit=5000', FETCH_OPTS);
       var json = await resp.json();
       if (json.status !== 'success') throw new Error(json.message || '资料载入失败');
 
