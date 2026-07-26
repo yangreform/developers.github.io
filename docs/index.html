@@ -309,12 +309,11 @@
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab-btn active" data-tab="ura-tab">&#127961;&#65039; URA 私宅（楼盘列表）</button>
-      <button class="tab-btn" data-tab="hdb-tab">&#127968; HDB 组屋（依市镇）</button>
-      <button class="tab-btn" data-tab="rental-tab">&#128196; HDB 租赁</button>
+      <button class="tab-btn active" data-tab="ura-tab">&#127961;&#65039; 🏙️ 私宅：依楼盘</button>
+      <button class="tab-btn" data-tab="dev-tab">&#127968; 🏠 私宅：依开发商</button>
     </div>
 
-    <!-- HDB Tab -->
+    <!-- URA Tab -->
     <div id="ura-tab" class="tab-panel active">
       <div class="search-bar">
         <input class="search-input" id="ura-search" placeholder="&#128269; 搜寻楼盘或街道名称..." oninput="filterTable('ura-table','ura-search','ura-count')">
@@ -336,144 +335,36 @@
             </tr>
           </thead>
           <tbody id="ura-tbody">
-            <tr><td colspan="8" class="no-data">载入中...</td></tr>
+            <tr><td colspan="9" class="no-data">载入中...</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Rental Tab -->
-    <div id="rental-tab" class="tab-panel active">
+    <!-- DEV Tab -->
+    <div id="dev-tab" class="tab-panel">
       <div class="search-bar">
-        <input class="search-input" id="rental-search" placeholder="&#128269; 搜寻市镇..." oninput="filterTable('rental-table','rental-search','rental-count')">
-        <span class="result-count" id="rental-count"></span>
+        <input class="search-input" id="dev-search" placeholder="&#128269; 搜寻开发商名称..." oninput="filterTable('dev-table','dev-search','dev-count')">
+        <span class="result-count" id="dev-count"></span>
       </div>
       <div class="table-wrap">
-        <table id="rental-table">
+        <table id="dev-table">
           <thead>
             <tr>
               <th>#</th>
-              <th>市镇</th>
-              <th>租赁笔数</th>
-              <th>平均月租 (S$)</th>
-              <th>最高月租 (S$)</th>
-              <th>最低月租 (S$)</th>
-              <th>类型</th>
+              <th>开发商</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortDevTable('total_projects')">总楼盘数 &#8693;</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortDevTable('avg_price')">最新均价 (S$) &#8693;</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortDevTable('avg_cagr')">年均涨幅 &#8693;</th>
             </tr>
           </thead>
-          <tbody id="rental-tbody">
-            <tr><td colspan="7" class="no-data">载入中...</td></tr>
+          <tbody id="dev-tbody">
+            <tr><td colspan="5" class="no-data">载入中...</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-  </div>
-    <div id="hdb-tab" class="tab-panel">
-      <div class="search-bar">
-        <input class="search-input" id="hdb-search" placeholder="&#128269; 搜寻市镇名称..." oninput="filterTable('hdb-table','hdb-search','hdb-count')">
-        <span class="result-count" id="hdb-count"></span>
-      </div>
-      <div class="table-wrap">
-        <table id="hdb-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>市镇</th>
-              <th>成交笔数</th>
-              <th>平均成交价 (S$)</th>
-              <th>最高成交价 (S$)</th>
-              <th>最低成交价 (S$)</th>
-              <th>类型</th>
-            </tr>
-          </thead>
-          <tbody id="hdb-tbody">
-            <tr><td colspan="7" class="no-data">载入中...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- URA Tab -->
-    <div id="ura-tab" class="tab-panel">
-      <div class="search-bar">
-        <input class="search-input" id="ura-search" placeholder="&#128269; 搜寻楼盘或街道名称..." oninput="filterTable('ura-table','ura-search','ura-count')">
-        <span class="result-count" id="ura-count"></span>
-      </div>
-      <div class="table-wrap">
-        <table id="ura-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>楼盘名称</th>
-            <th style="width:120px; text-align:left">开发商</th>
-              <th>邮递区号</th>
-              <th>最新均价 (S$)</th>
-              <th>均呎价 (S$)</th>
-              <th>年均涨幅</th>
-              <th>3年后预估价 (S$)</th>
-              <th>数据开始年份</th>
-            </tr>
-          </thead>
-          <tbody id="ura-tbody">
-            <tr><td colspan="8" class="no-data">载入中...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Rental Tab -->
-    <div id="rental-tab" class="tab-panel">
-      <div class="search-bar">
-        <input class="search-input" id="rental-search" placeholder="&#128269; 搜寻市镇..." oninput="filterTable('rental-table','rental-search','rental-count')">
-        <span class="result-count" id="rental-count"></span>
-      </div>
-      <div class="table-wrap">
-        <table id="rental-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>市镇</th>
-              <th>租赁笔数</th>
-              <th>平均月租 (S$)</th>
-              <th>最高月租 (S$)</th>
-              <th>最低月租 (S$)</th>
-              <th>类型</th>
-            </tr>
-          </thead>
-          <tbody id="rental-tbody">
-            <tr><td colspan="7" class="no-data">载入中...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-    <div id="rental-tab" class="tab-panel">
-      <div class="search-bar">
-        <input class="search-input" id="rental-search" placeholder="&#128269; 搜寻市镇..." oninput="filterTable('rental-table','rental-search','rental-count')">
-        <span class="result-count" id="rental-count"></span>
-      </div>
-      <div class="table-wrap">
-        <table id="rental-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>市镇</th>
-              <th>租赁笔数</th>
-              <th>平均月租 (S$)</th>
-              <th>最高月租 (S$)</th>
-              <th>最低月租 (S$)</th>
-              <th>类型</th>
-            </tr>
-          </thead>
-          <tbody id="rental-tbody">
-            <tr><td colspan="7" class="no-data">载入中...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-
+    
 <!-- Disclaimer & Contact Section -->
 <div class="cta-band" id="contact">
   <div style="max-width:800px; margin:0 auto; text-align:left;">
@@ -568,45 +459,7 @@
   }
 
   // ── 载入 HDB 资料 ──────────────────────────────────────────
-  async function loadHDBData() {
-    try {
-      var resp  = await fetch(API_BASE + '/api/get_heatmap_data?type=hdb&metric=price&year=all', FETCH_OPTS);
-      var json  = await resp.json();
-      if (json.status !== 'success') throw new Error(json.message);
-
-      // 也要取得 count 资料
-      var respC = await fetch(API_BASE + '/heatmap/hdb', FETCH_OPTS);
-      var jsonC = await respC.json();
-      var hdbMap = {};
-      if (jsonC.status === 'success') {
-        jsonC.data.forEach(function(d) { hdbMap[d.town] = d; });
-      }
-
-      var tbody = document.getElementById('hdb-tbody');
-      var rows = json.data || [];
-      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">暂无资料</td></tr>'; return; }
-
-      // Sort by avg_price desc
-      rows.sort(function(a,b){ return (b.weight||0)-(a.weight||0); });
-
-      var html = '';
-      rows.forEach(function(d, i) {
-        var extra = hdbMap[d.label] || {};
-        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick=\"window.location.href=\'heatmap.html?project=" + encodeURIComponent(d.project || d.label || d.town || "") + "\'\" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
-              + '<td class="num">' + (i+1) + '</td>'
-              + '<td class="town">' + (d.label || '—') + '</td>'
-              + '<td class="cnt">' + fmtNum(extra.tx_count) + '</td>'
-              + '<td class="price">S$ ' + fmtNum(d.weight) + '</td>'
-              + '<td>—</td>'
-              + '<td>—</td>'
-              + '<td><span class="badge badge-hdb">HDB</span></td>'
-              + '</tr>';
-      });
-      tbody.innerHTML = html;
-      document.getElementById('hdb-count').textContent = rows.length + ' 笔资料';
-    } catch(e) {
-      document.getElementById('hdb-tbody').innerHTML = '<tr><td colspan="7" class="no-data">无法载入：' + e.message + '</td></tr>';
-    }
+  
   }
 
   // ── 载入 URA 涨幅 & 预估资料 ─────────────────────────────────
@@ -668,57 +521,14 @@
   }
 
   // ── 载入租赁资料 ──────────────────────────────────────────
-  async function loadRentalData() {
-    try {
-      var rentalData = [
-        { town:'TAMPINES',     cnt:6532, avg:2980, max:5800, min:1500 },
-        { town:'JURONG WEST',  cnt:5890, avg:2750, max:5200, min:1400 },
-        { town:'WOODLANDS',    cnt:5210, avg:2680, max:5000, min:1350 },
-        { town:'BEDOK',        cnt:5100, avg:2950, max:5600, min:1450 },
-        { town:'SENGKANG',     cnt:4830, avg:3050, max:5500, min:1500 },
-        { town:'PUNGGOL',      cnt:4620, avg:3100, max:5600, min:1600 },
-        { town:'ANG MO KIO',   cnt:4210, avg:2850, max:5200, min:1400 },
-        { town:'HOUGANG',      cnt:3980, avg:2780, max:5000, min:1350 },
-        { town:'YISHUN',       cnt:3870, avg:2720, max:4800, min:1300 },
-        { town:'BUKIT BATOK',  cnt:3540, avg:2830, max:5000, min:1400 },
-        { town:'BISHAN',       cnt:2180, avg:3200, max:5800, min:1600 },
-        { town:'QUEENSTOWN',   cnt:2050, avg:3350, max:6000, min:1700 },
-        { town:'TOA PAYOH',    cnt:1980, avg:3100, max:5600, min:1550 },
-        { town:'KALLANG/WHAMPOA',cnt:1850,avg:3280,max:6200,min:1650},
-        { town:'SERANGOON',    cnt:1720, avg:3050, max:5500, min:1500 },
-        { town:'CENTRAL AREA', cnt:920,  avg:4200, max:9000, min:2000 },
-        { town:'BUKIT MERAH',  cnt:1650, avg:3150, max:6000, min:1550 },
-        { town:'CLEMENTI',     cnt:1480, avg:3080, max:5600, min:1500 },
-        { town:'GEYLANG',      cnt:1320, avg:2950, max:5500, min:1400 },
-        { town:'MARINE PARADE',cnt:820,  avg:3400, max:6500, min:1700 },
-      ];
-      rentalData.sort(function(a,b){ return b.avg-a.avg; });
-
-      var tbody = document.getElementById('rental-tbody');
-      var html = '';
-      rentalData.forEach(function(d,i){
-        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick=\"window.location.href=\'heatmap.html?project=" + encodeURIComponent(d.project || d.label || d.town || "") + "\'\" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
-              + '<td class="num">' + (i+1) + '</td>'
-              + '<td class="town">' + d.town + '</td>'
-              + '<td class="cnt">' + d.cnt.toLocaleString() + '</td>'
-              + '<td class="price">S$ ' + d.avg.toLocaleString() + '</td>'
-              + '<td class="price">S$ ' + d.max.toLocaleString() + '</td>'
-              + '<td style="color:var(--muted)">S$ ' + d.min.toLocaleString() + '</td>'
-              + '<td><span class="badge badge-hdb">HDB 租赁</span></td>'
-              + '</tr>';
-      });
-      tbody.innerHTML = html;
-      document.getElementById('rental-count').textContent = rentalData.length + ' 笔资料';
-    } catch(e) {
-      document.getElementById('rental-tbody').innerHTML = '<tr><td colspan="7" class="no-data">无法载入：' + e.message + '</td></tr>';
-    }
+  
   }
 
   // ── 启动 ──────────────────────────────────────────────────
   window.addEventListener('load', function() {
-    loadHDBData();
+    loadDevelopers();
     loadURAData();
-    loadRentalData();
+    
   });
 </script>
 
@@ -1053,6 +863,73 @@ window.addEventListener('load', function() {
         document.getElementById('form-success').style.display = 'none';
       }, 4000);
     });
-  </script>
+  
+    let devDataFull = [];
+    let devSortCol = 'total_projects';
+    let devSortAsc = false;
+
+    async function loadDevelopers() {
+      try {
+        var resp = await fetch(API_BASE + '/api/developer_stats', FETCH_OPTS);
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        var json = await resp.json();
+        
+        if (json.status === 'success' && json.data) {
+          devDataFull = json.data;
+          renderDevTable();
+        } else {
+          throw new Error(json.message || "Unknown error");
+        }
+      } catch (e) {
+        let tbody = document.getElementById('dev-tbody');
+        if(tbody) tbody.innerHTML = '<tr><td colspan="5" class="no-data">无法载入：' + e.message + '</td></tr>';
+      }
+    }
+
+    function sortDevTable(col) {
+      if (devSortCol === col) {
+        devSortAsc = !devSortAsc; 
+      } else {
+        devSortCol = col;
+        devSortAsc = false; 
+      }
+      
+      devDataFull.sort((a, b) => {
+        let valA = a[col];
+        let valB = b[col];
+        if (valA < valB) return devSortAsc ? -1 : 1;
+        if (valA > valB) return devSortAsc ? 1 : -1;
+        return 0;
+      });
+      
+      renderDevTable();
+    }
+
+    function renderDevTable() {
+      var tbody = document.getElementById('dev-tbody');
+      if(!tbody) return;
+      var html = '';
+      
+      devDataFull.forEach(function(d, index) {
+        var cagrColor = d.avg_cagr >= 0 ? 'color-up' : 'color-down';
+        var cagrArrow = d.avg_cagr >= 0 ? '&#9650;' : '&#9660;';
+        
+        html += '<tr>';
+        html += '<td>' + (index + 1) + '</td>';
+        html += '<td><strong>' + d.developer + '</strong></td>';
+        html += '<td>' + d.total_projects + '</td>';
+        html += '<td>S$ ' + d.avg_price.toLocaleString() + '</td>';
+        html += '<td class="' + cagrColor + '"><strong>' + cagrArrow + ' ' + Math.abs(d.avg_cagr).toFixed(1) + '% / 年</strong></td>';
+        html += '</tr>';
+      });
+      
+      tbody.innerHTML = html;
+      let countEl = document.getElementById('dev-count');
+      if(countEl) countEl.textContent = devDataFull.length + ' 个开发商';
+      
+      filterTable('dev-table','dev-search','dev-count');
+    }
+
+</script>
 </body>
 </html>
