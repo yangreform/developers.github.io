@@ -266,11 +266,11 @@ if __name__ == "__main__":
     
     # 1. HDB Resale (API ID: d_8b84c4ee58e3cfc0ece0d773c8ca6abc)
     hdb_resale_cols = ['month', 'town', 'flat_type', 'block', 'street_name', 'storey_range', 'floor_area_sqm', 'flat_model', 'lease_commence_date', 'remaining_lease', 'resale_price']
-    fetch_hdb_data('d_8b84c4ee58e3cfc0ece0d773c8ca6abc', 'hdb', hdb_resale_cols)
+    # fetch_hdb_data('d_8b84c4ee58e3cfc0ece0d773c8ca6abc', 'hdb', hdb_resale_cols)
     
     # 2. HDB Rental (API ID: d_c9f57187485a850908655db0e8cfe651)
     hdb_rental_cols = ['rent_approval_date', 'town', 'block', 'street_name', 'flat_type', 'monthly_rent']
-    fetch_hdb_data('d_c9f57187485a850908655db0e8cfe651', 'hdb_rental', hdb_rental_cols)
+    # fetch_hdb_data('d_c9f57187485a850908655db0e8cfe651', 'hdb_rental', hdb_rental_cols)
     
     # 3. URA Private Property
     fetch_ura_data()
