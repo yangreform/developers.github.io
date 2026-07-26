@@ -1,10 +1,8 @@
 import sqlite3
 import time
 import re
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.options import Options
+import sys
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 
 DB_NAME = 'backend/landlord_sg.db'
@@ -15,52 +13,69 @@ def extract_developer(text):
     return None
 
 def main():
+    print("==============================================")
+    print("請選擇執行模式：")
+    print("1: 跳過所有失敗紀錄，只查詢全新未查過的樓盤 (預設)")
+    print("2: 重試【Google 找不到】的樓盤 (包含以前的 Unknown)")
+    print("3: 重試【頁面未標示開發商】的樓盤")
+    print("==============================================")
+    
+    choice = input("請輸入選項 (1/2/3) [預設 1]: ").strip()
+    if choice not in ['1', '2', '3']:
+        choice = '1'
+        
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE IF NOT EXISTS ura_developers (project TEXT PRIMARY KEY, developer_name TEXT)")
     
-    # 找尋沒有開發商資料的建案
-    cursor.execute('''
-        SELECT project FROM ura_transactions 
-        WHERE project NOT IN (SELECT project FROM ura_developers)
-        GROUP BY project
-    ''')
+    if choice == '1':
+        # 1. 跳過所有已經在 DB 裡的 (不管成功還是失敗)
+        cursor.execute('''
+            SELECT project FROM ura_transactions 
+            WHERE project NOT IN (SELECT project FROM ura_developers)
+            GROUP BY project
+        ''')
+    elif choice == '2':
+        # 2. 重試 Google 找不到的 (加上之前舊版存的 Unknown)
+        cursor.execute('''
+            SELECT project FROM ura_developers
+            WHERE developer_name = 'Unknown_Google' OR developer_name = 'Unknown'
+        ''')
+    elif choice == '3':
+        # 3. 重試 頁面未標示 的
+        cursor.execute('''
+            SELECT project FROM ura_developers
+            WHERE developer_name = 'Unknown_Page'
+        ''')
+        
     missing_projects = [r[0] for r in cursor.fetchall()]
     
     if not missing_projects:
-        print("🎉 所有樓盤都已經有開發商資料了！")
+        print("🎉 目前沒有符合條件的樓盤需要查詢！")
         return
         
-    print(f"🔍 發現 {len(missing_projects)} 個樓盤缺乏開發商資料，準備啟動自動化瀏覽器查詢...")
+    print(f"🔍 發現 {len(missing_projects)} 個樓盤，準備啟動自動化瀏覽器查詢...")
     
-    # 啟動真實的 Chrome 瀏覽器 (不使用 headless，這樣萬一遇到驗證碼您可以手動點擊)
-    options = Options()
-    # 避免被輕易偵測為自動化測試軟體
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-    
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    })
+    options = uc.ChromeOptions()
+    driver = uc.Chrome(options=options, version_main=150)
     
     found_count = 0
+    consecutive_google_fails = 0  # 紀錄連續 Google 失敗次數
     
     try:
         for i, project in enumerate(missing_projects):
             print(f"[{i+1}/{len(missing_projects)}] 查詢 {project} ... ", end='', flush=True)
             
-            # 第一步：先透過 Google 搜尋取得 PropertyGuru 的準確網址 (包含 ID)
             search_url = f'https://www.google.com/search?q=site:propertyguru.com.sg/project+"{project}"'
             driver.get(search_url)
-            time.sleep(2) # 等待 Google 載入
+            time.sleep(2) 
             
             pg_url = None
             try:
                 links = driver.find_elements(By.XPATH, "//a[contains(@href, 'propertyguru.com.sg/project/')]")
                 for link in links:
                     href = link.get_attribute('href')
-                    if re.search(r'\-\d+$', href):  # 確認網址最後是數字 ID
+                    if re.search(r'\-\d+$', href):  
                         pg_url = href
                         break
             except:
@@ -68,28 +83,35 @@ def main():
                 
             if not pg_url:
                 print("❌ Google 找不到該建案的 PropertyGuru 頁面")
-                cursor.execute("INSERT INTO ura_developers (project, developer_name) VALUES (?, ?)", (project, "Unknown"))
+                cursor.execute("INSERT OR REPLACE INTO ura_developers (project, developer_name) VALUES (?, ?)", (project, "Unknown_Google"))
                 conn.commit()
-                continue
+                consecutive_google_fails += 1
                 
-            # 第二步：進入 PropertyGuru 頁面抓取開發商
+                # 如果連續 10 次 Google 找不到，很可能是遇到驗證碼或被擋了，直接關閉程式
+                if consecutive_google_fails >= 10:
+                    print("\n⚠️ 偵測到連續 10 次 Google 找不到頁面，可能遇到驗證碼或阻擋，程式自動關閉！")
+                    break
+                continue
+            else:
+                consecutive_google_fails = 0 # 只要有成功找到網址，就重置失敗計數
+                
             driver.get(pg_url)
-            time.sleep(3) # 等待網頁與 Cloudflare 載入
+            time.sleep(3)
             
             page_text = driver.execute_script("return document.body.innerText;")
             dev_name = extract_developer(page_text)
             
             if dev_name:
                 print(f"✅ 找到: {dev_name}")
-                cursor.execute("INSERT INTO ura_developers (project, developer_name) VALUES (?, ?)", (project, dev_name))
+                cursor.execute("INSERT OR REPLACE INTO ura_developers (project, developer_name) VALUES (?, ?)", (project, dev_name))
                 conn.commit()
                 found_count += 1
             else:
-                print("❌ 頁面中未標示開發商 (設為 Unknown)")
-                cursor.execute("INSERT INTO ura_developers (project, developer_name) VALUES (?, ?)", (project, "Unknown"))
+                print("❌ 頁面中未標示開發商")
+                cursor.execute("INSERT OR REPLACE INTO ura_developers (project, developer_name) VALUES (?, ?)", (project, "Unknown_Page"))
                 conn.commit()
                 
-            time.sleep(1) # 休息一下再繼續下一個
+            time.sleep(1)
             
     except KeyboardInterrupt:
         print("\n⚠️ 查詢被手動中斷。")
