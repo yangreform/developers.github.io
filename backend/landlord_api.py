@@ -707,85 +707,7 @@ def get_heatmap_data():
 # ==========================================
 # 🔥 HDB 热力图独立 API（依市镇统计）
 # ==========================================
-@app.route('/heatmap/hdb', methods=['GET', 'OPTIONS'])
-def get_hdb_heatmap():
-    if request.method == 'OPTIONS':
-        return '', 200
 
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        # Ensure developers table exists so query doesn't crash before first sync
-        cursor.execute("CREATE TABLE IF NOT EXISTS ura_developers (project TEXT PRIMARY KEY, developer_name TEXT)")
-
-
-        cursor.execute("""
-            SELECT
-                town,
-                COUNT(*) as tx_count,
-                AVG(resale_price) as avg_price,
-                AVG(resale_price / NULLIF(floor_area_sqm * 10.7639, 0)) as avg_psf
-            FROM hdb
-            GROUP BY town
-            HAVING tx_count > 0
-        """)
-        rows = [dict(r) for r in cursor.fetchall()]
-        conn.close()
-
-        TOWN_COORDS = {
-            'ANG MO KIO':      (1.3691, 103.8454),
-            'BEDOK':           (1.3236, 103.9273),
-            'BISHAN':          (1.3526, 103.8352),
-            'BUKIT BATOK':     (1.3590, 103.7637),
-            'BUKIT MERAH':     (1.2819, 103.8239),
-            'BUKIT PANJANG':   (1.3774, 103.7719),
-            'BUKIT TIMAH':     (1.3294, 103.7959),
-            'CENTRAL AREA':    (1.2897, 103.8501),
-            'CHOA CHU KANG':   (1.3840, 103.7470),
-            'CLEMENTI':        (1.3151, 103.7651),
-            'GEYLANG':         (1.3201, 103.8918),
-            'HOUGANG':         (1.3612, 103.8863),
-            'JURONG EAST':     (1.3329, 103.7436),
-            'JURONG WEST':     (1.3404, 103.7090),
-            'KALLANG/WHAMPOA': (1.3100, 103.8651),
-            'MARINE PARADE':   (1.3025, 103.9054),
-            'PASIR RIS':       (1.3721, 103.9474),
-            'PUNGGOL':         (1.4019, 103.9021),
-            'QUEENSTOWN':      (1.2942, 103.7861),
-            'SEMBAWANG':       (1.4491, 103.8185),
-            'SENGKANG':        (1.3868, 103.8914),
-            'SERANGOON':       (1.3554, 103.8679),
-            'TAMPINES':        (1.3496, 103.9568),
-            'TOA PAYOH':       (1.3343, 103.8563),
-            'WOODLANDS':       (1.4382, 103.7890),
-            'YISHUN':          (1.4304, 103.8354),
-        }
-
-        heatmap_data = []
-        for row in rows:
-            town = row['town'].strip().upper()
-            coords = TOWN_COORDS.get(town)
-            if coords:
-                heatmap_data.append({
-                    'town':      town,
-                    'lat':       coords[0],
-                    'lng':       coords[1],
-                    'tx_count':  row['tx_count'],
-                    'avg_price': round(row['avg_price'], 0) if row['avg_price'] else 0,
-                    'avg_psf':   round(row['avg_psf'], 2) if row['avg_psf'] else 0,
-                })
-
-        return jsonify({
-            'status': 'success',
-            'count':  len(heatmap_data),
-            'data':   heatmap_data
-        })
-
-    except Exception as e:
-        print(f"❌ [get_hdb_heatmap ERROR] {type(e).__name__}: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 # ==========================================
@@ -922,4 +844,112 @@ def get_ura_price_trend():
         import traceback
         traceback.print_exc()
         print(f"❌ [get_ura_price_trend ERROR] {type(e).__name__}: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ==========================================
+# 📈 私宅：依開發商 (Developer Stats)
+# GET /api/developer_stats
+# ==========================================
+@app.route('/api/developer_stats', methods=['GET', 'OPTIONS'])
+def get_developer_stats():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Ensure developers table exists
+        cursor.execute("CREATE TABLE IF NOT EXISTS ura_developers (project TEXT PRIMARY KEY, developer_name TEXT)")
+
+        # Step 1: Calculate average price per year for each project
+        cursor.execute("""
+            SELECT
+                t.project,
+                d.developer_name,
+                CAST('20' || SUBSTR(t.contractDate,3,2) AS INTEGER) AS year,
+                AVG(t.price) AS avg_price,
+                COUNT(*) AS tx_count
+            FROM ura_transactions t
+            LEFT JOIN ura_developers d ON t.project = d.project
+            WHERE t.price > 0
+              AND LENGTH(t.contractDate) = 4
+            GROUP BY t.project, year
+            HAVING tx_count >= 1
+            ORDER BY t.project, year
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        from collections import defaultdict
+        import math
+        import datetime
+        CURRENT_YEAR = datetime.date.today().year
+
+        project_years = defaultdict(dict)
+        project_developer = {}
+
+        for r in rows:
+            proj = r['project']
+            yr = r['year']
+            project_years[proj][yr] = r['avg_price']
+            project_developer[proj] = r['developer_name'] if r['developer_name'] else '—'
+
+        developer_stats = defaultdict(lambda: {'projects': set(), 'cagrs': [], 'latest_prices': []})
+
+        for proj, year_data in project_years.items():
+            dev = project_developer[proj]
+            if dev == '—' or dev.startswith('Unknown'):
+                continue
+                
+            years_sorted = sorted(year_data.keys())
+            if len(years_sorted) < 2:
+                continue
+
+            years_full = [y for y in years_sorted if y <= CURRENT_YEAR]
+            if len(years_full) < 2:
+                years_full = years_sorted
+
+            earliest_yr = years_full[0]
+            latest_price = year_data[years_full[-1]]
+            earliest_price = year_data[earliest_yr]
+            n_years = CURRENT_YEAR - earliest_yr
+            
+            if n_years <= 0 or earliest_price <= 0:
+                continue
+
+            cagr = (math.pow(latest_price / earliest_price, 1.0 / n_years) - 1) * 100
+            if cagr < -30.0 or cagr > 40.0 or n_years < 1:
+                continue
+
+            developer_stats[dev]['projects'].add(proj)
+            developer_stats[dev]['cagrs'].append(cagr)
+            developer_stats[dev]['latest_prices'].append(latest_price)
+
+        results = []
+        for dev, stats in developer_stats.items():
+            if len(stats['projects']) > 0:
+                avg_cagr = sum(stats['cagrs']) / len(stats['cagrs'])
+                avg_price = sum(stats['latest_prices']) / len(stats['latest_prices'])
+                results.append({
+                    'developer': dev,
+                    'total_projects': len(stats['projects']),
+                    'avg_cagr': round(avg_cagr, 2),
+                    'avg_price': round(avg_price)
+                })
+
+        # Sort by total_projects descending by default
+        results.sort(key=lambda x: x['total_projects'], reverse=True)
+
+        return jsonify({
+            'status': 'success',
+            'count': len(results),
+            'data': results
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500

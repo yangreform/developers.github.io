@@ -311,6 +311,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="ura-tab">&#127961;&#65039; 🏙️ 私宅：依楼盘</button>
       <button class="tab-btn" data-tab="dev-tab">&#127968; 🏠 私宅：依开发商</button>
+      <button class="tab-btn" data-tab="commercial-tab">&#127980; 🏢 商办 / 店面</button>
     </div>
 
     <!-- URA Tab -->
@@ -360,6 +361,35 @@
           </thead>
           <tbody id="dev-tbody">
             <tr><td colspan="5" class="no-data">载入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+
+    <!-- COMMERCIAL Tab -->
+    <div id="commercial-tab" class="tab-panel">
+      <div class="search-bar">
+        <input class="search-input" id="com-search" placeholder="&#128269; 搜寻楼盘、街道或类型..." oninput="filterTable('com-table','com-search','com-count')">
+        <span class="result-count" id="com-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="com-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>楼盘名称</th>
+              <th>街道</th>
+              <th>类型</th>
+              <th>年限</th>
+              <th>面积 (sqm)</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortComTable('price')">总价 (S$) &#8693;</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortComTable('psf')">单价 (S$ psf) &#8693;</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortComTable('date')">成交日期 &#8693;</th>
+            </tr>
+          </thead>
+          <tbody id="com-tbody">
+            <tr><td colspan="9" class="no-data">载入中...</td></tr>
           </tbody>
         </table>
       </div>
@@ -525,6 +555,7 @@
   window.addEventListener('load', function() {
     loadDevelopers();
     loadURAData();
+    loadCommercialData();
     
   });
 </script>
@@ -873,7 +904,8 @@ window.addEventListener('load', function() {
            var cagrArrow = p.cagr >= 0 ? '&#9650;' : '&#9660;';
            var priceStr = p.latest_price ? 'S$ ' + p.latest_price.toLocaleString() : '—';
            var cagrStr = (p.cagr !== null && p.cagr !== undefined) ? cagrArrow + ' ' + Math.abs(p.cagr).toFixed(1) + '% / 年' : '—';
-           html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer; transition: background 0.2s;" onclick="jumpToUraProject(\\'' + (p.project || '').replace(/'/g, "\\\\'") + '\\')" onmouseover="this.style.background=\\'var(--hover)\\'" onmouseout="this.style.background=\\'\\'">';
+           
+           html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer; transition: background 0.2s;" onclick="jumpToUraProject('${(p.project || '').replace(/'/g, "\\'")}')" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">`;
            html += '<td style="padding:8px; color:var(--muted);">' + (i+1) + '</td>';
            html += '<td style="padding:8px;"><strong>' + p.project + '</strong></td>';
            html += '<td style="padding:8px;" class="price">' + priceStr + '</td>';
@@ -910,6 +942,88 @@ window.addEventListener('load', function() {
       
       window.scrollTo({ top: uraTab.offsetTop - 50, behavior: 'smooth' });
     }
+
+  var comDataFull = [];
+  var comSortCol = 'price';
+  var comSortAsc = false;
+
+  async function loadCommercialData() {
+    try {
+      var resp = await fetch(API_BASE + '/api/commercial_transactions', FETCH_OPTS);
+      var json = await resp.json();
+      if (json.status !== 'success') throw new Error(json.message || '资料载入失败');
+      
+      comDataFull = json.data || [];
+      renderComTable();
+    } catch(e) {
+      document.getElementById('com-tbody').innerHTML = '<tr><td colspan="9" class="no-data">无法载入：' + e.message + '</td></tr>';
+    }
+  }
+
+  function sortComTable(col) {
+    if (comSortCol === col) {
+      comSortAsc = !comSortAsc;
+    } else {
+      comSortCol = col;
+      comSortAsc = false; // default desc
+    }
+    
+    comDataFull.sort(function(a, b) {
+      var valA, valB;
+      if (col === 'price') {
+        valA = a.price_sgd || 0;
+        valB = b.price_sgd || 0;
+      } else if (col === 'psf') {
+        valA = a.psf_sgd || 0;
+        valB = b.psf_sgd || 0;
+      } else if (col === 'date') {
+        // Date format might be MMM-YYYY, parsing it is tricky so we do basic string compare or parse Date
+        // Actually URA returns MM-YYYY or similar. Let's do string compare as fallback, or parse if possible.
+        var dA = new Date(a.contract_date);
+        var dB = new Date(b.contract_date);
+        valA = isNaN(dA) ? a.contract_date : dA.getTime();
+        valB = isNaN(dB) ? b.contract_date : dB.getTime();
+      }
+      
+      if (valA < valB) return comSortAsc ? -1 : 1;
+      if (valA > valB) return comSortAsc ? 1 : -1;
+      return 0;
+    });
+    
+    renderComTable();
+    // Re-apply filter if exists
+    filterTable('com-table', 'com-search', 'com-count');
+  }
+
+  function renderComTable() {
+    var tbody = document.getElementById('com-tbody');
+    if (!comDataFull.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data">暂无商办/店面资料，请执行爬虫抓取</td></tr>';
+      return;
+    }
+    
+    var html = '';
+    comDataFull.forEach(function(d, i) {
+      var priceStr = d.price_sgd ? 'S$ ' + d.price_sgd.toLocaleString() : '—';
+      var psfStr = d.psf_sgd ? 'S$ ' + d.psf_sgd.toLocaleString() : '—';
+      var typeColor = d.property_type.toLowerCase().includes('office') ? 'color: #63b3ed;' : 'color: #f0c84a;';
+      
+      html += '<tr data-row="1">';
+      html += '<td style="color:var(--muted)">' + (i+1) + '</td>';
+      html += '<td><strong>' + d.project_name + '</strong></td>';
+      html += '<td>' + d.street_name + '</td>';
+      html += '<td style="font-weight:bold; ' + typeColor + '">' + d.property_type + '</td>';
+      html += '<td style="color:var(--muted); font-size:12px;">' + d.tenure + '</td>';
+      html += '<td>' + d.area_sqm + '</td>';
+      html += '<td class="price" style="color:#4ade80">' + priceStr + '</td>';
+      html += '<td style="color:var(--muted)">' + psfStr + '</td>';
+      html += '<td style="font-size:12px;">' + d.contract_date + '</td>';
+      html += '</tr>';
+    });
+    tbody.innerHTML = html;
+    document.getElementById('com-count').textContent = comDataFull.length + ' 笔商办/店面资料';
+  }
+    
 </script>
 </body>
 </html>
