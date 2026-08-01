@@ -33,22 +33,6 @@ if "%MM%"=="34" (
     )
 )
 
-echo.
-:: Check for Sunday Database Update at 03:00
-for /f "skip=1" %%d in ('wmic path win32_localtime get dayofweek') do (
-    if "%%d"=="0" (
-        if "%HH%"=="03" (
-            if "%MM%"=="00" (
-                echo [!] It's Sunday 3:00 AM. Running Database Update...
-                start "" cmd /c "..\backend\schedule_update.bat"
-                :: We don't sleep here because the loop will sleep at the end anyway,
-                :: but to prevent re-triggering within the same minute:
-                timeout /t 65 /nobreak >nul
-            )
-        )
-    )
-)
-
 echo Monitoring in background... (Checking every 60s)
 timeout /t 60 /nobreak >nul
 goto loop

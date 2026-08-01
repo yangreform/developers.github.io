@@ -125,6 +125,9 @@ DB_NAME = os.path.join(BASE_DIR, "LandlordSG", "landlord_sg.db")
 
 WATCH_LIST = [
     {"symbol": "BTC", "secType": "CRYPTO", "exchange": "PAXOS", "currency": "USD", "expiry": "", "decimals": 1},
+    {"symbol": "VXM", "secType": "FUT", "exchange": "CFE", "currency": "USD", "expiry": "202608", "decimals": 3},
+    {"symbol": "KORU", "secType": "STK", "exchange": "SMART", "currency": "USD", "expiry": "", "decimals": 2},
+    {"symbol": "SOXL", "secType": "STK", "exchange": "SMART", "currency": "USD", "expiry": "", "decimals": 2},
 ]
 
 ib = IB()
@@ -954,6 +957,47 @@ def get_positions_with_pnl(ib_client: IB, ticker_decimals_map: dict[str, int]):
             'contract': p.contract,
         })
 
+    # Include WATCH_LIST items with position 0 if they aren't in my_positions
+    for item in WATCH_LIST:
+        sym = item['symbol']
+        if not any(r['symbol'] == sym for r in results):
+            c = Contract(
+                symbol=sym,
+                secType=item['secType'],
+                exchange=item['exchange'],
+                currency=item['currency'],
+                lastTradeDateOrContractMonth=item.get('expiry', '')
+            )
+            ib_client.qualifyContracts(c)
+            tickers = ib_client.reqTickers(c)
+            market_price = 0.0
+            if tickers:
+                t = tickers[0]
+                for pr in [t.marketPrice(), t.last, t.close]:
+                    if pr == pr and pr > 0:
+                        market_price = float(pr)
+                        break
+            
+            # For VXM, multiplier is 100
+            multiplier = 100.0 if sym == "VXM" else 1.0
+
+            results.append({
+                'symbol': sym,
+                'localSymbol': c.localSymbol if c.localSymbol else sym,
+                'position': 0.0,
+                'avgCost': 0.0,
+                'marketPrice': market_price,
+                'pnl': 0.0,
+                'totalCost': 0.0,
+                'decimals': item.get('decimals', 2),
+                'multiplier': multiplier,
+                'secType': c.secType,
+                'strike': c.strike,
+                'right': c.right,
+                'expiry': c.lastTradeDateOrContractMonth,
+                'contract': c,
+            })
+
     return results
 
 
@@ -1104,6 +1148,10 @@ def main():
                         (g for g, info in HEDGE_CONFIG.items() if sym_disp.upper().startswith(info['symbols'])),
                         None,
                     )
+
+                    # 針對 VIX 對沖，忽略選擇權 (KORU/SOXL options)
+                    if my_group_name == 'VIX對沖' and sec_type in ['OPT', 'FOP']:
+                        my_group_name = None
 
                     pos_delta, pos_theta, pos_gamma = 0.0, 0.0, 0.0
 

@@ -5,11 +5,19 @@ import sys
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 
-DB_NAME = 'backend/landlord_sg.db'
+DB_NAME = 'landlord_sg.db'
 
 def extract_developer(text):
-    m = re.search(r'Developer\s+([A-Za-z0-9\s]+?(?:Pte Ltd|Ltd|Limited|Group|Corp|Developer))', text, re.I)
+    # Match any characters (including @, &, -) until a common developer suffix
+    m = re.search(r'Developer\s+([^\n]+?(?:Pte Ltd|Ltd|Limited|Group|Corp|Developer|LLP|Inc\.?|Holdings?|Development|Properties))', text, re.I | re.IGNORECASE)
     if m: return m.group(1).strip()
+    
+    # Fallback: just take whatever is on the same line or next line (after Developer)
+    m2 = re.search(r'Developer\s+([^\n]+)', text, re.I)
+    if m2:
+        val = m2.group(1).strip()
+        if len(val) < 100: # Sanity check length
+            return val
     return None
 
 def main():
@@ -21,11 +29,16 @@ def main():
     print("==============================================")
     
     '''
-    choice = input("請輸入選項 (1/2/3) [預設 1]: ").strip()
-    if choice not in ['1', '2', '3']:
-        choice = '1'
+    if len(sys.argv) > 1:
+        choice = sys.argv[1].strip()
+        if choice not in ['1', '2', '3']:
+            choice = '1'
+    else:
+        choice = input("請輸入選項 (1/2/3) [預設 1]: ").strip()
+        if choice not in ['1', '2', '3']:
+            choice = '1'
     '''
-    choice = '1'
+    choice = '3'
         
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -71,7 +84,7 @@ def main():
             
             search_url = f'https://www.google.com/search?q=site:propertyguru.com.sg/project+"{project}"'
             driver.get(search_url)
-            time.sleep(40) 
+            time.sleep(5) 
             
             pg_url = None
             try:
@@ -91,7 +104,7 @@ def main():
                 consecutive_google_fails += 1
                 
                 # 如果連續 10 次 Google 找不到，很可能是遇到驗證碼或被擋了，直接關閉程式
-                if consecutive_google_fails >= 3:
+                if consecutive_google_fails >= 5:
                     print("\n⚠️ 偵測到連續 10 次 Google 找不到頁面，可能遇到驗證碼或阻擋，程式自動關閉！")
                     break
                 continue
@@ -99,7 +112,7 @@ def main():
                 consecutive_google_fails = 0 # 只要有成功找到網址，就重置失敗計數
                 
             driver.get(pg_url)
-            time.sleep(10)
+            time.sleep(15)
             
             page_text = driver.execute_script("return document.body.innerText;")
             dev_name = extract_developer(page_text)

@@ -646,69 +646,7 @@ def get_heatmap_data():
             except Exception:
                 pass
 
-            if metric == 'count':
-                hdb_weight_expr = "COUNT(*)"
-            elif metric == 'psf':
-                hdb_weight_expr = "AVG(h.resale_price / NULLIF(h.floor_area_sqm * 10.7639, 0))"
-            else:
-                hdb_weight_expr = "AVG(h.resale_price)"
 
-            # 用 town 关联 ura_coordinates 的 street 栏位取近似座标
-            # 更精准做法：用 town 中心点（预先计算好）；此处用 GROUP BY town 搭配已知座标
-            hdb_query = f"""
-                SELECT
-                    h.town,
-                    {hdb_weight_expr} AS weight,
-                    COUNT(*) AS tx_count
-                FROM hdb h
-                WHERE 1=1 {year_filter_hdb}
-                GROUP BY h.town
-                HAVING weight > 0
-            """
-            cursor.execute(hdb_query)
-            hdb_rows = [dict(r) for r in cursor.fetchall()]
-
-            # HDB 市镇中心座标（新加坡 26 个市镇）
-            TOWN_COORDS = {
-                'ANG MO KIO':      (1.3691, 103.8454),
-                'BEDOK':           (1.3236, 103.9273),
-                'BISHAN':          (1.3526, 103.8352),
-                'BUKIT BATOK':     (1.3590, 103.7637),
-                'BUKIT MERAH':     (1.2819, 103.8239),
-                'BUKIT PANJANG':   (1.3774, 103.7719),
-                'BUKIT TIMAH':     (1.3294, 103.7959),
-                'CENTRAL AREA':    (1.2897, 103.8501),
-                'CHOA CHU KANG':   (1.3840, 103.7470),
-                'CLEMENTI':        (1.3151, 103.7651),
-                'GEYLANG':         (1.3201, 103.8918),
-                'HOUGANG':         (1.3612, 103.8863),
-                'JURONG EAST':     (1.3329, 103.7436),
-                'JURONG WEST':     (1.3404, 103.7090),
-                'KALLANG/WHAMPOA': (1.3100, 103.8651),
-                'MARINE PARADE':   (1.3025, 103.9054),
-                'PASIR RIS':       (1.3721, 103.9474),
-                'PUNGGOL':         (1.4019, 103.9021),
-                'QUEENSTOWN':      (1.2942, 103.7861),
-                'SEMBAWANG':       (1.4491, 103.8185),
-                'SENGKANG':        (1.3868, 103.8914),
-                'SERANGOON':       (1.3554, 103.8679),
-                'TAMPINES':        (1.3496, 103.9568),
-                'TOA PAYOH':       (1.3343, 103.8563),
-                'WOODLANDS':       (1.4382, 103.7890),
-                'YISHUN':          (1.4304, 103.8354),
-            }
-
-            for row in hdb_rows:
-                town = row['town'].strip().upper()
-                coords = TOWN_COORDS.get(town)
-                if coords:
-                    results.append({
-                        'lat':    coords[0],
-                        'lng':    coords[1],
-                        'label':  town,
-                        'weight': float(row['weight']) if row['weight'] else 0,
-                        'source': 'hdb'
-                    })
 
         conn.close()
 
@@ -769,7 +707,7 @@ def get_ura_price_trend():
                 AVG(t.price / NULLIF(t.area * 10.7639, 0)) AS avg_psf,
                 COUNT(*) AS tx_count
             FROM ura_transactions t
-            JOIN ura_coordinates c ON t.project = c.project
+            LEFT JOIN ura_coordinates c ON t.project = c.project
             LEFT JOIN ura_developers d ON t.project = d.project
             WHERE t.price > 0
               AND t.area  > 0
@@ -793,7 +731,7 @@ def get_ura_price_trend():
             yr   = r['year']
             project_years[proj][yr]  = r['avg_price']
             project_psf[proj][yr]    = r['avg_psf'] if r['avg_psf'] else 0
-            project_postal[proj]     = r['postal']
+            project_postal[proj]     = ''
             project_developer[proj]  = r['developer_name'] if r['developer_name'] else '—'
 
         # Step 3: 计算每个楼盘的 CAGR 及 3年预估价

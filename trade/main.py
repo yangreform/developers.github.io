@@ -315,11 +315,15 @@ def webhook():
                 # 預設對照表
                 mapping = {
                     "MBT": "202608", "VXM": "202608",
-                    "1OZ": "202608", "MGC": "202608", "MHNG": "202609", "MNG": "202609", "MCL": "202609",
+                    "1OZ": "202608", "MGC": "202610", "MHNG": "202609", "MNG": "202609", "MCL": "202609",
                     "MNQ": "202609", "MES": "202609", "M2K": "202609", "M6E": "202609", "MJY": "202609", "MYM": "202609", "MHG": "202609", "YC": "202609"
                 }
                 
                 # 特殊邏輯：MNQ 轉倉規則
+                #if sym == "MGC":
+                #    return "202608" if act == "BUY" else "202610"
+                #if sym == "MCL":
+                #    return "202609" if act == "BUY" else "202610"
                 #if sym == "MNQ":
                 #    return "202606" if act == "BUY" else "202609"
                 #if sym == "M2K":
@@ -356,6 +360,20 @@ def webhook():
             details = ib.reqContractDetails(contract)
             min_tick = details[0].minTick if details and getattr(details[0], 'minTick', 0) > 0 else 0.01
 
+            # 針對部分 CBOT/COMEX 商品，IB 回報的 minTick (可能因為單位問題) 與實際報價小數點位數不同，這裡進行覆寫
+            TICK_OVERRIDES = {
+                'YC': 0.125,     # 玉米 Mini (跳動點 1/8 = 0.125)
+                'ZC': 0.25,      # 玉米 (跳動點 1/4 = 0.25)
+                'MGC': 0.1,      # 微型黃金
+                'MES': 0.25,     # 微型 SP500
+                'MNQ': 0.25,     # 微型 Nasdaq
+                'M2K': 0.1,      # 微型羅素
+                'MYM': 1.0,      # 微型道瓊
+                'MCL': 0.01,     # 微型原油
+            }
+            if actual_symbol in TICK_OVERRIDES:
+                min_tick = TICK_OVERRIDES[actual_symbol]
+
             # 3. 獲取市價
             mkt_price = float(tv_price)
 
@@ -378,8 +396,12 @@ def webhook():
 
             # 🌟 2. 掛上 IBKR Adaptive Algo 外掛 (魔法在這裡)
             # ==========================================
-            order.algoStrategy = 'Adaptive'
-            order.algoParams = [TagValue('adaptivePriority', 'Normal')]
+            # 股票在盤前/盤後不支援 Adaptive Algo，必須改用一般限價單
+            if not is_future and not is_rth:
+                logger.info(f"[{symbol}] 股票盤外時段不支援 Adaptive Algo，改用一般限價單")
+            else:
+                order.algoStrategy = 'Adaptive'
+                order.algoParams = [TagValue('adaptivePriority', 'Normal')]
 
             # CBOT 農產品期貨（YC=玉米）在美股正規時段外
             CBOT_FUTURES = {'YC', 'MYM'}  # CBOT 交易所的期貨品種
@@ -401,7 +423,7 @@ def webhook():
             # 5. 執行與確認
             trade = ib.placeOrder(contract, order)
             
-            end_time = time.time() + 15  # Adaptive Algo 需要較多時間，延長至 5 秒
+            end_time = time.time() + 5  # Adaptive Algo 需要較多時間，延長至 5 秒
             while not trade.isDone() and time.time() < end_time:
                 ib.sleep(0.5)
             
