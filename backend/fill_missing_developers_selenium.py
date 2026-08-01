@@ -38,7 +38,7 @@ def main():
         if choice not in ['1', '2', '3']:
             choice = '1'
     '''
-    choice = '3'
+    choice = '2'
         
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -84,7 +84,7 @@ def main():
             
             search_url = f'https://www.google.com/search?q=site:propertyguru.com.sg/project+"{project}"'
             driver.get(search_url)
-            time.sleep(5) 
+            time.sleep(35) 
             
             pg_url = None
             try:
@@ -104,7 +104,7 @@ def main():
                 consecutive_google_fails += 1
                 
                 # 如果連續 10 次 Google 找不到，很可能是遇到驗證碼或被擋了，直接關閉程式
-                if consecutive_google_fails >= 5:
+                if consecutive_google_fails >= 500:
                     print("\n⚠️ 偵測到連續 10 次 Google 找不到頁面，可能遇到驗證碼或阻擋，程式自動關閉！")
                     break
                 continue

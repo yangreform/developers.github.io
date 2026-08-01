@@ -1,0 +1,192 @@
+<script>
+window.addEventListener('load', function() {
+  if(!document.getElementById('macroChart')) return;
+  const ctx = document.getElementById('macroChart').getContext('2d');
+  
+  
+  // Dynamic Chart Logic
+  const raw_data = {
+    "CCR": {"2015": 2525000, "2016": 2449000, "2017": 2424000, "2018": 2626000, "2019": 2676000, "2020": 2727000, "2021": 3012487.44, "2022": 3296486.82, "2023": 3271091.4, "2024": 3105310.44, "2025": 3034964.83, "2026": 3360068.56}, 
+    "RCR": {"2015": 1530000, "2016": 1484000, "2017": 1469000, "2018": 1591000, "2019": 1622000, "2020": 1653000, "2021": 1819111.78, "2022": 1940072.1, "2023": 2049842.52, "2024": 2202317.66, "2025": 2347062.88, "2026": 2426525.7}, 
+    "OCR": {"2015": 1244000, "2016": 1207000, "2017": 1194000, "2018": 1294000, "2019": 1319000, "2020": 1344000, "2021": 1479955.91, "2022": 1686715.1, "2023": 1690002.06, "2024": 1782955.74, "2025": 1903214.9, "2026": 2014524.79}
+  };
+  
+  // Create UI controls
+  const chartContainer = document.getElementById('macroChart').parentElement;
+  const controlsDiv = document.createElement('div');
+  controlsDiv.style.cssText = 'position:absolute; top:20px; right:24px; z-index:10; display:flex; gap:10px; background:var(--panel); padding:8px 12px; border-radius:8px; border:1px solid var(--border);';
+  
+  controlsDiv.innerHTML = `
+    <div style="display:flex; align-items:center; gap:5px;">
+      <label style="color:var(--muted); font-size:12px;">基准年:</label>
+      <select id="startYear" style="background:var(--navy); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 5px; font-size:12px; cursor:pointer;">
+        <option value="2015">2015</option>
+        <option value="2016">2016</option>
+        <option value="2017">2017</option>
+        <option value="2018">2018</option>
+        <option value="2019">2019</option>
+        <option value="2020">2020</option>
+        <option value="2021" selected>2021</option>
+        <option value="2022">2022</option>
+        <option value="2023">2023</option>
+        <option value="2024">2024</option>
+      </select>
+    </div>
+    <div style="display:flex; align-items:center; gap:5px;">
+      <label style="color:var(--muted); font-size:12px;">预估至:</label>
+      <select id="endYear" style="background:var(--navy); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 5px; font-size:12px; cursor:pointer;">
+        <option value="2025">2025</option>
+        <option value="2026">2026</option>
+        <option value="2027">2027</option>
+        <option value="2028" selected>2028</option>
+      </select>
+    </div>
+  `;
+  chartContainer.appendChild(controlsDiv);
+
+  let macroChartInstance = null;
+
+  function updateChart() {
+    const sYear = parseInt(document.getElementById('startYear').value);
+    const eYear = parseInt(document.getElementById('endYear').value);
+    
+    // Validate
+    if (eYear <= sYear) {
+      document.getElementById('endYear').value = (sYear + 1).toString();
+      return updateChart();
+    }
+
+    const labels = [];
+    const ccrData = [];
+    const rcrData = [];
+    const ocrData = [];
+    const fdData = [];
+    const cpiData = [];
+    
+    // Historical FD (approx) and CPI (approx) starting from 2021
+    const fdRates = {2015:0.3, 2016:0.3, 2017:0.3, 2018:0.4, 2019:0.6, 2020:0.4, 2021:0.5, 2022:1.5, 2023:3.2, 2024:3.2, 2025:2.8, 2026:2.5, 2027:2.5, 2028:2.5};
+    const cpiRates = {2015:-0.5, 2016:-0.5, 2017:0.6, 2018:0.4, 2019:0.6, 2020:-0.2, 2021:0.9, 2022:4.1, 2023:4.2, 2024:3.1, 2025:2.5, 2026:2.0, 2027:2.0, 2028:2.0};
+
+    let fdIndex = 100.0;
+    let cpiIndex = 100.0;
+    
+    const baseCcr = raw_data.CCR[sYear];
+    const baseRcr = raw_data.RCR[sYear];
+    const baseOcr = raw_data.OCR[sYear];
+
+    for (let y = sYear; y <= eYear; y++) {
+      labels.push(y > 2025 ? y + ' (预估)' : y.toString());
+      
+      // Calculate Index
+      if (y === sYear) {
+        ccrData.push(100.0);
+        rcrData.push(100.0);
+        ocrData.push(100.0);
+        fdData.push(100.0);
+        cpiData.push(100.0);
+      } else {
+        fdIndex = fdIndex * (1 + fdRates[y]/100);
+        cpiIndex = cpiIndex * (1 + cpiRates[y]/100);
+        fdData.push(parseFloat(fdIndex.toFixed(1)));
+        cpiData.push(parseFloat(cpiIndex.toFixed(1)));
+        
+        if (y <= 2025) {
+            ccrData.push(parseFloat(((raw_data.CCR[y] / baseCcr) * 100).toFixed(1)));
+            rcrData.push(parseFloat(((raw_data.RCR[y] / baseRcr) * 100).toFixed(1)));
+            ocrData.push(parseFloat(((raw_data.OCR[y] / baseOcr) * 100).toFixed(1)));
+        } else {
+            // Project using 2021-2025 CAGR
+            const ccrCagr = Math.pow(raw_data.CCR[2025] / raw_data.CCR[2021], 1/4) - 1;
+            const rcrCagr = Math.pow(raw_data.RCR[2025] / raw_data.RCR[2021], 1/4) - 1;
+            const ocrCagr = Math.pow(raw_data.OCR[2025] / raw_data.OCR[2021], 1/4) - 1;
+            
+            const lastCcr = ccrData[ccrData.length - 1];
+            const lastRcr = rcrData[rcrData.length - 1];
+            const lastOcr = ocrData[ocrData.length - 1];
+            
+            ccrData.push(parseFloat((lastCcr * (1 + ccrCagr)).toFixed(1)));
+            rcrData.push(parseFloat((lastRcr * (1 + rcrCagr)).toFixed(1)));
+            ocrData.push(parseFloat((lastOcr * (1 + ocrCagr)).toFixed(1)));
+        }
+      }
+    }
+
+    if (macroChartInstance) {
+  macroChartInstance.destroy();
+}
+
+    
+    // === Add CAGR Table ===
+    let cagrTable = document.getElementById('cagrTable');
+    if (!cagrTable) {
+      cagrTable = document.createElement('div');
+      cagrTable.id = 'cagrTable';
+      cagrTable.style.cssText = 'margin-top:15px; padding:15px; background:var(--navy); border-radius:8px; border:1px solid var(--border); overflow-x:auto;';
+      chartContainer.appendChild(cagrTable);
+    }
+    
+    function calcCagr(startVal, endVal, years) {
+      if(years <= 0 || !startVal) return '0.0%';
+      const rate = (Math.pow(endVal / startVal, 1 / years) - 1) * 100;
+      return (rate > 0 ? '+' : '') + rate.toFixed(1) + '%';
+    }
+    
+    const yearsDiff = eYear - sYear;
+    const ccrCagr = calcCagr(100.0, ccrData[ccrData.length-1], yearsDiff);
+    const rcrCagr = calcCagr(100.0, rcrData[rcrData.length-1], yearsDiff);
+    const ocrCagr = calcCagr(100.0, ocrData[ocrData.length-1], yearsDiff);
+    const fdCagr = calcCagr(100.0, fdData[fdData.length-1], yearsDiff);
+    const cpiCagr = calcCagr(100.0, cpiData[cpiData.length-1], yearsDiff);
+    
+    cagrTable.innerHTML = `
+      <h4 style="margin:0 0 10px 0; color:var(--text); font-size:14px;">区间平均年化复合增长率 (CAGR): ${sYear} ~ ${eYear}</h4>
+      <table style="width:100%; text-align:center; font-size:13px; border-collapse:collapse;">
+        <tr style="border-bottom:1px solid var(--border); color:var(--muted);">
+          <th style="padding:5px;">CCR (核心中央区)</th>
+          <th style="padding:5px;">RCR (中央区以外)</th>
+          <th style="padding:5px;">OCR (中央区外围)</th>
+          <th style="padding:5px;">定存利率</th>
+          <th style="padding:5px;">通货膨胀</th>
+        </tr>
+        <tr>
+          <td style="padding:8px; font-weight:bold; color:#a0aec0;">${ccrCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#f0c84a;">${rcrCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#9f7aea;">${ocrCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#63b3ed;">${fdCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#fc8181;">${cpiCagr}</td>
+        </tr>
+      </table>
+    `;
+
+    macroChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'RCR (中央区以外) 房市', data: rcrData, borderColor: '#f0c84a', backgroundColor: 'rgba(240, 200, 74, 0.1)', borderWidth: 3, tension: 0.3, fill: true },
+          { label: 'OCR (中央区外围) 房市', data: ocrData, borderColor: '#9f7aea', borderWidth: 3, tension: 0.3 },
+          { label: 'CCR (核心中央区) 房市', data: ccrData, borderColor: '#a0aec0', borderWidth: 3, tension: 0.3 },
+          { label: '定存利率 (Fixed Deposit)', data: fdData, borderColor: '#63b3ed', borderWidth: 2, borderDash: [5, 5], tension: 0.1 },
+          { label: '通货膨胀率 (Inflation)', data: cpiData, borderColor: '#fc8181', borderWidth: 2, borderDash: [5, 5], tension: 0.1 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, color: '#8899bb',
+        plugins: {
+          legend: { position: 'top', labels: { color: '#e8f0fe', usePointStyle: true, boxWidth: 8 } },
+          tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(10,14,26,0.9)', titleColor: '#f0c84a', bodyColor: '#e8f0fe', borderColor: 'rgba(99,179,237,0.3)', borderWidth: 1 }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(99,179,237,0.1)' }, ticks: { color: '#8899bb' } },
+          y: { grid: { color: 'rgba(99,179,237,0.1)' }, ticks: { color: '#8899bb' }, title: { display: true, text: `累积指数 (${sYear}=100)`, color: '#8899bb' } }
+        },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+      }
+    });
+  }
+
+  document.getElementById('startYear').addEventListener('change', updateChart);
+  document.getElementById('endYear').addEventListener('change', updateChart);
+  updateChart();
+});
+</script>

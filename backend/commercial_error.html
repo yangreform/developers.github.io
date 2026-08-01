@@ -1,0 +1,1621 @@
+<html lang="en"><head><script async="" src="https://assets.wogaa.sg/snowplow/3.13.1/sp.js"></script><script async="" src="https://www.google-analytics.com/analytics.js"></script><script nonce="">
+(function () {
+    if (window.__ttPolicyCreated) {
+        return;
+    }
+
+    if (window.trustedTypes && trustedTypes.createPolicy) {
+        try {
+            trustedTypes.createPolicy('default', {
+                createHTML: s => s,
+                createScript: s => s,
+                createScriptURL: s => s
+            });
+            window.__ttPolicyCreated = true;
+        } catch (e) {
+            // Ignore duplicate creation attempts
+        }
+    }
+})();
+</script>
+
+
+
+
+
+
+
+<!-- layout.html -->
+
+
+<!-- Head -->
+
+
+	
+      
+      <title>Commercial Property Transactions - Property Market Information</title>
+    
+
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="_csrf" content="d3ba37c5-3286-4ce1-962d-330bd1c6f45b">
+	<meta name="_csrf_header" content="X-CSRF-TOKEN">
+	<meta name="description" content="Free-to-use platform with information such as property prices, rentals, vacancies, supply and stock of private residential and commercial properties.">
+	
+    <script nonce="" src="/property-market-information/vendor/jquery-3.6.0.min.js"></script>
+    <script nonce="" src="/property-market-information/vendor/bootstrap/js/bootstrap.min.js"></script>
+    <script nonce="" src="/property-market-information/vendor/bootstrap-multiselect/bootstrap-multiselect.js"></script>
+    <script nonce="" src="/property-market-information/vendor/chart.js/Chart.bundle.min.js"></script>
+    <script nonce="" src="/property-market-information/vendor/chart.js/utils.js"></script>   
+    <link href="/property-market-information/vendor/chart.js/Chart.min.css" rel="stylesheet">
+    <script nonce="" src="/property-market-information/vendor/jquery-ui-1.13.2/jquery-ui.min.js"></script>   
+    <script nonce="" src="/property-market-information/vendor/select2/js/select2.min.js"></script>
+    <script nonce="" src="/property-market-information/vendor/jquery-ui-touch-punch-0.2.3/jquery.ui.touch-punch.min.js"></script>
+    <script nonce="" src="/property-market-information/vendor/DataTables/datatables.min.js"></script>
+    
+	<script nonce="" src="/property-market-information/js/uramain.js"></script>
+    <script nonce="" src="/property-market-information/js/pmi/main.js"></script>
+
+    
+    <link rel="stylesheet" href="/property-market-information/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/property-market-information/vendor/bootstrap-multiselect/bootstrap-multiselect.css" type="text/css">
+    <link rel="stylesheet" href="/property-market-information/vendor/jquery-ui-1.13.2/jquery-ui.min.css">
+    <link rel="stylesheet" href="/property-market-information/vendor/select2/css/select2.min.css">
+    <link rel="stylesheet" href="/property-market-information/vendor/DataTables/datatables.min.css" type="text/css">
+	<link rel="stylesheet" href="/property-market-information/css/pmi/clean.css" type="text/css">
+	
+	<link rel="stylesheet" href="/property-market-information/css/pmi/main.css" type="text/css">  
+
+    
+			
+		<link rel="stylesheet" href="/property-market-information/css/sgds.css">
+			
+	
+
+    <link rel="shortcut icon" href="/property-market-information/asset/img/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/property-market-information/asset/img/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="/reis/css/sgds.css"><script type="text/javascript" src="https://assets.wogaa.sg/scripts/wogaa.js" crossorigin="anonymous"></script><script async="" src="https://assets.wogaa.sg/scripts/wogaa.js?url=https%3A%2F%2Feservice.ura.gov.sg%2Fproperty-market-information%2FpmiCommercialTransactionSearch"></script><meta name="wogaa_rsid" content="wogaaeserviceuraprod"></head>
+
+<body data-session-end-date="">
+    <div class="pageholder pageholderFull">
+        <div id="fontSize">
+            <button id="incFontSize">A+</button>
+            <button id="decFontSize">A-</button>
+        </div>
+
+        <button id="goTop" title="Go to top" class="hidden"><i class="glyphicon glyphicon-chevron-up"></i>Top</button>
+
+
+
+
+
+<script nonce="" src="/property-market-information/js/pmi/util.js"></script>
+
+<div class="sgds-masthead"><div class="sgds-container"><div class="row-header"><div class="col has-text-centered-touch"><a href="https://www.gov.sg" target="_blank"><span class="sgds-icon sgds-icon-sg-crest is-size-4"></span><span class="is-text">A Singapore Government Agency Website</span></a></div></div></div></div><div><header class="containerFullWidth"><div class="col-sm-6 uraLogoHolder padding0  text-left"><a href="https://eservice.ura.gov.sg"><img src="/property-market-information/img/uralogo.png" alt="URA - Urban Redevelopment Authority"></a></div><div class="col-sm-6 padding0 uraLogoHolder singaporeLogo text-right hidden-xs"></div>
+				<div class="col-sm-12 announcement-bar announcement-bar-focused" id="scam-info-msg">
+				    <div class="announcement-bar-content">
+				        <div class="announcement-bar-text" id="announcementText">
+				            <div class="announcement-bar-text-inside"><span>We will <strong>NEVER</strong> ask you to transfer money or
+				                    disclose bank log-in details over a phone call, letter, email or text message. Call the 24/7 <a href="https://www.scamshield.gov.sg/" target="_blank" rel="noopener noreferrer">ScamShield</a> Helpline at 1799 if you are unsure if something is a
+				                    scam.
+				                </span>
+				            </div>
+				        </div>
+				        <div class="announcement-bar-close" id="close-scam-info-msg">
+				            <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 24 24" class="h-6 w-6" height="2em" width="2em" xmlns="http://www.w3.org/2000/svg">
+				                <path d="m16.192 6.344-4.243 4.242-4.242-4.242-1.414 1.414L10.535 12l-4.242 4.242 1.414 1.414 4.242-4.242 4.243 4.242 1.414-1.414L13.364 12l4.242-4.242z">
+				                </path>
+				            </svg>
+				        </div>
+				    </div>
+				</div></header></div>
+
+<div id="clearheader" class="clearfix"></div>
+
+<nav id="navbar-primary" class="navbar navbar-default" style="background-color: white;">
+	<div class="container-fluid pmi-header">
+		<button aria-label="Menu" type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-menu">
+			<span class="sr-only"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+		</button>
+
+		<div class="navbar-header">
+			<h3><a target="_blank" href="https://www.ura.gov.sg/Corporate/Property/Property-Data" rel="noopener noreferrer">Property Data</a></h3>
+		</div>
+
+		<div class="collapse navbar-collapse" id="main-menu">
+			<ul class="nav navbar-nav">
+				
+					<li class="dropdown">
+						<a class="dropdown-toggle" data-toggle="dropdown" href="#">Private Residential <span class="caret"></span></a>
+						
+						<ul class="dropdown-menu">
+							
+								
+									<li>
+										<a href="/property-market-information/pmiResidentialTransactionSearch">Transaction</a>
+									</li>
+								
+
+								
+							
+								
+
+								
+									<li class="dropdown dropdown-submenu">
+										<a class="dropdown-toggle" data-toggle="dropdown" href="#">Rental</a>
+
+										<ul class="dropdown-menu">
+											
+												
+											
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialRentalSearch">Rental Search</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialRentalStatisticsForNonLanded">Rental Statistics for Non-Landed Private Residential Properties by Project Name</a>
+													</li>
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+										</ul>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/property-market-information/pmiResidentialDeveloperSalesPrice">Developers' Sales</a>
+									</li>
+								
+
+								
+							
+								
+
+								
+									<li class="dropdown dropdown-submenu">
+										<a class="dropdown-toggle" data-toggle="dropdown" href="#">Supply in the Pipeline</a>
+
+										<ul class="dropdown-menu">
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialProjectUncompleted">Uncompleted Private Residential and Executive Condominium Projects with Approvals for Development</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialPipelinePrivateExecutive">Pipeline Supply of Private Residential Units and Executive Condominiums by Expected Year of Completion</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialPipelinePrivateUnits">Pipeline Supply of Private Residential Units by Market Segment, Development Status and Expected Year of Completion</a>
+													</li>
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+										</ul>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/property-market-information/pmiResidentialTimeseries">Time Series Statistics</a>
+									</li>
+								
+
+								
+							
+						</ul>
+					</li>
+				
+					<li class="dropdown">
+						<a class="dropdown-toggle" data-toggle="dropdown" href="#">Commercial <span class="caret"></span></a>
+						
+						<ul class="dropdown-menu">
+							
+								
+									<li>
+										<a href="/property-market-information/pmiCommercialTransactionSearch">Transaction</a>
+									</li>
+								
+
+								
+							
+								
+
+								
+									<li class="dropdown dropdown-submenu">
+										<a class="dropdown-toggle" data-toggle="dropdown" href="#">Rental</a>
+
+										<ul class="dropdown-menu">
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialRentalRetailAnalysis">Retail Rental Analysis</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialRentalOfficeAnalysis">Office Rental Analysis</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialRentalStatsByStreet">Rental Statistics for Office and Retail Space by Street</a>
+													</li>
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+										</ul>
+									</li>
+								
+							
+								
+
+								
+									<li class="dropdown dropdown-submenu">
+										<a class="dropdown-toggle" data-toggle="dropdown" href="#">Supply in the Pipeline</a>
+
+										<ul class="dropdown-menu">
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialProjectUncompleted">Uncompleted Commercial Projects with Approvals for Development</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialPipelineOfficeRetailHotel">Pipeline Supply of Office, Retail Space and Hotel Room by Development Status and Expected Year of Completion</a>
+													</li>
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+										</ul>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/property-market-information/pmiCommercialStockCompletedQuarter">Commercial Projects Completed in the Quarter</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="/property-market-information/pmiCommercialTimeseries">Time Series Statistics</a>
+									</li>
+								
+
+								
+							
+						</ul>
+					</li>
+				
+					<li class="dropdown">
+						<a class="dropdown-toggle" data-toggle="dropdown" href="#">Help <span class="caret"></span></a>
+						
+						<ul class="dropdown-menu">
+							
+								
+									<li>
+										<a href="https://www.ura.gov.sg/Corporate/Property/Property-Data/definition-of-data-terms" target="_blank" rel="noopener noreferrer">Glossary of Terms</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="https://www.ura.gov.sg/Corporate/Property/Property-Data/Data-Release-Calendar" target="_blank" rel="noopener noreferrer">Data Release Calendar</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="https://eservice.ura.gov.sg/reis/index" target="_blank" rel="noopener noreferrer">Subscribe to REALIS</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="https://www.ura.gov.sg/Corporate/Terms-Conditions" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="https://www.ura.gov.sg/Corporate/Contact-Us" target="_blank" rel="noopener noreferrer">Contact Us</a>
+									</li>
+								
+
+								
+							
+						</ul>
+					</li>
+				
+			</ul>
+		</div>
+	</div>
+</nav>
+
+
+	<ol class="breadcrumb" style="background-color: white;">
+		
+		<li>
+			Commercial
+		</li>
+
+		
+
+		
+			
+				<li class="active">
+					Transaction
+				</li>
+			
+			
+		
+	</ol>
+
+
+
+
+
+<div id="locationDetails" class="modal fade padding-left-0" role="dialog" data-url="pmiSearchCommercialTransactionLocationPopup"><script nonce="">
+(function () {
+    if (window.__ttPolicyCreated) {
+        return;
+    }
+
+    if (window.trustedTypes && trustedTypes.createPolicy) {
+        try {
+            trustedTypes.createPolicy('default', {
+                createHTML: s => s,
+                createScript: s => s,
+                createScriptURL: s => s
+            });
+            window.__ttPolicyCreated = true;
+        } catch (e) {
+            // Ignore duplicate creation attempts
+        }
+    }
+})();
+</script>
+
+
+
+
+	<div class="modal-dialog modal-lg">
+
+		<!-- Modal content-->
+		<div class="modal-content modal-content-mod">
+			<div class="modal-header modal-header-mod">
+				<button type="button" class="close" data-dismiss="modal">×</button>
+			<div class="selectedItems">Selected: </div>
+				<ul class="nav nav-tabs">
+
+	<li class="active"><a data-toggle="tab" href="#projectName">Project</a></li>
+	
+
+
+
+
+	<li><a data-toggle="tab" href="#postalDistrict">Postal District</a></li>
+	
+
+
+
+
+
+
+					<li class="dropdown" style="display: none;">
+						<a class="dropdown-toggle" data-toggle="dropdown" href="#">More <span class="caret"></span></a>
+						<ul class="dropdown-menu dropdown-menu-right">
+						</ul>
+					</li>
+				</ul>
+				
+				<div data-tab-header="#projectName" class="">
+					<label>Project Name</label>
+					<div class="alphabetList">
+						<div><div><a href="#" class="active"><i class="glyphicon glyphicon-filter"></i></a><a href="#">#</a><a href="#">A</a><a href="#">B</a><a href="#">C</a><a href="#">D</a><a href="#">E</a></div></div>
+						<div><div><a href="#">F</a><a href="#">G</a><a href="#">H</a><a href="#">I</a><a href="#">J</a><a href="#">K</a><a href="#">L</a></div></div>
+						<div><div><a href="#">M</a><a href="#">N</a><a href="#">O</a><a href="#">P</a><a href="#">Q</a><a href="#">R</a><a href="#">S</a></div></div>
+						<div><div><a href="#">T</a><a href="#">U</a><a href="#">V</a><a href="#">W</a><a href="#">X</a><a href="#">Y</a><a href="#">Z</a></div></div>
+					</div>
+					<div class="form-group">
+						<label>Search</label>
+						<input type="text" class="form-control" placeholder="Project name">
+					</div>
+				</div>
+
+
+			</div>
+			<div class="modal-body" style="max-height: 1115px;">
+				<div class="tab-content" style="margin-top: 15px;">
+
+					<div id="projectName" class="tab-pane fade in active">
+						<div class="checkbox">
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="111 SOMERSET">111 SOMERSET</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="15 SCOTTS">15 SCOTTS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="1953">1953</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="20 COLLYER QUAY">20 COLLYER QUAY</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="28 RC SUITES">28 RC SUITES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="77 @ EAST COAST">77 @ EAST COAST</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ADELPHI PARK ESTATE">ADELPHI PARK ESTATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ALEXANDRA CENTRAL">ALEXANDRA CENTRAL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ALEXIS">ALEXIS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ARC 380">ARC 380</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ARTISAN 8">ARTISAN 8</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ASCENT @ 456">ASCENT @ 456</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ATLAND HOUSE">ATLAND HOUSE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ATRIUM RESIDENCES">ATRIUM RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BAGNALL HAUS">BAGNALL HAUS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BALESTIER PLAZA">BALESTIER PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BALESTIER POINT">BALESTIER POINT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BALMORAL PLAZA">BALMORAL PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BEACH ROAD CONSERVATION AREA">BEACH ROAD CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BEAUTY WORLD CENTRE">BEAUTY WORLD CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BEAUTY WORLD PLAZA">BEAUTY WORLD PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BINJAI PARK">BINJAI PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BLAIR PLAIN CONSERVATION AREA">BLAIR PLAIN CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BOAT QUAY CONSERVATION AREA">BOAT QUAY CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BOATHOUSE RESIDENCES">BOATHOUSE RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BOON COURT">BOON COURT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BOON SING BUILDING">BOON SING BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BOTANNIA">BOTANNIA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BUGIS CUBE">BUGIS CUBE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BUKIT PANJANG PLAZA">BUKIT PANJANG PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BUKIT PASOH BUILDING">BUKIT PASOH BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BUKIT PASOH CONSERVATION AREA">BUKIT PASOH CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BUKIT PASOH EXTNSN CONSTN AREA">BUKIT PASOH EXTNSN CONSTN AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BUKIT TIMAH PLAZA">BUKIT TIMAH PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BUKIT TIMAH SHOPPING CENTRE">BUKIT TIMAH SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BURLINGTON SQUARE">BURLINGTON SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="BYLANDS BUILDING">BYLANDS BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CAMELODGE">CAMELODGE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CENTRAL SQUARE">CENTRAL SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CENTRIUM SQUARE">CENTRIUM SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CENTROPOD @ CHANGI">CENTROPOD @ CHANGI</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CHANGI CITY POINT">CHANGI CITY POINT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CHARLTON CORNER">CHARLTON CORNER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CHENN LEONN BUILDING">CHENN LEONN BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CHIAT HONG BUILDING">CHIAT HONG BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CHINATOWN POINT">CHINATOWN POINT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CITY GATE">CITY GATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CITY PLAZA">CITY PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CLOVER PARK">CLOVER PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="COCO PALMS">COCO PALMS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CONCORDE HOTEL AND SHOPPING MALL">CONCORDE HOTEL AND SHOPPING MALL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CONCORDE SHOPPING CENTRE">CONCORDE SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CONNEXION">CONNEXION</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CORONATION SHOPPING PLAZA">CORONATION SHOPPING PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CROSS STREET EXCHANGE">CROSS STREET EXCHANGE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CROWN AT ROBINSON">CROWN AT ROBINSON</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CROWN CENTRE">CROWN CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CT HUB 2">CT HUB 2</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="CUPPAGE PLAZA">CUPPAGE PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="D'LEEDON">D'LEEDON</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="DELFI ORCHARD">DELFI ORCHARD</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="DESKER ROAD CONSERVATION AREA">DESKER ROAD CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="EAST VILLAGE">EAST VILLAGE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="EASTGATE">EASTGATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="EASTWOOD CENTRE">EASTWOOD CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="EMERALD GARDEN">EMERALD GARDEN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="EMERALD HILL CONSERVATION AREA">EMERALD HILL CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ENG AUN MANSION">ENG AUN MANSION</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ENG KONG PARK">ENG KONG PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="EON SHENTON">EON SHENTON</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="EUHABITAT">EUHABITAT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="EVERITT EDGE">EVERITT EDGE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="EVERSHINE AND CENTURY COMPLEX">EVERSHINE AND CENTURY COMPLEX</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FAR EAST PLAZA">FAR EAST PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FAR EAST SHOPPING CENTRE">FAR EAST SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FARRER PARK SUITES">FARRER PARK SUITES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FENG MING BUILDING">FENG MING BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FOOK HAI BUILDING">FOOK HAI BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FORTUNE CENTRE">FORTUNE CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FRANKEL ESTATE">FRANKEL ESTATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FU LU SHOU COMPLEX">FU LU SHOU COMPLEX</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FURAMA CITY CENTRE SINGAPORE">FURAMA CITY CENTRE SINGAPORE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="FUYUEN COURT">FUYUEN COURT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GB BUILDING">GB BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GEYLANG CONSERVATION AREA">GEYLANG CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GIFFARD MANSIONS">GIFFARD MANSIONS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GOLDEN MILE COMPLEX">GOLDEN MILE COMPLEX</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GOLDEN MILE TOWER">GOLDEN MILE TOWER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GOLDEN VILLAGE - YISHUN TEN">GOLDEN VILLAGE - YISHUN TEN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GOLDHILL PLAZA">GOLDHILL PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GOLDHILL SHOPPING CENTRE">GOLDHILL SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GRAND BUILDING">GRAND BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GRANDLINK SQUARE">GRANDLINK SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GREEN COURT">GREEN COURT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GREENDALE COURT">GREENDALE COURT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GSM BUILDING">GSM BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="GUTHRIE BUILDING">GUTHRIE BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HAVELOCK2">HAVELOCK2</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HERITAGE PLACE">HERITAGE PLACE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HEXACUBE">HEXACUBE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HIGH PARK RESIDENCES">HIGH PARK RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HIGH STREET CENTRE">HIGH STREET CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HIGH STREET PLAZA">HIGH STREET PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HIGHLAND CENTRE">HIGHLAND CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HILLSTA">HILLSTA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HILLVIEW REGENCY">HILLVIEW REGENCY</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HOA NAM BUILDING">HOA NAM BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HOLLAND ROAD SHOPPING CENTRE">HOLLAND ROAD SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HOLLAND VILLAGE">HOLLAND VILLAGE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HOTEL CLOVER">HOTEL CLOVER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HOTEL KAI">HOTEL KAI</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="HOUGANG GREEN SHOPPING MALL">HOUGANG GREEN SHOPPING MALL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ICB SHOPPING CENTRE">ICB SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ICON @ PASIR PANJANG">ICON @ PASIR PANJANG</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ICON@CHANGI">ICON@CHANGI</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="INTERNATIONAL PLAZA">INTERNATIONAL PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="JADESCAPE">JADESCAPE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="JALAN BESAR CONSERVATION AREA">JALAN BESAR CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="JALAN BESAR PLAZA">JALAN BESAR PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="JCUBE">JCUBE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="JK BUILDING">JK BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="JUNCTION NINE">JUNCTION NINE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KAMPONG GLAM CONSERVATION AREA">KAMPONG GLAM CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KAP">KAP</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KATONG PLAZA">KATONG PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KATONG SHOPPING CENTRE">KATONG SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KEMBANGAN COURT">KEMBANGAN COURT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KEMBANGAN PLAZA">KEMBANGAN PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KENSINGTON SQUARE">KENSINGTON SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KINDOL GARDENS">KINDOL GARDENS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KINEX">KINEX</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="KRETA AYER CONSERVATION AREA">KRETA AYER CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="LAGUN SARI BUILDING">LAGUN SARI BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="LAVENDER PLACE">LAVENDER PLACE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="LE REGAL">LE REGAL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="LE SHANTIER">LE SHANTIER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="LIANG SEAH COURT">LIANG SEAH COURT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="LIBERTY HOUSE">LIBERTY HOUSE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="LITTLE INDIA CONSERVATION AREA">LITTLE INDIA CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="LOFT @ NATHAN">LOFT @ NATHAN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="LUCKY PLAZA">LUCKY PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MALACCA CENTRE">MALACCA CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MANDARIN GARDENS">MANDARIN GARDENS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MANHATTAN HOUSE">MANHATTAN HOUSE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MAPLE WOODS">MAPLE WOODS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MAPLETREE ANSON">MAPLETREE ANSON</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MAYFAIR PARK">MAYFAIR PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MAYSPRINGS">MAYSPRINGS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MERCHANTS BUILDING">MERCHANTS BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MIDLAND HOUSE">MIDLAND HOUSE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MIDPOINT ORCHARD">MIDPOINT ORCHARD</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MILLAGE">MILLAGE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MING ARCADE">MING ARCADE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MMI BUILDING">MMI BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MODA">MODA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="MONVILLE MANSIONS">MONVILLE MANSIONS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="NARRA RESIDENCES">NARRA RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="NEHSONS BUILDING">NEHSONS BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="NEW WORLD CENTRE">NEW WORLD CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="NEWEST">NEWEST</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="NOMU">NOMU</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="NORMANTON PARK">NORMANTON PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="NOVENA REGENCY">NOVENA REGENCY</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="OASIA HOTEL">OASIA HOTEL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="OCEAN PARK">OCEAN PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="OKIO">OKIO</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ONE CLAYMORE">ONE CLAYMORE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ONE DUSUN RESIDENCES">ONE DUSUN RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ONE GEORGE STREET">ONE GEORGE STREET</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ONE SOPHIA">ONE SOPHIA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ONE-NORTH EDEN">ONE-NORTH EDEN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ONE-NORTH RESIDENCES">ONE-NORTH RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ONZE @ TANJONG PAGAR">ONZE @ TANJONG PAGAR</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ORCHARD PLAZA">ORCHARD PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ORCHARD SHOPPING CENTRE">ORCHARD SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ORCHARD TOWERS">ORCHARD TOWERS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ORCHID HOTEL">ORCHID HOTEL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ORIENTAL VENTURE BUILDING">ORIENTAL VENTURE BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="OXLEY TOWER">OXLEY TOWER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PANDAN VALLEY">PANDAN VALLEY</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PARC SOMME">PARC SOMME</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PARKLANE SHOPPING MALL">PARKLANE SHOPPING MALL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PARKWAY CENTRE">PARKWAY CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PARKWAY PARADE">PARKWAY PARADE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PASIR PANJANG GARDENS">PASIR PANJANG GARDENS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PAVILION SQUARE">PAVILION SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PAYA LEBAR SQUARE">PAYA LEBAR SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PEK CHUAN BUILDING">PEK CHUAN BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PENINSULA EXCELSIOR HOTEL">PENINSULA EXCELSIOR HOTEL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PENINSULA PLAZA">PENINSULA PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PENINSULA SHOPPING COMPLEX">PENINSULA SHOPPING COMPLEX</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PEOPLE'S GARDEN">PEOPLE'S GARDEN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PEOPLE'S PARK CENTRE">PEOPLE'S PARK CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PEOPLE'S PARK COMPLEX">PEOPLE'S PARK COMPLEX</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PETAIN RD/TYRWHITT RD CONSERVATION AREA">PETAIN RD/TYRWHITT RD CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PETAIN ROAD/TYRWHITT ROAD CONSERVATION A">PETAIN ROAD/TYRWHITT ROAD CONSERVATION A</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PGP BUILDING">PGP BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PICARDY GARDENS">PICARDY GARDENS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PIL BUILDING">PIL BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PLATINA GARDENS">PLATINA GARDENS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PLUS">PLUS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PORCELAIN HOTEL">PORCELAIN HOTEL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PRINSEP PLACE">PRINSEP PLACE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PRUDENTIAL TOWER">PRUDENTIAL TOWER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="PS100">PS100</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="QUEENSWAY SHOPPING CENTRE">QUEENSWAY SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="R66 APARTMENTS">R66 APARTMENTS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="RACE COURSE RD/OWEN RD CON AREA">RACE COURSE RD/OWEN RD CON AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="RANGOON 88">RANGOON 88</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="REGENCY SUITES">REGENCY SUITES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="REHAU BUILDING">REHAU BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="RIVERFRONT RESIDENCES">RIVERFRONT RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="RIVERGATE">RIVERGATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="RIVERTREES RESIDENCES">RIVERTREES RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ROBERTSON BLUE">ROBERTSON BLUE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ROBINSON 112">ROBINSON 112</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ROBINSON SQUARE">ROBINSON SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ROCCA BALESTIER">ROCCA BALESTIER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ROXY SQUARE">ROXY SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ROYAL SQUARE AT NOVENA">ROYAL SQUARE AT NOVENA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="RV POINT">RV POINT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SAMSUNG HUB">SAMSUNG HUB</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SBF CENTER">SBF CENTER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SEASIDE PARK">SEASIDE PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SECOND AVENUE JUNCTION">SECOND AVENUE JUNCTION</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SELETAR HILLS ESTATE">SELETAR HILLS ESTATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SEMBAWANG COTTAGE">SEMBAWANG COTTAGE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SEMBAWANG HILLS ESTATE">SEMBAWANG HILLS ESTATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SEMBAWANG PARK">SEMBAWANG PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SERANGOON GARDEN ESTATE">SERANGOON GARDEN ESTATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SGX CENTRE 2">SGX CENTRE 2</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SHENTON HOUSE">SHENTON HOUSE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SIGLAP V">SIGLAP V</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SIM LIM SQUARE">SIM LIM SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SIM LIM TOWER">SIM LIM TOWER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SIMON PLAZA">SIMON PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SIMS AVENUE CENTRE">SIMS AVENUE CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SIMS URBAN OASIS">SIMS URBAN OASIS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SIN CHUAN GARDEN">SIN CHUAN GARDEN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SINGAPORE SHOPPING CENTRE">SINGAPORE SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SKY EDEN@BEDOK">SKY EDEN@BEDOK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SLF BUILDING">SLF BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SOHO 188">SOHO 188</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SOHO LIFE">SOHO LIFE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SOLITAIRE ON CECIL">SOLITAIRE ON CECIL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SOUTH UNION PARK">SOUTH UNION PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SOUTHAVEN II">SOUTHAVEN II</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SOUTHBANK">SOUTHBANK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SOUTHPOINT">SOUTHPOINT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SPACE @ KOVAN">SPACE @ KOVAN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SPAZIO @ KOVAN">SPAZIO @ KOVAN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SPRINGLEAF TOWER">SPRINGLEAF TOWER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SQUARE 2">SQUARE 2</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="STARS OF KOVAN">STARS OF KOVAN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="STUDIO8">STUDIO8</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SUITES AT BUKIT TIMAH">SUITES AT BUKIT TIMAH</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SUITES@ KATONG">SUITES@ KATONG</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SULTAN GATE PLACE">SULTAN GATE PLACE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SULTAN PLAZA">SULTAN PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SUNHAVEN">SUNHAVEN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SUNSHINE PLAZA">SUNSHINE PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SUNTEC TOWER ONE">SUNTEC TOWER ONE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SUNTEC TOWER THREE">SUNTEC TOWER THREE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SUNTEC TOWER TWO">SUNTEC TOWER TWO</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="SYCAMORE TREE">SYCAMORE TREE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TAHIR BUILDING">TAHIR BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TAI SENG POINT">TAI SENG POINT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TANJONG KATONG COMPLEX">TANJONG KATONG COMPLEX</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TANJONG PAGAR CONSERVATION AREA">TANJONG PAGAR CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TEACHER'S HOUSING ESTATE">TEACHER'S HOUSING ESTATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TEAMBUILD CENTRE">TEAMBUILD CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TELOK AYER CONSERVATION AREA">TELOK AYER CONSERVATION AREA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TELOK BLANGAH HOUSE">TELOK BLANGAH HOUSE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TEXTILE CENTRE">TEXTILE CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE 101">THE 101</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE ADELPHI">THE ADELPHI</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE ALPS RESIDENCES">THE ALPS RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE ARCADE">THE ARCADE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE ARIZON">THE ARIZON</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE BENCOOLEN">THE BENCOOLEN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE CENTRAL">THE CENTRAL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE CENTREPOINT">THE CENTREPOINT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE CITRON">THE CITRON</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE COMMERZE@IRVING">THE COMMERZE@IRVING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE FLOW MALL">THE FLOW MALL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE GARDENS AT BISHAN">THE GARDENS AT BISHAN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE GLADES">THE GLADES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE GOLDEN LANDMARK">THE GOLDEN LANDMARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE GOLDEN MILE">THE GOLDEN MILE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE HILL @ONE-NORTH">THE HILL @ONE-NORTH</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE HILLFORD">THE HILLFORD</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE INTERLACE">THE INTERLACE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE LENOX">THE LENOX</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE MEZZO">THE MEZZO</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE MIDTOWN">THE MIDTOWN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE MILTONIA RESIDENCES">THE MILTONIA RESIDENCES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE MINTON">THE MINTON</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE MODULES">THE MODULES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE OCTAGON">THE OCTAGON</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE ODEON KATONG">THE ODEON KATONG</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE PETALS">THE PETALS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE PLAZA">THE PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE PROMENADE@PELIKAT">THE PROMENADE@PELIKAT</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE RAIL MALL">THE RAIL MALL</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE RIVERSIDE PIAZZA">THE RIVERSIDE PIAZZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE SUNFLOWER">THE SUNFLOWER</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE TROPICA">THE TROPICA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE VENUE SHOPPES">THE VENUE SHOPPES</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE WATERSIDE">THE WATERSIDE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THE WOODGROVE">THE WOODGROVE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THOMSON GARDEN ESTATE">THOMSON GARDEN ESTATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THOMSON PLAZA">THOMSON PLAZA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THOMSON RIDGE">THOMSON RIDGE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THOMSON V ONE">THOMSON V ONE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="THOMSON V TWO">THOMSON V TWO</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TIONG BAHRU ESTATE">TIONG BAHRU ESTATE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TOKIO MARINE CENTRE">TOKIO MARINE CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TONG BUILDING">TONG BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TONG ENG BUILDING">TONG ENG BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TREASURES@G19">TREASURES@G19</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TRIO">TRIO</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="TUNG ANN ASSOCIATION BUILDING">TUNG ANN ASSOCIATION BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="UNI BUILDING">UNI BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="UNION BUILDING">UNION BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="UNITED HOUSE">UNITED HOUSE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="UPPER SERANGOON SHOPPING CENTRE">UPPER SERANGOON SHOPPING CENTRE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="URBAN VISTA">URBAN VISTA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="VIBES @ EAST COAST">VIBES @ EAST COAST</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="VIBES @ KOVAN">VIBES @ KOVAN</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="VIEW AT KISMIS">VIEW AT KISMIS</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="VISION EXCHANGE">VISION EXCHANGE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="VISIONCREST">VISIONCREST</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="VIVA VISTA">VIVA VISTA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="WILMER PLACE">WILMER PLACE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="WING FONG BUILDING">WING FONG BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="WIS@CHANGI">WIS@CHANGI</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="WISMA ATRIA">WISMA ATRIA</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="WOODGROVE CONDOMINIUM">WOODGROVE CONDOMINIUM</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="WOODS SQUARE">WOODS SQUARE</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="YELEY BUILDING">YELEY BUILDING</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="YEW LIAN PARK">YEW LIAN PARK</label>
+						
+							<label class="col-sm-6 col-xs-12" style="display: none;"><input type="checkbox" value="ZAMAN CENTRE">ZAMAN CENTRE</label>
+						
+						</div>
+				  </div>
+	
+
+
+
+
+				  <div id="postalDistrict" class="tab-pane fade">
+						<label>Postal District</label>
+						<div class="checkbox">
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="01">D01 / Raffles Place, Cecil, Marina, People's Park</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="02">D02 / Anson, Tanjong Pagar</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="03">D03 / Queenstown, Tiong Bahru</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="04">D04 / Telok Blangah, Harbourfront</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="05">D05 / Pasir Panjang, Hong Leong Garden, Clementi New Town</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="06">D06 / High Street, Beach Road (part)</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="07">D07 / Middle Road, Golden Mile</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="08">D08 / Little India</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="09">D09 / Orchard, Cairnhill, River Valley</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="10">D10 / Ardmore, Bukit Timah, Holland Road, Tanglin</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="11">D11 / Watten Estate, Novena, Thomson</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="12">D12 / Balestier, Toa Payoh, Serangoon</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="13">D13 / Macpherson, Braddell</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="14">D14 / Geylang, Eunos</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="15">D15 / Katong, Joo Chiat, Amber Road</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="16">D16 / Bedok, Upper East Coast, Eastwood, Kew Drive</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="17">D17 / Loyang, Changi</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="18">D18 / Tampines, Pasir Ris</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="19">D19 / Serangoon Garden, Hougang, Punggol</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="20">D20 / Bishan, Ang Mo Kio</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="21">D21 / Upper Bukit Timah, Clementi Park, Ulu Pandan</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="22">D22 / Jurong</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="23">D23 / Hillview, Dairy Farm, Bukit Panjang, Choa Chu Kang</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="24">D24 / Lim Chu Kang, Tengah</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="25">D25 / Kranji, Woodgrove</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="26">D26 / Upper Thomson, Springleaf</label>
+						
+							
+								<div class="clearfix"></div>
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="27">D27 / Yishun, Sembawang</label>
+						
+							
+							<label class="col-sm-12 col-md-6"><input type="checkbox" value="28">D28 / Seletar</label>
+						
+						</div>
+					</div>
+	
+
+
+
+
+
+
+			</div>
+		</div>
+		<div class="clearfix"></div>
+		<div class="modal-footer">
+			<button type="button" class="btn btn-default" onclick="goModalTop()" style="display: none;">Go to Top</button> <button type="button" class="btn btn-warning" data-dismiss="modal">Cancel</button> <button id="apply" type="button" class="btn btn-primary">Apply</button>
+		</div>
+	</div>
+	</div>
+
+</div>
+
+<div class="container-fluid formContent">
+	<div class="stepsHolder clear clearfix mgTop1">
+	<span class="stepHeading">Step</span>
+	<ul class="stepsContainer">
+		<li class="stepActive">
+			<a href="#">
+				<span>1</span>
+			</a>
+		</li>
+		<li class="noMargin">
+			<a href="#">
+				<span>2</span>
+			</a>
+		</li>
+		<li class="stepsBackLine"></li>
+	</ul>
+</div>
+
+	
+	<h2>Commercial Property Transactions</h2>
+	
+	<div class="panel panel-default infoPanelHolder panelHolder">
+	<div class="panel-heading">
+		<h3 class="panel-title">
+			Information
+			<span class="glyphicon floatright expClpIcon glyphicon-custom glyphicon-minus-sign"></span>
+		</h3>
+	</div>
+	<div class="panel-body">
+		<div class="initialPanelContent" style="display: none;">
+			<ol>
+				<li>This e-Service comprises statistics on commercial property transactions with caveats lodged within the last 60 months.</li>
+			</ol>
+		</div>
+
+		<div class="mainPanelContent">
+			<ol>
+				
+					<li>
+						This e-Service comprises statistics on commercial property transactions with caveats lodged within the last 60 months.
+					</li>
+				
+					<li>
+						Caveats are legal documents lodged by purchasers with the Singapore Land Authority to register their legal interest in the property. Caveats are usually lodged by purchasers after the Option to Purchase is exercised or the Sales and Purchase agreement is signed.
+					</li>
+				
+					<li>
+						It is not mandatory to lodge a caveat. As such, some transacted properties may not have caveats lodged against them.
+					</li>
+				
+					<li>
+						A maximum of 5 projects can be selected at a time. To search for transactions by postal districts, the property type field is compulsory. <a href="https://www.ura.gov.sg/Corporate/-/media/Corporate/Property/PMI-Online/List_Of_Postal_Districts.pdf" target="_blank" rel="noopener noreferrer">Please click here to view a list of postal districts and their general locations.</a>
+					</li>
+				
+					<li>
+						Information is updated twice a week on every Tuesday and Friday. If the scheduled update falls on a public holiday, it will be updated on the following working day.
+					</li>
+				
+					<li>
+						More detailed real estate statistics are available from URA's Real Estate Information System (REALIS). Subscription to REALIS can be done via the following link: <a href="/reis" target="_blank" rel="noopener noreferrer">eservice.ura.gov.sg/reis</a>.
+					</li>
+				
+			</ol>
+		</div>
+		<div class="text-right">
+			<a href="#" class="initialPanelContent readLinkPanel" style="display: none;">Read more</a>
+			<a href="#" class="mainPanelContent readLinkPanel">Read less</a>
+		</div>
+	</div>
+</div>
+
+
+	<form id="appForm" data-target="#searchResult" data-pkg="pmi" action="/property-market-information/pmiCommercialTransactionSearch" method="post">
+		<input id="resultPerPage" name="resultPerPage" type="hidden" value="20">
+		<input id="displayResult" name="displayResult" type="hidden" value="true">
+		<input id="displayResultHeader" name="displayResultHeader" type="hidden" value="true">
+		<input id="loadAnalysis" name="loadAnalysis" type="hidden" value="true">
+		<input id="displayAnalysis" name="displayAnalysis" type="hidden" value="false">
+		<input id="displayChart" name="displayChart" type="hidden" value="true">
+		<input id="displayAnalysisFilters" name="displayAnalysisFilters" type="hidden" value="true">
+		<input id="dashboardDisplay" name="dashboardDisplay" type="hidden" value="false">
+
+		<div class="form-row">
+			<div class="form-group col-lg-6">
+				<label class="must">Project or Location</label>
+				<div class="input-group">
+					<span class="input-group-addon select-span" data-toggle="modal" data-target="#locationDetails" data-backdrop="static" data-placeholder="Select project or postal district">Select project or postal district</span>
+					<span class="input-group-btn">
+						<input id="s_locationDetails" name="locationDetails" type="hidden" value="[]">
+						<button aria-label="Project or Location" class="btn btn-default followGroupHeight search-popup-btn" type="button" data-toggle="modal" data-target="#locationDetails" style="height: 35px;">
+							<i class="glyphicon glyphicon-menu-right"></i>
+						</button>
+					</span>
+				</div>
+			</div>
+
+			<div class="form-group col-sm-6 col-lg-3">
+				<label data-must-for-postal-district="">Property Type</label>
+					<select aria-label="Property Type" id="propertyTypeNo" name="propertyTypeNo" class="form-control" size="1" data-reset-default="" disabled="">
+						<option value="" label="Select property type">
+						
+							</option><option value="1">Retail</option>
+						
+							<option value="2">Office</option>
+						
+							<option value="3">Shophouses</option>
+						
+					</select>
+			</div>
+
+			<div class="form-group col-sm-6 col-lg-3">
+				<label class="must">Sale Date</label> <br>
+				<select id="saleYearFrom" name="saleYearFrom" data-reset-default="2021" class="form-control search-filter-select" aria-label="Sale Year From">
+					<option value="">Year</option>
+					<option value="2021" selected="selected">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
+				</select><select id="saleMonthFrom" name="saleMonthFrom" data-reset-default="7" class="form-control search-filter-select" aria-label="Sale Month From">
+					<option value="">Mth</option>
+					<option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7" selected="selected">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+				</select>
+					- <span class="text-nowrap">
+					<select id="saleYearTo" name="saleYearTo" data-reset-default="2026" class="form-control search-filter-select" aria-label="Sale Year To">
+						<option value="">Year</option>
+						<option value="2021">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected="selected">2026</option>
+					</select><select id="saleMonthTo" name="saleMonthTo" data-reset-default="7" class="form-control search-filter-select" aria-label="Sale Month To">
+						<option value="">Mth</option>
+						<option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7" selected="selected">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+					</select>
+				</span>
+
+				
+			</div>
+		</div>
+
+		<div class="form-group">
+			By clicking "Search" you are agreeing to <a href="https://www.ura.gov.sg/Corporate/Terms-Conditions" target="_blank" rel="noopener noreferrer">URA Terms and Conditions</a>.
+
+			<div class="text-right">
+				<span class="btn-group-span">
+					<button type="reset" class="btn btn-warning" value="Reset" id="resetSearchs"><span class="glyphicon glyphicon-repeat"></span> Reset</button>
+					<button type="submit" class="btn btn-primary" data-init-wogaa="eserviceura-5504"><span class="glyphicon glyphicon-search"></span> Search</button>
+				</span>
+			</div>
+		</div>
+	<div>
+<input type="hidden" name="_csrf" value="d3ba37c5-3286-4ce1-962d-330bd1c6f45b">
+</div></form>
+</div>
+
+<div id="searchResult" class="container-fluid"></div>
+
+
+
+
+
+<div class="sgds-footer"><div class="sgds-container"><div class="row"><div class="col is-right-desktop-only"><ul><li class="is-inline-block-desktop-only"><p><a href="https://www.ura.gov.sg/Corporate/Contact-Us" target="_blank">Contact</a></p></li><li class="is-inline-block-desktop-only"><p><a href="/feedbackWeb/contactus_feedback.jsp" target="_blank">Feedback</a></p></li></ul></div></div><div class="row is-vcentered divider"><div class="col"><ul><li><a href="https://tech.gov.sg/report_vulnerability" target="_blank">Report Vulnerability<i class="sgds-icon sgds-icon-external"></i></a></li><li><a href="https://www.ura.gov.sg/Corporate/Privacy-Statement" target="_blank">Privacy Statement</a></li><li><a href="https://www.ura.gov.sg/Corporate/Terms-of-Use" target="_blank">Terms of Use</a></li></ul></div><div class="col has-text-right-desktop has-text-right-tablet has-text-left-mobile"><p class="is-hidden-touch">© 2019 Urban Redevelopment Authority.<br>Last Updated 28 August 2019</p><p class="is-hidden-desktop">© 2019 Urban Redevelopment Authority</p><p class="is-hidden-desktop last-updated">Last Updated 28 Aug 2019</p></div></div></div></div>
+</div>
+
+
+
+
+</body></html>

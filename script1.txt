@@ -1,0 +1,108 @@
+<script>
+  // ── API Base（后端 ngrok）──
+  const API_BASE = 'https://imelda-nondeferent-deformedly.ngrok-free.dev/app';
+
+  // ── Tab 切换 ──────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── 搜寻过滤 ──────────────────────────────────────────────
+  function filterTable(tableId, searchId, countId) {
+    var q = document.getElementById(searchId).value.trim().toLowerCase();
+    var rows = document.querySelectorAll('#' + tableId + ' tbody tr[data-row]');
+    var vis = 0;
+    rows.forEach(function(tr) {
+      var text = tr.textContent.toLowerCase();
+      var show = !q || text.indexOf(q) > -1;
+      tr.style.display = show ? '' : 'none';
+      if (show) vis++;
+    });
+    var cnt = document.getElementById(countId);
+    if (cnt) cnt.textContent = q ? ('显示 ' + vis + ' / ' + rows.length + ' 笔') : (rows.length + ' 笔资料');
+  }
+
+  // ngrok bypass header（解决 ngrok 浏览器警告页面问题）
+  var NGROK_HDR = { 'ngrok-skip-browser-warning': '1' };
+  var FETCH_OPTS = { headers: NGROK_HDR };
+
+  // ── 格式化数字 ─────────────────────────────────────────────
+  function fmtNum(n) {
+    if (!n && n !== 0) return '—';
+    return Math.round(n).toLocaleString();
+  }
+
+  // ── 载入 HDB 资料 ──────────────────────────────────────────
+
+  // ── 载入 URA 涨幅 & 预估资料 ─────────────────────────────────
+  async function loadURAData() {
+    try {
+      // 呼叫新的 price trend API
+      var resp = await fetch(API_BASE + '/api/ura_price_trend?limit=500', FETCH_OPTS);
+      var json = await resp.json();
+      if (json.status !== 'success') throw new Error(json.message || '资料载入失败');
+
+      var tbody = document.getElementById('ura-tbody');
+      var rows = json.data || [];
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="no-data">暂无资料</td></tr>'; return; }
+
+      // 已按 CAGR desc 排序（由后端处理）
+      var html = '';
+      rows.forEach(function(d, i) {
+        // 年均涨幅显示
+        var cagrCls = d.cagr > 3 ? 'cagr-up' : (d.cagr < -3 ? 'cagr-dn' : 'cagr-neu');
+        var cagrArrow = d.cagr > 0 ? '&#9650; ' : (d.cagr < 0 ? '&#9660; ' : '');
+        var cagrText  = cagrArrow + Math.abs(d.cagr).toFixed(1) + '% / 年';
+
+        // Sparkline（迷你年度趋势）
+        var spark = '';
+        if (d.yearly && d.yearly.length >= 2) {
+          var prices = d.yearly.map(function(y) { return y.avg_price; });
+          var minP = Math.min.apply(null, prices);
+          var maxP = Math.max.apply(null, prices);
+          var rng  = maxP - minP || 1;
+          spark = '<span class="sparkline">';
+          prices.forEach(function(p) {
+            var h = Math.max(3, Math.round(((p - minP) / rng) * 18));
+            var clr = d.cagr > 0 ? '#48bb78' : '#fc8181';
+            spark += '<span class="spark-bar" title="S$' + p.toLocaleString() + '" style="height:' + h + 'px;background:' + clr + '"></span>';
+          });
+          spark += '</span>';
+        }
+
+        // 期间显示
+        var period = d.earliest_yr + ' (' + d.n_years + '年)';
+
+        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick=\"window.location.href=\'heatmap.html?project=" + encodeURIComponent(d.project || d.label || d.town || "") + "\'\" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
+              + '<td class="num">' + (i+1) + '</td>'
+              + '<td class="town">' + (d.project || '—') + spark + '</td>'
+              + '<td style="color:var(--muted);font-size:12px">' + (d.developer || '—') + '</td>'
+              + '<td style="color:var(--muted);font-size:12px">' + (d.postal && d.postal !== 'NIL' ? d.postal : '—') + '</td>'
+              + '<td class="price">S$ ' + (d.latest_price ? d.latest_price.toLocaleString() : '—') + '</td>'
+              + '<td style="color:var(--muted)">' + (d.latest_psf ? 'S$ ' + d.latest_psf.toFixed(0) : '—') + '</td>'
+              + '<td class="' + cagrCls + '">' + cagrText + '</td>'
+              + '<td class="price" style="color:' + (d.cagr > 0 ? '#68d391' : '#fc8181') + '">S$ ' + (d.est_3yr ? d.est_3yr.toLocaleString() : '—') + '</td>'
+              + '<td style="font-size:11px;color:var(--muted)">' + period + '</td>'
+              + '</tr>';
+      });
+      tbody.innerHTML = html;
+      document.getElementById('ura-count').textContent = rows.length + ' 笔楼盘（按年均涨幅排序）';
+    } catch(e) {
+      document.getElementById('ura-tbody').innerHTML = '<tr><td colspan="8" class="no-data">无法载入：' + e.message + '</td></tr>';
+    }
+  }
+
+  // ── 载入租赁资料 ──────────────────────────────────────────
+
+  // ── 启动 ──────────────────────────────────────────────────
+  window.addEventListener('load', function() {
+    loadDevelopers();
+    loadURAData();
+    
+  });
+</script>

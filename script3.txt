@@ -1,0 +1,84 @@
+<script>
+window.addEventListener('load', function() {
+  if(!document.getElementById('macroChart')) return;
+  const ctx = document.getElementById('macroChart').getContext('2d');
+  
+  const labels = ['2021', '2022', '2023', '2024', '2025', '2026 (预估)', '2027 (预估)', '2028 (预估)'];
+  const ccrData = [100.0, 109.4, 108.6, 103.1, 100.7, 100.9, 101.1, 101.3];
+  const rcrData = [100.0, 106.6, 112.7, 121.1, 129.0, 137.5, 146.5, 156.1];
+  const ocrData = [100.0, 114.0, 114.2, 120.5, 128.6, 136.9, 145.8, 155.3];
+  const fdData = [100.0, 101.5, 104.7, 108.0, 111.0, 113.8, 116.6, 119.5];
+  const cpiData = [100.0, 104.1, 108.5, 111.9, 114.7, 117.0, 119.3, 121.7];
+  const hdbData = [100.0, 102.6, 105.3, 108.0, 110.8, 113.7, 116.6, 119.6];
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'RCR (中央区以外) 房市',
+          data: rcrData,
+          borderColor: '#f0c84a',
+          backgroundColor: 'rgba(240, 200, 74, 0.1)',
+          borderWidth: 3,
+          tension: 0.3,
+          fill: true
+        },
+        {
+          label: 'OCR (中央区外围) 房市',
+          data: ocrData,
+          borderColor: '#9f7aea', // Purple
+          borderWidth: 3,
+          tension: 0.3
+        },
+        {
+          label: 'CCR (核心中央区) 房市',
+          data: ccrData,
+          borderColor: '#a0aec0', // Gray/Silver
+          borderWidth: 3,
+          tension: 0.3
+        },
+        {
+          label: '定存利率 (Fixed Deposit)',
+          data: fdData,
+          borderColor: '#63b3ed',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          tension: 0.1
+        },
+        {
+          label: '通货膨胀率 (Inflation)',
+          data: cpiData,
+          borderColor: '#fc8181',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          tension: 0.1
+        },
+        {
+          label: 'HDB 贷款利率 (HDB Loan)',
+          data: hdbData,
+          borderColor: '#48bb78',
+          borderWidth: 2,
+          borderDash: [2, 2],
+          tension: 0.1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      color: '#8899bb',
+      plugins: {
+        legend: { position: 'top', labels: { color: '#e8f0fe', usePointStyle: true, boxWidth: 8 } },
+        tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(10,14,26,0.9)', titleColor: '#f0c84a', bodyColor: '#e8f0fe', borderColor: 'rgba(99,179,237,0.3)', borderWidth: 1 }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(99,179,237,0.1)' }, ticks: { color: '#8899bb' } },
+        y: { grid: { color: 'rgba(99,179,237,0.1)' }, ticks: { color: '#8899bb' }, title: { display: true, text: '累积指数 (2021=100)', color: '#8899bb' } }
+      },
+      interaction: { mode: 'nearest', axis: 'x', intersect: false }
+    }
+  });
+});
+</script>

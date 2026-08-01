@@ -282,31 +282,14 @@ def webhook():
             actual_symbol = alias_map.get(symbol.upper(), symbol.upper())
 
             # ======== 1. 檢查特定商品與庫存狀況 ========
-            CHECK_SYMBOLS = ['TMF','1OZ','MBT','MJY','M6E','MHNG','MHG','M2K','MES','MNQ']    #long only
-            #CHECK_SYMBOLS = ['VXM']    #add
-            if symbol in CHECK_SYMBOLS:
-                current_pos = get_current_position(ib, actual_symbol)
-                logger.info(f"{symbol}({actual_symbol}) 目前庫存口數: {current_pos}")
-                if action == 'BUY' and current_pos >= -1:
-                    ib.disconnect()
-                    return jsonify({'status': 'skip', 'message': '庫存為-1，這次不下單'}), 200
-            CHECK_SYMBOLS = ['XC','MCL']    #long only
-            if symbol in CHECK_SYMBOLS:
-                # XC 在 IBKR 實際 symbol 為 YC，需用 actual_symbol 查詢
-                current_pos = get_current_position(ib, actual_symbol)
-                logger.info(f"{symbol}({actual_symbol}) 目前庫存口數: {current_pos}")
-                if action == 'SELL' and current_pos <= 1:
-                    ib.disconnect()
-                    return jsonify({'status': 'skip', 'message': '庫存為+1，這次不下單'}), 200
             # ============================================
             # 2. 建立合約
             # 定義各期貨商品的交易所對應表
             exchange_map = {
-                "MBT": "CME", "M2K": "CME", "MES": "CME", "MNQ": "CME", "M6E": "CME", "MJY": "CME",
-                "MHG": "COMEX", "1OZ": "COMEX", "MGC": "COMEX",
+                "MET": "CME", "MES": "CME", "MNQ": "CME", "M6E": "CME", "MJY": "CME",
+                "MHG": "COMEX", "MGC": "COMEX",
                 "MHNG": "NYMEX", "MCL": "NYMEX",
-                "MYM": "CBOT", "YC": "CBOT",
-                "VXM": "CFE"
+                "YC": "CBOT", "VXM": "CFE"
             }
 
             # 3. 修正：將 expiry_map 改為支援條件邏輯 (支援 BUY/SELL 分別指定不同月份)
@@ -314,9 +297,9 @@ def webhook():
             def get_target_expiry(sym, act):
                 # 預設對照表
                 mapping = {
-                    "MBT": "202608", "VXM": "202608",
-                    "1OZ": "202608", "MGC": "202610", "MHNG": "202609", "MNG": "202609", "MCL": "202609",
-                    "MNQ": "202609", "MES": "202609", "M2K": "202609", "M6E": "202609", "MJY": "202609", "MYM": "202609", "MHG": "202609", "YC": "202609"
+                    "MET": "202608", "VXM": "202608",
+                    "MGC": "202610", "MHNG": "202609", "MNG": "202609", "MCL": "202609",
+                    "MNQ": "202609", "MES": "202609", "M6E": "202609", "MJY": "202609", "MHG": "202609", "YC": "202609"
                 }
                 
                 # 特殊邏輯：MNQ 轉倉規則
@@ -326,8 +309,6 @@ def webhook():
                 #    return "202609" if act == "BUY" else "202610"
                 #if sym == "MNQ":
                 #    return "202606" if act == "BUY" else "202609"
-                #if sym == "M2K":
-                #    return "202606" if act == "BUY" else "202609"
                 #if sym == "M6E":
                 #    return "202609" if act == "BUY" else "202606"
                 #if sym == "MJY":
@@ -336,7 +317,7 @@ def webhook():
                 #if sym == "MHG":
                 #    return "202607" if act == "BUY" else "202609"
 
-                #if sym == "MBT":
+                #if sym == "MET":
                 #    return "202607" if act == "BUY" else "202608"
                 #if sym == "VXM":
                 #    return "202608" if act == "BUY" else "202607"
@@ -367,8 +348,6 @@ def webhook():
                 'MGC': 0.1,      # 微型黃金
                 'MES': 0.25,     # 微型 SP500
                 'MNQ': 0.25,     # 微型 Nasdaq
-                'M2K': 0.1,      # 微型羅素
-                'MYM': 1.0,      # 微型道瓊
                 'MCL': 0.01,     # 微型原油
             }
             if actual_symbol in TICK_OVERRIDES:
@@ -404,7 +383,7 @@ def webhook():
                 order.algoParams = [TagValue('adaptivePriority', 'Normal')]
 
             # CBOT 農產品期貨（YC=玉米）在美股正規時段外
-            CBOT_FUTURES = {'YC', 'MYM'}  # CBOT 交易所的期貨品種
+            CBOT_FUTURES = {'YC'}  # CBOT 交易所的期貨品種
             
             if is_future:
                 if not is_rth and actual_symbol in CBOT_FUTURES:

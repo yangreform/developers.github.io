@@ -123,12 +123,14 @@ SHIOAJI_CA_PASSWD = env_str("SHIOAJI_CA_PASSWD", required=False)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_NAME = os.path.join(BASE_DIR, "LandlordSG", "landlord_sg.db")
 
+'''
 WATCH_LIST = [
     {"symbol": "BTC", "secType": "CRYPTO", "exchange": "PAXOS", "currency": "USD", "expiry": "", "decimals": 1},
     {"symbol": "VXM", "secType": "FUT", "exchange": "CFE", "currency": "USD", "expiry": "202608", "decimals": 3},
     {"symbol": "KORU", "secType": "STK", "exchange": "SMART", "currency": "USD", "expiry": "", "decimals": 2},
     {"symbol": "SOXL", "secType": "STK", "exchange": "SMART", "currency": "USD", "expiry": "", "decimals": 2},
 ]
+'''
 
 ib = IB()
 api = None
@@ -958,6 +960,7 @@ def get_positions_with_pnl(ib_client: IB, ticker_decimals_map: dict[str, int]):
         })
 
     # Include WATCH_LIST items with position 0 if they aren't in my_positions
+    '''
     for item in WATCH_LIST:
         sym = item['symbol']
         if not any(r['symbol'] == sym for r in results):
@@ -999,6 +1002,7 @@ def get_positions_with_pnl(ib_client: IB, ticker_decimals_map: dict[str, int]):
             })
 
     return results
+    '''
 
 
 # ==============================================================================
@@ -1040,6 +1044,7 @@ def main():
                 ib.connect(IB_HOST, IB_PORT, clientId=IB_CLIENT_ID, timeout=15)
                 ib.reqMarketDataType(4)
 
+                '''
                 for item in WATCH_LIST:
                     c = Contract(
                         symbol=item['symbol'],
@@ -1051,6 +1056,7 @@ def main():
                     ib.qualifyContracts(c)
                     ib.reqMktData(c, '', False, False)
                     ticker_decimals_map[item['symbol']] = item.get('decimals', 2)
+                '''
                 print(">>> IB 連接成功！")
 
             acc_info = get_account_details(ib)

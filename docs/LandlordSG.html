@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LandlordSG · 新加坡房产资料平台</title>
+
+  <!-- PWA & Mobile Meta -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0e1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LandlordSG">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- SEO & Open Graph (Social Preview) -->
+  <meta name="description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。提供 HDB 与 URA 最新成交资料。">
+  <meta property="og:title" content="LandlordSG - 新加坡房产即时资料库">
+  <meta property="og:description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。">
+  <meta property="og:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="LandlordSG - 新加坡房产即时资料库">
+  <meta name="twitter:description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。">
+  <meta name="twitter:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
+
+  <meta name="keywords" content="LANDED HOUSING DEVELOPMENT, NORMANTON PARK, PARC CLEMATIS, PARKTOWN RESIDENCE, TREASURE AT TAMPINES, SPRINGLEAF RESIDENCE, GRAND DUNMAN, CHUAN PARK, EMERALD OF KATONG, THE FLORENCE RESIDENCES, AURELLE OF TAMPINES, THE ORIE, THE RESERVE RESIDENCES, THE CONTINUUM, CANNINGHILL PIERS, SKYE AT HOLLAND, COPEN GRAND, TEMBUSU GRAND, LENTOR MODERN, ZYON GRAND, TENET, NORTH GAIA, RIVERFRONT RESIDENCES, LENTOR HILLS RESIDENCES, ONE MARINA GARDENS, COASTAL CABANA, OTTO PLACE, AFFINITY AT SERANGOON, IRWELL HILL RESIDENCES, LEEDON GREEN, AVENUE SOUTH RESIDENCE, SOL ACRES, PINERY RESIDENCES, PASIR RIS 8, NAVA GROVE, LENTOR MANSION, RIVELLE TAMPINES, PINETREE HILL, THE WATERGARDENS AT CANBERRA, LUMINA GRAND, NOVO PLACE, MIDWOOD, PARC GREENWICH, RIVER GREEN, LENTOR CENTRAL RESIDENCES, HILLOCK GREEN, PARC ESTA, PENRITH, SERANGOON GARDEN ESTATE, SENGKANG GRAND RESIDENCES, DAIRY FARM RESIDENCES, STIRLING RESIDENCES, KI RESIDENCES AT BROOKVALE, D'LEEDON, PICCADILLY GRAND, RIVER MODERN, PROMENADE PEAK, PROVENCE RESIDENCE, ONE PEARL BANK, HIGH PARK RESIDENCES, AMO RESIDENCE, THE BOTANY AT DAIRY FARM, KINGSFORD WATERBAY, ELTA, THE WOODLEIGH RESIDENCES, THE MYST, FABER RESIDENCE, THE TOPIARY, RIVIERE, JADESCAPE, ALTURA, SIMS URBAN OASIS, ONE BERNAM, J'DEN, REFLECTIONS AT KEPPEL BAY, PENROSE, LYNDENWOODS, HILLHAVEN, FORETT@BUKIT TIMAH, AMBER PARK, HYLL ON HOLLAND, CANBERRA CRESCENT RESIDENCES, CLAVON, THE AVENIR, LIV @ MB, BELLEWATERS, PARC RIVIERA, NORWOOD GRAND, THE MINTON, OLA, EIGHT RIVERSUITES, THE LAKEGARDEN RESIDENCES, THE LANDMARK, THE TRE VER, BLOOMSBURY RESIDENCES, PULLMAN RESIDENCES NEWTON, FOURTH AVENUE RESIDENCES, THE TERRACE, RESIDENTIAL APARTMENTS, THE VISIONAIRE">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta name="description" content="LandlordSG — 新加坡最完整的房产成交资料平台，涵盖 HDB 组屋与 URA 私宅即时行情，附热力图视觉化分析">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --navy:#0a0e1a;
+      --navy2:#0d1325;
+      --panel:rgba(15,22,44,0.9);
+      --gold:#c9a227;
+      --gold-light:#f0c84a;
+      --accent:#63b3ed;
+      --green:#48bb78;
+      --purple:#9f7aea;
+      --text:#e8f0fe;
+      --muted:#8899bb;
+      --border:rgba(99,179,237,0.15);
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:'Inter',sans-serif;background:var(--navy);color:var(--text);min-height:100vh}
+
+    /* ── Navbar ── */
+    nav{
+      position:sticky;top:0;z-index:100;
+      background:rgba(10,14,26,0.97);border-bottom:1px solid var(--border);
+      backdrop-filter:blur(20px);padding:0 24px;
+      display:flex;align-items:center;justify-content:space-between;height:64px;
+    }
+    .nav-brand{font-size:17px;font-weight:800;background:linear-gradient(90deg,var(--gold),var(--gold-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none;letter-spacing:-0.3px}
+    .nav-links{display:flex;gap:6px}
+    .nav-link{padding:7px 16px;border-radius:20px;font-size:13px;font-weight:500;color:var(--muted);text-decoration:none;transition:all 0.2s;border:1px solid transparent}
+    .nav-link:hover{color:var(--text);background:rgba(99,179,237,0.08);border-color:var(--border)}
+    .nav-link.btn-cta{background:linear-gradient(135deg,rgba(201,162,39,0.2),rgba(240,200,74,0.12));color:var(--gold-light);border-color:rgba(201,162,39,0.3)}
+    .nav-link.btn-cta:hover{background:linear-gradient(135deg,rgba(201,162,39,0.3),rgba(240,200,74,0.2));box-shadow:0 0 16px rgba(201,162,39,0.2)}
+
+    /* ── Hero ── */
+    .hero{
+      min-height:85vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      text-align:center;padding:60px 24px;position:relative;overflow:hidden;
+      background:radial-gradient(ellipse at 50% 0%,rgba(99,179,237,0.06) 0%,transparent 60%),
+                 radial-gradient(ellipse at 80% 80%,rgba(201,162,39,0.05) 0%,transparent 50%),
+                 var(--navy);
+    }
+    .hero::after{
+      content:'';position:absolute;bottom:0;left:0;right:0;height:120px;
+      background:linear-gradient(to bottom,transparent,var(--navy));pointer-events:none;
+    }
+    .hero-pill{
+      display:inline-flex;align-items:center;gap:8px;margin-bottom:24px;
+      padding:7px 18px;border-radius:24px;
+      background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.2);
+      font-size:12px;font-weight:600;color:var(--accent);letter-spacing:0.5px;
+    }
+    .hero h1{
+      font-size:clamp(36px,6vw,72px);font-weight:800;line-height:1.1;margin-bottom:20px;
+      letter-spacing:-1px;
+    }
+    .hero h1 .blue{background:linear-gradient(135deg,#63b3ed,#4299e1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .hero h1 .gold{background:linear-gradient(135deg,var(--gold),var(--gold-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .hero-desc{font-size:clamp(15px,2vw,18px);color:var(--muted);max-width:580px;line-height:1.7;margin-bottom:40px}
+    .hero-btns{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+    .btn-primary-lg{
+      padding:14px 32px;border-radius:30px;font-size:15px;font-weight:700;
+      background:linear-gradient(135deg,#63b3ed,#4299e1);color:#fff;
+      border:none;cursor:pointer;text-decoration:none;
+      transition:all 0.25s;display:inline-flex;align-items:center;gap:9px;
+      box-shadow:0 6px 28px rgba(99,179,237,0.35);
+    }
+    .btn-primary-lg:hover{transform:translateY(-3px);box-shadow:0 10px 40px rgba(99,179,237,0.5)}
+    .btn-gold-lg{
+      padding:14px 32px;border-radius:30px;font-size:15px;font-weight:700;
+      background:linear-gradient(135deg,var(--gold),var(--gold-light));color:#0a0e1a;
+      border:none;cursor:pointer;text-decoration:none;
+      transition:all 0.25s;display:inline-flex;align-items:center;gap:9px;
+      box-shadow:0 6px 28px rgba(201,162,39,0.3);
+    }
+    .btn-gold-lg:hover{transform:translateY(-3px);box-shadow:0 10px 40px rgba(201,162,39,0.45)}
+
+    /* ── Quick Stats Bar ── */
+    .stats-bar{
+      display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;
+      background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+    }
+    .stat-item{
+      background:var(--navy2);padding:24px 28px;text-align:center;
+      transition:background 0.2s;
+    }
+    .stat-item:hover{background:rgba(99,179,237,0.04)}
+    .stat-num{font-size:28px;font-weight:800;line-height:1}
+    .stat-num.blue{background:linear-gradient(135deg,#63b3ed,#90cdf4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .stat-num.gold{background:linear-gradient(135deg,var(--gold),var(--gold-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .stat-num.green{background:linear-gradient(135deg,var(--green),#9ae6b4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .stat-num.purple{background:linear-gradient(135deg,var(--purple),#d6bcfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .stat-desc{font-size:12px;color:var(--muted);margin-top:6px;font-weight:500}
+
+    /* ── Feature Cards ── */
+    .features{padding:72px 24px;max-width:1200px;margin:0 auto}
+    .section-eyebrow{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:2px;margin-bottom:12px}
+    .section-h{font-size:clamp(24px,3.5vw,40px);font-weight:800;margin-bottom:10px;letter-spacing:-0.5px}
+    .section-sub{font-size:15px;color:var(--muted);margin-bottom:40px;max-width:500px;line-height:1.6}
+    .feat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+    .feat-card{
+      background:var(--panel);border:1px solid var(--border);border-radius:20px;
+      padding:32px 28px;transition:transform 0.25s,box-shadow 0.25s,border-color 0.25s;
+      text-decoration:none;color:inherit;display:block;
+    }
+    .feat-card:hover{transform:translateY(-6px);box-shadow:0 20px 60px rgba(0,0,0,0.35);border-color:rgba(99,179,237,0.3)}
+    .feat-card.gold-hover:hover{border-color:rgba(201,162,39,0.35);box-shadow:0 20px 60px rgba(201,162,39,0.1)}
+    .feat-icon{
+      width:52px;height:52px;border-radius:14px;margin-bottom:20px;
+      display:flex;align-items:center;justify-content:center;font-size:24px;
+    }
+    .feat-icon.blue{background:rgba(99,179,237,0.15);box-shadow:0 0 20px rgba(99,179,237,0.2)}
+    .feat-icon.gold{background:rgba(201,162,39,0.12);box-shadow:0 0 20px rgba(201,162,39,0.15)}
+    .feat-icon.green{background:rgba(72,187,120,0.12);box-shadow:0 0 20px rgba(72,187,120,0.15)}
+    .feat-title{font-size:18px;font-weight:700;margin-bottom:10px}
+    .feat-desc{font-size:13px;color:var(--muted);line-height:1.65;margin-bottom:16px}
+    .feat-link{font-size:13px;font-weight:600;color:var(--accent);display:inline-flex;align-items:center;gap:5px}
+    .feat-card.gold-hover .feat-link{color:var(--gold-light)}
+
+    /* ── Data Tables ── */
+    .data-section{background:var(--navy2);padding:72px 24px}
+    .data-inner{max-width:1200px;margin:0 auto}
+    .tabs{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+    .tab-btn{
+      padding:8px 20px;border-radius:20px;font-size:13px;font-weight:600;
+      border:1px solid var(--border);background:transparent;color:var(--muted);
+      cursor:pointer;font-family:inherit;transition:all 0.2s;
+    }
+    .tab-btn:hover{background:rgba(99,179,237,0.08);color:var(--text)}
+    .tab-btn.active{background:rgba(99,179,237,0.15);color:var(--accent);border-color:rgba(99,179,237,0.4)}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+    .table-wrap{overflow-x:auto;border-radius:16px;border:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead tr{background:rgba(99,179,237,0.06);border-bottom:1px solid var(--border)}
+    thead th{padding:14px 18px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;white-space:nowrap}
+    tbody tr{border-bottom:1px solid rgba(99,179,237,0.06);transition:background 0.15s}
+    tbody tr:hover{background:rgba(99,179,237,0.04)}
+    tbody tr:last-child{border-bottom:none}
+    td{padding:13px 18px;color:var(--text);vertical-align:middle}
+    td.num{font-variant-numeric:tabular-nums;font-weight:500}
+    td.town{font-weight:600;color:var(--text)}
+    td.price{color:var(--gold-light);font-weight:600}
+    td.cnt{color:var(--accent);font-weight:500}
+    .badge{display:inline-flex;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600}
+    .badge-hdb{background:rgba(246,173,85,0.18);color:#f6ad55}
+    .badge-ura{background:rgba(99,179,237,0.18);color:#63b3ed}
+    .badge-up{background:rgba(72,187,120,0.15);color:var(--green)}
+    /* CAGR 涨幅 badges */
+    .cagr-up{color:#48bb78;font-weight:700}
+    .cagr-dn{color:#fc8181;font-weight:700}
+    .cagr-neu{color:var(--muted);font-weight:500}
+    .sparkline{display:inline-flex;align-items:flex-end;gap:2px;height:20px;vertical-align:middle;margin-left:4px}
+    .spark-bar{width:4px;border-radius:2px 2px 0 0;background:var(--accent);opacity:0.7;transition:opacity 0.2s}
+    .spark-bar:hover{opacity:1}
+    .search-bar{
+      display:flex;gap:10px;margin-bottom:18px;align-items:center;flex-wrap:wrap;
+    }
+    .search-input{
+      flex:1;min-width:200px;padding:9px 16px;border-radius:20px;
+      border:1px solid var(--border);background:rgba(255,255,255,0.04);
+      color:var(--text);font-family:inherit;font-size:13px;outline:none;
+      transition:border-color 0.2s;
+    }
+    .search-input:focus{border-color:var(--accent)}
+    .search-input::placeholder{color:var(--muted)}
+    .result-count{font-size:12px;color:var(--muted);white-space:nowrap}
+    .no-data{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+
+    /* ── CTA Band ── */
+    .cta-band{
+      padding:72px 24px;text-align:center;
+      background:radial-gradient(ellipse at 50% 50%,rgba(99,179,237,0.06) 0%,transparent 70%),var(--navy);
+    }
+    .cta-band h2{font-size:clamp(24px,4vw,42px);font-weight:800;margin-bottom:14px;letter-spacing:-0.5px}
+    .cta-band p{font-size:16px;color:var(--muted);margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto}
+
+    /* ── Footer ── */
+    footer{background:rgba(5,8,16,0.98);border-top:1px solid var(--border);text-align:center;padding:28px;font-size:13px;color:var(--muted)}
+    footer a{color:var(--accent);text-decoration:none}
+    footer a:hover{text-decoration:underline}
+
+    @media(max-width:600px){.nav-links{gap:4px}.nav-link{padding:6px 10px;font-size:12px}}
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav>
+  <a class="nav-brand" href="LandlordSG.html">LandlordSG &#127968;</a>
+  <div class="nav-links">
+    <a class="nav-link" href="heatmap.html">&#128200; 热力图</a>
+    <!-- <a class="nav-link btn-cta" href="about.html">&#11088; 优质百万团队</a> -->
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-pill"><i class="bi bi-database-fill"></i>&nbsp; 新加坡房产资料平台</div>
+  <h1>
+    <span class="blue">新加坡</span>房产<br>
+    <span class="gold">即时行情</span>资料库
+  </h1>
+  <p class="hero-desc">
+    涵盖 <strong>22.7 万笔</strong> HDB 组屋成交、<strong>13.9 万笔</strong> URA 私宅交易，<br>
+    搭配热力图视觉化，一眼掌握全岛房市脉动。
+  </p>
+  <!--div class="hero-btns">
+    <a href="heatmap.html" class="btn-primary-lg"><i class="bi bi-map-fill"></i> 开启热力图</a>
+    <!-- <a href="about.html" class="btn-gold-lg"><i class="bi bi-person-fill"></i> 联络顾问</a> -->
+  </div-->
+</section>
+
+<!-- Stats Bar>
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-num blue">227,521</div>
+    <div class="stat-desc">HDB 组屋成交笔数</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num gold">139,624</div>
+    <div class="stat-desc">URA 私宅成交笔数</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num green">2,997</div>
+    <div class="stat-desc">私宅楼盘座标资料</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num purple">54,415</div>
+    <div class="stat-desc">HDB 租赁纪录</div>
+  </div>
+</div>
+
+<div class="features">
+  <div class="section-eyebrow">核心功能</div>
+  <h2 class="section-h">全方位掌握<br>新加坡房市</h2>
+  <p class="section-sub">从热力图到逐笔资料查询，提供最直观的房市分析工具。</p>
+
+  <div class="feat-grid">
+    <a href="heatmap.html" class="feat-card">
+      <div class="feat-icon blue">&#128200;</div>
+      <div class="feat-title">成交热力图</div>
+      <div class="feat-desc">以地图视觉化呈现全岛 URA 私宅与 HDB 组屋的成交价格、呎价与交易量分布，一目了然掌握热点区域。</div>
+      <span class="feat-link">立即查看 &#8594;</span>
+    </a>
+    <!-- <a href="about.html" class="feat-card gold-hover">
+      <div class="feat-icon gold">&#127775;</div>
+      <div class="feat-title">优质百万团队</div>
+      <div class="feat-desc">由资深顾问台湾小伶 Melody 带领，提供 HDB 组屋、URA 私宅与海外买家全程服务，中英双语，贴心到位。</div>
+      <span class="feat-link">了解更多 &#8594;</span>
+    </a> -->
+    <div class="feat-card" style="cursor:default">
+      <div class="feat-icon green">&#128202;</div>
+      <div class="feat-title">即时行情资料</div>
+      <div class="feat-desc">整合政府公开资料，涵盖 2017 至今的完整成交纪录，支援依市镇、类型、年份等多维度筛选查询。</div>
+      <span class="feat-link" style="color:var(--green)">见下方资料表 &#8595;</span>
+    </div>
+  </div>
+</div-->
+
+
+<!-- Macro Chart -->
+<div class="features" style="padding-top:0;">
+  <div class="section-eyebrow">宏观经济比较</div>
+  <h2 class="section-h">新加坡房市与宏观指标趋势</h2>
+  <p class="section-sub">对比过去各地区房市平均涨幅与定存、通膨走势，并依基准年动态预估未来发展。</p>
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:24px;position:relative;height:400px;width:100%;max-width:1000px;margin:0 auto;">
+    <canvas id="macroChart"></canvas>
+  </div>
+</div>
+
+<!-- Data Tables -->
+<div class="data-section">
+  <div class="data-inner">
+    <div class="section-eyebrow">即时资料库</div>
+    <h2 class="section-h">房市成交资料总览</h2>
+    <p class="section-sub">以下资料来自 landlord_sg.db，依市镇分类汇总。</p>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="dev-tab">&#127968; 🏠 私宅：依开发商</button>
+      <button class="tab-btn" data-tab="ura-tab">&#127961;&#65039; 🏙️ 私宅：依楼盘</button>
+      <button class="tab-btn" data-tab="commercial-tab">&#127980; 🏢 商办 / 店面</button>
+    </div>
+
+    <!-- URA Tab -->
+    <div id="ura-tab" class="tab-panel">
+      <div class="search-bar">
+        <input class="search-input" id="ura-search" placeholder="&#128269; 搜寻楼盘或街道名称..." oninput="filterTable('ura-table','ura-search','ura-count')">
+        <span class="result-count" id="ura-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="ura-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>楼盘名称</th>
+            <th style="width:120px; text-align:left">开发商</th>
+              <th>邮递区号</th>
+              <th>最新均价 (S$)</th>
+              <th>均呎价 (S$)</th>
+              <th>年均涨幅</th>
+              <th>3年后预估价 (S$)</th>
+              <th>数据开始年份</th>
+            </tr>
+          </thead>
+          <tbody id="ura-tbody">
+            <tr><td colspan="9" class="no-data">载入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DEV Tab -->
+    <div id="dev-tab" class="tab-panel active">
+      <div class="search-bar">
+        <input class="search-input" id="dev-search" placeholder="&#128269; 搜寻开发商名称..." oninput="filterTable('dev-table','dev-search','dev-count')">
+        <span class="result-count" id="dev-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="dev-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>开发商</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortDevTable('total_projects')">总楼盘数 &#8693;</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortDevTable('avg_price')">最新均价 (S$) &#8693;</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortDevTable('avg_cagr')">年均涨幅 &#8693;</th>
+            </tr>
+          </thead>
+          <tbody id="dev-tbody">
+            <tr><td colspan="5" class="no-data">载入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+
+    <!-- COMMERCIAL Tab -->
+    <div id="commercial-tab" class="tab-panel">
+      <div class="search-bar">
+        <input class="search-input" id="com-search" placeholder="&#128269; 搜寻楼盘、街道或类型..." oninput="filterTable('com-table','com-search','com-count')">
+        <span class="result-count" id="com-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="com-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>楼盘名称</th>
+              <th>街道</th>
+              <th>类型</th>
+              <th>年限</th>
+              <th>面积 (sqm)</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortComTable('price')">总价 (S$) &#8693;</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortComTable('psf')">单价 (S$ psf) &#8693;</th>
+              <th style="cursor:pointer; color:var(--accent);" onclick="sortComTable('date')">成交日期 &#8693;</th>
+            </tr>
+          </thead>
+          <tbody id="com-tbody">
+            <tr><td colspan="9" class="no-data">载入中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+<!-- Disclaimer & Contact Section -->
+<div class="cta-band" id="contact">
+  <div style="max-width:800px; margin:0 auto; text-align:left;">
+    <h2 style="text-align:center;">联络我们与功能建议</h2>
+    <p style="text-align:center; color:var(--muted); font-size:14px; margin-bottom:30px;">
+      ⚠️ <strong>声明：本站非房屋仲介网页</strong>，仅作为新加坡房市即时现况与数据视觉化平台，不能做为唯一买卖参考依据。<br>All information is provided for reference only and shall not be used as a sole basis for any commitment, offer or contract.<br>
+      若您有任何功能建议，或有实际的买卖/租赁需求需要推荐专业资源，欢迎填写下方表单联络我们。
+    </p>
+
+    <!-- Contact Form -->
+    <style>
+      .form-group{margin-bottom:15px}
+      .form-label{display:block;margin-bottom:6px;font-size:13px;color:var(--muted)}
+      .form-input,.form-textarea{width:100%;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:14px;box-sizing:border-box}
+      .form-input:focus,.form-textarea:focus{outline:none;border-color:var(--gold)}
+      .form-textarea{resize:vertical;min-height:100px}
+      .btn-submit{display:inline-block;width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),#e0b82b);color:#0a0e1a;border:none;border-radius:8px;cursor:pointer;font-weight:bold;font-size:16px;margin-top:10px;transition:0.2s;}
+      .btn-submit:hover{opacity:0.9; transform:translateY(-1px);}
+      #form-success{display:none;text-align:center;padding:20px;color:#4ade80;font-weight:500}
+    </style>
+    
+    <form id="contact-form">
+      <div class="form-group">
+        <label class="form-label" for="form-name">姓名 / 称呼</label>
+        <input class="form-input" id="form-name" type="text" placeholder="请输入您的姓名" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="form-email">Email</label>
+        <input class="form-input" id="form-email" type="email" placeholder="example@email.com" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="form-phone">电话 / WhatsApp (选填)</label>
+        <input class="form-input" id="form-phone" type="tel" placeholder="+65 XXXX XXXX">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="form-msg">建议或需求</label>
+        <textarea class="form-textarea" id="form-msg" placeholder="请描述您的功能建议或置业/租赁需求..." required></textarea>
+      </div>
+      <button type="submit" class="btn-submit">&#128231; 送出讯息</button>
+      <div id="form-success">&#10003; 讯息已送出！我们将尽快回复您。</div>
+    </form>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <p>
+    &copy; 2026 LandlordSG &nbsp;|&nbsp;
+    新加坡房产即时资料平台 &nbsp;|&nbsp;
+    <a href="mailto:Law@weishun.cc">Law@weishun.cc</a> &nbsp;|&nbsp;
+    资料来源：HDB / URA 官方公开资料
+  </p>
+</footer>
+
+<script>
+  // ── API Base（后端 ngrok）──
+  const API_BASE = 'https://imelda-nondeferent-deformedly.ngrok-free.dev/app';
+
+  // ── Tab 切换 ──────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── 搜寻过滤 ──────────────────────────────────────────────
+  function filterTable(tableId, searchId, countId) {
+    var q = document.getElementById(searchId).value.trim().toLowerCase();
+    var rows = document.querySelectorAll('#' + tableId + ' tbody tr[data-row]');
+    var vis = 0;
+    rows.forEach(function(tr) {
+      var text = tr.textContent.toLowerCase();
+      var show = !q || text.indexOf(q) > -1;
+      tr.style.display = show ? '' : 'none';
+      if (show) vis++;
+    });
+    var cnt = document.getElementById(countId);
+    if (cnt) cnt.textContent = q ? ('显示 ' + vis + ' / ' + rows.length + ' 笔') : (rows.length + ' 笔资料');
+  }
+
+  // ngrok bypass header（解决 ngrok 浏览器警告页面问题）
+  var NGROK_HDR = { 'ngrok-skip-browser-warning': '1' };
+  var FETCH_OPTS = { headers: NGROK_HDR };
+
+  // ── 格式化数字 ─────────────────────────────────────────────
+  function fmtNum(n) {
+    if (!n && n !== 0) return '—';
+    return Math.round(n).toLocaleString();
+  }
+
+  // ── 载入 HDB 资料 ──────────────────────────────────────────
+
+  // ── 载入 URA 涨幅 & 预估资料 ─────────────────────────────────
+  async function loadURAData() {
+    try {
+      // 呼叫新的 price trend API
+      var resp = await fetch(API_BASE + '/api/ura_price_trend?limit=5000', FETCH_OPTS);
+      var json = await resp.json();
+      if (json.status !== 'success') throw new Error(json.message || '资料载入失败');
+
+      var tbody = document.getElementById('ura-tbody');
+      var rows = json.data || [];
+      window.uraDataFull = rows;
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="no-data">暂无资料</td></tr>'; return; }
+
+      // 已按 CAGR desc 排序（由后端处理）
+      var html = '';
+      rows.forEach(function(d, i) {
+        // 年均涨幅显示
+        var cagrCls = d.cagr > 3 ? 'cagr-up' : (d.cagr < -3 ? 'cagr-dn' : 'cagr-neu');
+        var cagrArrow = d.cagr > 0 ? '&#9650; ' : (d.cagr < 0 ? '&#9660; ' : '');
+        var cagrText  = cagrArrow + Math.abs(d.cagr).toFixed(1) + '% / 年';
+
+        // Sparkline（迷你年度趋势）
+        var spark = '';
+        if (d.yearly && d.yearly.length >= 2) {
+          var prices = d.yearly.map(function(y) { return y.avg_price; });
+          var minP = Math.min.apply(null, prices);
+          var maxP = Math.max.apply(null, prices);
+          var rng  = maxP - minP || 1;
+          spark = '<span class="sparkline">';
+          prices.forEach(function(p) {
+            var h = Math.max(3, Math.round(((p - minP) / rng) * 18));
+            var clr = d.cagr > 0 ? '#48bb78' : '#fc8181';
+            spark += '<span class="spark-bar" title="S$' + p.toLocaleString() + '" style="height:' + h + 'px;background:' + clr + '"></span>';
+          });
+          spark += '</span>';
+        }
+
+        // 期间显示
+        var period = d.earliest_yr + ' (' + d.n_years + '年)';
+
+        html += `<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick="window.location.href='heatmap.html?project=${encodeURIComponent(d.project || d.label || d.town || "")}'" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">`
+              + '<td class="num">' + (i+1) + '</td>'
+              + '<td class="town">' + (d.project || '—') + spark + '</td>'
+              + '<td style="color:var(--muted);font-size:12px">' + (d.developer || '—') + '</td>'
+              + '<td style="color:var(--muted);font-size:12px">' + (d.postal && d.postal !== 'NIL' ? d.postal : '—') + '</td>'
+              + '<td class="price">S$ ' + (d.latest_price ? d.latest_price.toLocaleString() : '—') + '</td>'
+              + '<td style="color:var(--muted)">' + (d.latest_psf ? 'S$ ' + d.latest_psf.toFixed(0) : '—') + '</td>'
+              + '<td class="' + cagrCls + '">' + cagrText + '</td>'
+              + '<td class="price" style="color:' + (d.cagr > 0 ? '#68d391' : '#fc8181') + '">S$ ' + (d.est_3yr ? d.est_3yr.toLocaleString() : '—') + '</td>'
+              + '<td style="font-size:11px;color:var(--muted)">' + period + '</td>'
+              + '</tr>';
+      });
+      tbody.innerHTML = html;
+      document.getElementById('ura-count').textContent = rows.length + ' 笔楼盘（按年均涨幅排序）';
+    } catch(e) {
+      document.getElementById('ura-tbody').innerHTML = '<tr><td colspan="8" class="no-data">无法载入：' + e.message + '</td></tr>';
+    }
+  }
+
+  // ── 载入租赁资料 ──────────────────────────────────────────
+
+  // ── 启动 ──────────────────────────────────────────────────
+  window.addEventListener('load', function() {
+    loadDevelopers();
+    loadURAData();
+    loadCommercialData();
+    
+  });
+</script>
+
+<!-- SEO Hidden Keywords -->
+<div style="display:none;" aria-hidden="true"># 1 LOFT, # 1 SUITES, 1 CANBERRA, 1 KING ALBERT PARK, 1 MOULMEIN RISE, 10 EVELYN, 10 SHELFORD, 11 AMBER ROAD, 111 EMERALD HILL, 120 GRANGE, 15 HOLLAND HILL, 16 @ AMBER, 18 SHELFORD, 18 WOODSVILLE, 183 LONGHAUS, 19 NASSIM, 1919, 1953, 2 RVG, 21 ANDERSON, 21 RICHARDS, 21 SHELFORD, 24 ONE RESIDENCES, 26 NEWTON, 28 IMPERIAL RESIDENCES, 28 RC SUITES, 28 SHELFORD, 283 STUDIO, 3 CUSCADEN, 3 ORCHARD BY-THE-PARK, 32 GILSTEAD, 33 RESIDENCES, 35 GILSTEAD, 368 THOMSON, 38 I SUITES, 38 JERVOIS, 3@PHILLIPS, 3@SANDILANDS, 3BHC, 448@EAST COAST, 57 @ KOVAN, 6 DERBYSHIRE, 75BR, 76 SHENTON, 77 @ EAST COAST, 8 @ MOUNT SOPHIA, 8 @ STRATTON, 8 BASSEIN, 8 EDEN GROVE, 8 FARRER SUITES, 8 HULLET, 8 NAPIER, 8 ON CHUAN, 8 RAJA, 8 RODYK, 8 SAINT THOMAS, 833 M B RESIDENCES, 8@BT, 8@WOODLEIGH, 8M RESIDENCES, 91 MARSHALL, A TREASURE TROVE, AALTO, ADAM PARK CONDOMINIUM, ADAM PLACE, ADANA @ THOMSON, ADELPHI PARK ESTATE, ADRIA, AFFINITY AT SERANGOON, AFFLUENCE COURT, AIRSTREAM, AIRVIEW PARK, ALANA, ALBA, ALEGRIA, ALESSANDREA, ALEX RESIDENCES, ALEXIS, ALLAMANDA GROVE, ALLSWORTH PARK, ALPHA APARTMENTS, ALTEZ, ALTURA, ALWYN PARK, AMANINDA, AMARANDA GARDENS, AMARYLLIS VILLE, AMBER 45, AMBER HOUSE, AMBER PARK, AMBER POINT, AMBER RESIDENCES, AMBER SKYE, AMO RESIDENCE, AMPAS APARTMENTS, ANGULLIA PARK RESIDENCES @ ORCHARD, APLETON VIEW, APOLLO GARDENS, AQUARINE GARDENS, AQUARIUS BY THE PARK, AQUENE, ARC AT TAMPINES, ARCHIPELAGO, ARDISIA GARDENS, ARDMORE II, ARDMORE PARK, ARDMORE THREE, ARDOR RESIDENCE, ARENA RESIDENCES, ARINA EAST RESIDENCES, ARIVA ON SHAN SERVICED RESIDENCE, ARTHUR 118, ARTHUR MANSIONS, ARTISAN 8, ARTRA, ASCENT @ 456, ASCENTIA SKY, ASPEN HEIGHTS, ASPEN LINQ, ASPEN LOFT, ASTON GREEN, ASTON LODGE, ASTON MANSIONS, ASTON RESIDENCE, ASTOR, ASTOR GREEN, ASTORIA PARK, ASTRID MEADOWS, ASTRIDVILLE, ATELIER VILLAS, ATLASSIA, ATRIUM RESIDENCES, ATTITUDE AT KIM YAM, AURA 83, AURALIS, AUREA, AURELLE OF TAMPINES, AUSTVILLE RESIDENCES, AVA TOWERS, AVALON, AVANT PARC, AVANT RESIDENCES, AVENUE SOUTH RESIDENCE, AVILA GARDENS, AVILA TERRACE, AVON PARK, AXIS @ SIGLAP, AZALEA PARK CONDOMINIUM, BAGNALL COURT, BAGNALL HAUS, BALCON EAST, BALESTIER 288, BALESTIER PLAZA, BALESTIER POINT, BALESTIER REGENCY, BALLOTA PARK CONDOMINIUM, BALMORAL 8, BALMORAL CREST, BALMORAL GATE, BALMORAL HEIGHTS, BALMORAL HILLS, BALMORAL PLAZA, BALMORAL POINT, BALMORAL RESIDENCES, BALMY COURT, BAN GUAN PARK, BANYAN CONDOMINIUM, BANYAN PARK, BANYAN VILLAS, BAODE BUILDING, BARKER 9, BARKER VILLE, BAROSSA GARDENS, BARTLEY RESIDENCES, BARTLEY RIDGE, BARTLEY RISE, BARTLEY RISE ESTATE, BARTLEY VILLAS, BARTLEY VUE, BASSEIN COURT, BAYOU RESIDENCE, BAYSHORE PARK, BAYVILLE CONDOMINIUM, BAYWATER, BAYWIND RESIDENCES, BEACON HEIGHTS, BEAU VISTA, BEAUFORT ON NASSIM, BEAUTY GARDEN, BEAUTY WORLD CENTRE, BEAUTY WORLD PLAZA, BEAVERTON COURT, BEDOK COURT, BEDOK GROVE, BEDOK PARK, BEDOK PESARI, BEDOK RESIDENCES, BEDOK RIA, BEDOK SHOPPING COMPLEX, BEDOKVILLE, BEECHWOOD TERRACE, BELGRAVIA ACE, BELGRAVIA GREEN, BELGRAVIA PARK, BELGRAVIA VILLAS, BELLA CASITA, BELLA VISTA, BELLAVILLE, BELLE VUE RESIDENCES, BELLERIVE, BELLEWATERS, BELLEWOODS, BELLEZZA @ KATONG, BELMOND GREEN, BELMONDO VIEW, BELYSA, BENA PARK, BENG TONG MANSION, BERKELEY RESIDENCES, BETA GROVE, BEVERLY HILL, BIJOU, BINJAI CREST, BINJAI PARK, BIRCHWOOD MANSIONS, BIRMINGHAM MANSIONS, BISHAN 8, BISHAN LOFT, BISHAN PARK CONDOMINIUM, BISHAN POINT, BISHOPSGATE RESIDENCES, BLAIR PLAIN CONSERVATION AREA, BLEU @ EAST COAST, BLISS LOFT, BLISS REGALIA, BLISS RESIDENCES, BLISS VILLE, BLISS@KOVAN, BLOOMSBURY RESIDENCES, BLOSSOM MANSIONS, BLOSSOM RESIDENCES, BLOSSOM VIEW, BLOSSOMS @ WOODLEIGH, BLOSSOMS BY THE PARK, BLU CORAL, BLUE HORIZON, BLUWATERS, BLUWATERS 2, BOAT QUAY CONSERVATION AREA, BOATHOUSE RESIDENCES, BOON COURT, BOON TECK APARTMENTS, BOON TECK TOWER, BOONVIEW, BOTANIC @ CLUNY PARK, BOTANIC GARDENS MANSION, BOTANIC GARDENS VIEW, BOTANIKA, BOTANIQUE AT BARTLEY, BOTANNIA, BOUGAINVILLA APARTMENTS, BOULEVARD 88, BOULEVARD VUE, BOWMONT CENTRE, BRADDELL HEIGHTS ESTATE, BRADDELL VIEW, BREEZE BY THE EAST, BREEZEWAYS, BREEZY MANSIONS, BRIGHT GARDEN, BRIGHTHILL RESIDENCES, BRIGHTON CREST, BRISTOL LODGE, BUCKLEY 18, BUCKLEY CLASSIQUE, BUCKLEY RESIDENCE, BUKIT 828, BUKIT LOYANG ESTATE, BUKIT REGENCY, BULLION PARK, BUONA LODGE, BUONA VISTA GARDENS, BURGHLEY DRIVE, BURGUNDY HILL, BURLINGTON SQUARE, BUTTERWORTH 8, BUTTERWORTH VIEW, CABANA, CACTUS GREEN, CADENCE LIGHT, CAIFU VIEW, CAIRNHILL 16, CAIRNHILL ASTORIA, CAIRNHILL CONSERVATION AREA, CAIRNHILL CREST, CAIRNHILL NINE, CAIRNHILL PLAZA, CAIRNHILL RESIDENCES, CALARASI, CALDECOTT HILL ESTATE, CALIN MANSIONS, CALLIDORA VILLE, CAMBIO SUITES, CAMBRIDGE VILLAGE, CAMDEN PARK, CAMELIA PARK, CAMELLIA LODGE, CAMELODGE, CAMELOT BY-THE-WATER, CANAAN, CANARY PARK, CANARY VILLE, CANBERLIN APARTMENTS, CANBERLIN LODGE, CANBERRA CRESCENT RESIDENCES, CANBERRA RESIDENCES, CANDEVILLE, CANNAVILLE, CANNE LODGE, CANNINGHILL PIERS, CANTIZ @ RAMBAI, CAPE ROYALE, CAPITOL PARK, CARABELLE, CARDIFF RESIDENCE, CARIBBEAN AT KEPPEL BAY, CARISSA PARK CONDOMINIUM, CARLYX GREEN, CARLYX RESIDENCE, CARMI MANSIONS, CARMINE COLLECTION, CARPMAEL THIRTY-EIGHT, CASA AERATA, CASA AL MARE, CASA AROMA, CASA CAIRNHILL, CASA CAMBIO, CASA EMERALD, CASA ESPANIA, CASA ESPERANZA, CASA FELIZ, CASA FIDELIO, CASA FLORA, CASA FORTUNA, CASA IRRAWADDY, CASA JERVOIS, CASA MERAH, CASA MEYA, CASA NOVACREST, CASA PASIR RIS, CASA RIVIERA, CASA ROSA, CASA SARINA, CASA SERENO, CASABELLA, CASABLANCA, CASAFINA, CASCADALE, CASCATA, CASERO @ DUNMAN, CASHEW ESTATE, CASHEW GREEN, CASHEW HEIGHTS CONDOMINIUM, CASHEW PARK CONDOMINIUM, CASHEW VILLAS, CASPIAN, CASSIA EDGE, CASSIA VIEW, CASTLE GREEN, CASTLE LOFT, CASUARINA COVE, CATHAY GARDEN, CAVAN SUITES, CAVENAGH COURT, CAVENAGH GARDENS, CAVENAGH HOUSE, CAVENDISH PARK, CAYMAN RESIDENCES, CELADON VIEW, CELESTIA, CENTENNIA SUITES, CENTRA HEIGHTS, CENTRA LOFT, CENTRA RESIDENCE, CENTRA STUDIOS, CENTRA SUITES, CENTRAL GREEN CONDOMINIUM, CENTRAL GROVE, CENTRAL IMPERIAL, CENTRAL MEADOWS, CENTRAL VIEW, CENTRINA, CENTRO MANSIONS, CENTRO RESIDENCES, CENTURION 12, CENTURION RESIDENCES, CENTURY MANSIONS, CENTURY WOODS, CERELIA VISTA, CEYLON COURT, CEYLON CREST, CHANCERY ESQUIRE, CHANCERY HILL VILLAS, CHANCERY PARK, CHANGI COURT, CHANGI GREEN, CHANGI GROVE, CHANGI HEIGHTS, CHANGI RISE CONDOMINIUM, CHANTILLY RISE, CHAPEL COURT, CHAPEL LODGE, CHARISMA VIEW, CHARLESTON, CHARLTON 18, CHARLTON 27, CHARLTON CORNER, CHARLTON PARK, CHARLTON RESIDENCES, CHARLTON VILLAS, CHARMING GARDEN, CHATEAU LA SALLE, CHATEAU LE FAME, CHATELET, CHELSEA GARDENS, CHELSEA GROVE, CHELSEA LODGE, CHELSEA VILLAGE, CHEN FANG MANSIONS, CHENG SOON GARDEN, CHEOW KENG GARDEN, CHEPSTOW VILLE, CHERRY GARDENS, CHERRYHILL, CHESTER PARK, CHESTERVALE, CHESTNUT GARDENS, CHESTNUT RESIDENCES, CHESTNUT VILLE, CHIKU MANSIONS, CHILTERN PARK, CHIP BEE GARDENS, CHIP HOCK GARDENS, CHIP THYE GARDEN, CHISELHURST GREEN, CHIVERTON, CHOON KIM HOUSE, CHOON SING GARDEN, CHUAN GARDEN, CHUAN GREEN, CHUAN PARK, CHUAN PARK (DEMOLISHED), CHUAN TERRACE, CHUAN VALE, CHUAN VILLAS, CHUAN VILLE, CHUAN VISTA II, CHUAN YUAN, CHUVILLE, CHWEE CHIAN VIEW, CITIGATE RESIDENCE, CITY EDGE, CITY GATE, CITY LOFT, CITY PLAZA, CITY REGENCY, CITY SQUARE RESIDENCES, CITY STUDIOS, CITY SUITES, CITYLIFE@TAMPINES, CITYLIGHTS, CITYSCAPE @FARRER PARK, CITYVALE, CITYVISTA RESIDENCES, CLAREMONT, CLASSICAL TERRACE, CLAVON, CLAYDENCE, CLAYMORE PLAZA, CLEMENTI GREEN, CLEMENTI PARK, CLEMENTIWOODS CONDOMINIUM, CLIFTEN, CLIVEDEN AT GRANGE, CLOVER BY THE PARK, CLOVER PARK, CLUNY PARK RESIDENCE, CLYDES RESIDENCE, CLYDESCOVE, CLYDESVIEW, CLYDESWOOD, COASTAL BREEZE RESIDENCES, COASTAL CABANA, COASTAL VIEW RESIDENCES, COASTAL VILLAS, COASTARINA, COASTLINE RESIDENCES, COCO PALMS, COLCHESTER PARK, COMFORT GARDEN, COMMONWEALTH TOWERS, COMPASS HEIGHTS, CONCOURSE SKYLINE, CONDOMINIUM DEVELOPMENT, COPEN GRAND, CORAL ISLAND, CORAL PARK, CORALIS, CORALS AT KEPPEL BAY, CORONA VILLE, CORONATION ARCADE, CORONATION GARDENS, CORONATION GROVE, CORONATION SHOPPING PLAZA, CORONATION VILLAGE, CORONATION VILLE, COSMO, COSTA DEL SOL, COSTA ESTE, COSTA RHU, COSY 23, COSY LODGE, COTE D'AZUR, COTSWOLD VILLAS, COUNTRY ESQUIRE, COUNTRY GRANDEUR, COUNTRY PARK CONDOMINIUM, COUNTRYVIEW, CRADELS, CRAIG PLACE, CRANE COURT, CRESCENDO BUILDING, CRESCENDO PARK, CRYSTAL COURT, CRYSTAL DEW, CRYSTAL HEIGHTS, CRYSTAL LODGE, CRYSTAL MANSIONS, CRYSTAL RHU, CUBE 8, CUBIK, CUSCADEN RESERVE, CUSCADEN RESIDENCES, CYAN, D - HERITAGE APARTMENTS, D' ALMIRA, D' CASITA, D' CASTILIA, D' DALVEY, D' FRESCO, D' IXORAS, D' KENARIS, D' PALMA, D'BANYAN, D'CAMBRIDGE, D'CHATEAU @ SHELFORD, D'ECOSIA, D'ELIAS, D'EVELYN, D'GALLERY, D'GROVE VILLAS, D'HIRO@HILLSIDE, D'LEEDON, D'LOTUS, D'MANOR, D'MIRA, D'NEST, D'OASIA, D'PAVILION, D'SAVILLE, D'SUNRISE, D'WEAVE, D'WILKINSON, D'ZIRE, D-MANSIONS, DA SILVA VILLAS, DAHLIA PARK CONDOMINIUM, DAINTREE RESIDENCE, DAIRY FARM RESIDENCES, DAISY LODGE, DAISY PARK, DAISY SUITES, DAISY TERRACE, DAKOTA RESIDENCES, DALLA VALE, DALVEY COURT, DALVEY HAUS, DALVEY VILLAS, DAWN VILLE, DE CASALLE, DE CENTURION, DE LENTE, DE PARADISO, DE ROYALE, DEDAP GARDENS, DELFI ORCHARD, DELIGHT COURT, DENG FU VILLE, DERBYSHIRE HEIGHTS, DEVONSHIRE 12, DEVONSHIRE RESIDENCES, DLV., DOMAIN 21, DOMUS, DORMER PARK, DORSET MANSIONS, DORSETT RESIDENCES, DOUBLE BAY RESIDENCES, DOVER PARKVIEW, DRAGON VIEW PARK, DRAYCOTT EIGHT, DUBLIN LODGE, DUBLIN ROAD FLATS, DUCHESS CREST, DUCHESS GARDEN, DUCHESS MANOR, DUCHESS RESIDENCES, DUCHESS ROYALE, DUET, DUKE'S GARDEN, DUKES RESIDENCE, DUKU APARTMENTS, DUNEARN 386, DUNEARN ESTATE, DUNEARN LODGE, DUNEARN SUITES, DUNMAN GARDEN, DUNMAN GROVE, DUNMAN PLACE, DUNMAN REGENCY, DUNMAN VIEW, DUNSFOLD 18, DUNSFOLD RESIDENCES, DUO RESIDENCES, DYNASTY GARDEN, DYNASTY LODGE, E MAISON, E-SPACE, E7 LODGE, EALINE PARK, EAST 25 APARTMENTS, EAST BAY GARDENS, EAST COAST HILL, EAST COAST PARK, EAST COAST RESIDENCES, EAST COURT, EAST ELEGANCE, EAST GALLERIA, EAST GROVE, EAST MEADOWS, EAST MEWS, EAST PALM, EAST SHINE, EAST SIGNATURE, EAST TUDOR, EAST VIEW, EAST VIEW 18, EAST VIEW GARDEN, EAST VILLAGE, EASTBAY, EASTCOVE RESIDENCES, EASTERN GARDEN, EASTERN GROVE, EASTERN LAGOON, EASTERN RESIDENCE, EASTPAC BUILDING, EASTPOINT GREEN, EASTREES, EASTSIDE LOFT, EASTVALE, EASTVILLE APARTMENTS, EASTWIND MANSIONS, EASTWOOD CENTRE, EASTWOOD GARDENS, EASTWOOD GREEN, EASTWOOD GREEN TERRACES, EASTWOOD LODGE, EASTWOOD PARK, EASTWOOD REGENCY, EASTWOOD TERRACE, EASTWOOD VILLE, EASTWOOD WALK GARDENS, EATON PARK, EBONY MANSIONS, ECHELON, ECO, ECO SANCTUARY, ECOPOLITAN, ECOVILLE, EDELWEISS PARK CONDOMINIUM, EDEN CREST, EDEN PARK, EDEN RESIDENCES CAPITOL, EDEN VIEW, EDENZ LOFT, EDENZ SUITES, EIGHT @ EAST COAST, EIGHT COURTYARDS, EIGHT RIVERSUITES, EIS RESIDENCES, ELEVEN @ HOLLAND, ELIAS GREEN, ELIAS TERRACE, ELITE COURT, ELITE RESIDENCES, ELIZABETH HEIGHTS, ELIZABETH TOWER, ELLIOT AT THE EAST COAST, ELTA, EMERALD EAST, EMERALD GARDEN, EMERALD HILL CONSERVATION AREA, EMERALD OF KATONG, EMERALD PARK, EMERY POINT, EMILY RESIDENCE, EMPRADO SUITES, EN FU MANSIONS, ENCHANT�‰, ENG AUN MANSION, ENG AUN PARK, ENG HOON MANSIONS, ENG KONG GREEN, ENG KONG PARK, ENGLISH VILLAS, ENVIO, EON SHENTON, EQUATORIAL APARTMENTS, ESCADA VIEW, ESPA, ESPADA, ESPARINA RESIDENCES, ESPIRA RESIDENCE, ESPIRA SPRING, ESPIRA SUITES, ESTA RUBY, ESTE VILLA, ESTELLA GARDENS, ESTERINA, ESTILO, ESTIQUE, ESTRIVILLAS, ETON COURT, EUHABITAT, EUNOS PARK, EUPHONY GARDENS, EURO-ASIA APARTMENTS, EURO-ASIA COURT, EURO-ASIA LODGE, EURO-ASIA PARK, EVANIA, EVELYN MANSIONS, EVERGREEN GARDEN, EVERGREEN PARK, EVERGREEN VIEW, EVERITT EDGE, EWE BOON REGENT, EXCELSIOR GARDENS, FABER CREST, FABER GARDEN, FABER GARDEN CONDOMINIUM, FABER HILLS, FABER RESIDENCE, FAIRLODGE, FAIRMOUNT CONDOMINIUM, FAME COURT, FAMILIE MANSIONS, FANTA GARDEN, FAR HORIZON GARDENS, FARRER PARK SUITES, FENGLI GARDENS, FERN LODGE, FERNHILL COTTAGE, FERNWOOD TERRACES, FERNWOOD TOWERS, FERRARIA PARK CONDOMINIUM, FERRELL RESIDENCES, FIFTH AVENUE CONDOMINIUM, FIFTY-TWO STEVENS, FINLAND GARDENS, FIORENZA, FIVE CHANCERY, FIVENINE, FLAME TREE PARK, FLAMINGO VALLEY, FLO RESIDENCE, FLORA EAST, FLORAVIEW, FLORAVILLE, FLORENCE GARDENS, FLORENCE GROVE, FLORENCE TERRACE, FLORIDA PARK, FLORIDIAN, FLORISSA PARK, FLYNN PARK, FOH PIN GARDEN, FONTAINE PARRY, FONTANA HEIGHTS, FOOK HAI BUILDING, FORESQUE RESIDENCES, FOREST HILLS CONDOMINIUM, FOREST WOODS, FORESTVILLE, FORETT@BUKIT TIMAH, FORT GARDENS, FORTE SUITES, FORTUNA GARDEN, FORTUNA GARDENS, FORTUNA HILL, FORTUNA SEAVIEW VILLAS, FORTUNE JADE, FORTUNE PARK, FORTUNE VIEW, FOUR SEASONS PARK, FOURTH AVENUE RESIDENCES, FRAGRANCE COURT, FRAGRANT GARDENS, FRANKEL ESTATE, FREESIA WOODS, FRUITION, FUDU PARK, FULCRUM, FULTON HILL, FUYONG ESTATE, FUYUEN COURT, FYVE DERBYSHIRE, G RESIDENCES, GABRIEL VILLAS, GAIA, GALAXY TOWERS, GALLERY 8, GALLERY FIFTEEN, GALLOP GABLES, GALLOP GREEN, GALLOP VILLAS, GAMBIER COURT, GAMBIR RIDGE, GAMBIR TERRACE, GAO MING HUA YUAN, GARDEN APARTMENTS, GARDEN PARK RESIDENCES, GARDEN VIEW ESTATE, GARDENVILLE, GARDENVISTA, GARLICK PARK, GEM RESIDENCES, GEMINI APARTMENTS, GEMS VILLE, GENTLE REFLECTIONS, GENTLE VILLAS, GERALD GARDENS, GERALD MUGLISTON, GERALD MUGLISTON ESTATE, GERALD RESIDENCE, GEYLANG CONSERVATION AREA, GEYLANG HERITAGE, GIDEON'S LODGE, GIFFARD MANSIONS, GILLENIA, GILSTEAD 38, GILSTEAD BROOKS, GILSTEAD COURT, GILSTEAD MANSION, GILSTEAD TWO, GISBORNE LIGHT, GLAMOUR VILLE, GLASGOW GREEN, GLASGOW RESIDENCE, GLENDALE PARK, GLENTREES, GLOBAL VILLE, GLORIA MANSION, GLOUCESTER MANSIONS, GOLD COAST CONDOMINIUM, GOLD LEAF MANSIONS, GOLDEN HEIGHTS, GOLDEN HILL ESTATE, GOLDEN RISE ESTATE, GOLDENHILL PARK CONDOMINIUM, GOLDENHILL VILLAS, GOLDHILL GARDEN, GOLDHILL GARDENS, GOLDHILL TOWERS, GOLDLEAF GARDENS, GOLDWOOD GARDENS, GOODLINK PARK, GOODMAN CREST, GOODVIEW APARTMENTS, GOODWILL COURT, GOODWOOD GARDENS, GOODWOOD GRAND, GOODWOOD RESIDENCE, GOVT CO-OP HOUSING ESTATE, GPL TERRACE, GRACE COURT, GRACE GARDEN, GRACE PARK, GRAMERCY PARK, GRAND CHATEAU, GRAND DUCHESS AT ST PATRICK'S, GRAND DUNMAN, GRAND REGALIA, GRAND REGENCY, GRANDE VISTA, GRANDEUR 8, GRANDEUR PARK RESIDENCES, GRANDIOSO 8, GRANDLINK SQUARE, GRANDVIEW SUITES, GRANGE 1866, GRANGE HEIGHTS, GRANGE INFINITE, GRANGE RESIDENCES, GREEN  HILL ESTATE, GREEN COURT, GREEN HILL ESTATE, GREEN PARK, GREEN SPRINGS, GREENBANK PARK, GREENDALE COURT, GREENLANE APARTMENT, GREENRIDGE, GREENWOOD MEWS, GREENWOOD VILLAS, GROSVENOR VIEW, GROVE RESIDENCE, GUAN SOON TERRACE, GUAN SOON VILLAS, GUILIN COURT, GUILIN MANSIONS, GUILIN VIEW, GUILLEMARD EDGE, GUILLEMARD SUITES, GUILLEMARD VIEW, H RESIDENCES, H2O RESIDENCES, HAI SING PARK, HAIG 162, HAIG APARTMENTS, HAIG COURT, HAIG ELEVEN, HAIG LODGE, HAIG RESIDENCES, HAIG TEN, HALLMARK RESIDENCES, HAPPY ESTATE, HAPPY GARDENS, HAPPY MANSION, HAPPY PARK, HARBOUR RESIDENCES, HARBOUR SUITES, HARBOUR VIEW GARDENS, HARBOUR VIEW TOWERS, HARBOURLIGHTS, HARMONY @ 1A, HARVEST MANSIONS, HARVEY VIEW, HAUS ON HANDY, HAUS@SERANGOON GARDEN, HAWAII TOWER, HAZEL PARK CONDOMINIUM, HAZEL PARK TERRACE, HEDGES PARK CONDOMINIUM, HEETON CLASSIC, HEETON PARK, HEJI GARDENS, HELIOS RESIDENCES, HENLEY GARDENS, HENRY PARK, HERITAGE 9, HERITAGE EAST, HERITAGE RESIDENCES, HERITAGE VIEW, HERON BAY, HERTFORD COLLECTION, HERTFORD MANSION, HIGH OAK CONDOMINIUM, HIGH PARK RESIDENCES, HIGH STREET CENTRE, HIGHGATE, HIGHGATE PARK, HIGHLAND CENTRE, HIGHLAND CONDOMINIUM, HIGHLAND COTTAGES, HIGHLAND ROW, HIGHLINE RESIDENCES, HIJAUAN, HILBRE28, HILL HOUSE, HILLBROOKS, HILLCREST ARCADIA, HILLCREST PARK, HILLCREST VILLA, HILLHAVEN, HILLINGTON GREEN, HILLION RESIDENCES, HILLOCK GREEN, HILLS APARTMENT, HILLS TWOONE, HILLSGROVE, HILLSIDE MANSIONS, HILLSTA, HILLTOP GROVE, HILLTOPS, HILLVIEW 128, HILLVIEW APARTMENTS, HILLVIEW ESTATE, HILLVIEW GARDEN ESTATE, HILLVIEW GREEN, HILLVIEW HEIGHTS, HILLVIEW PARK, HILLVIEW REGENCY, HILLVIEW RESIDENCE, HILLVIEW VILLAS, HILLVISTA, HOA NAM BUILDING, HOCK MANSION, HOCK SENG PARK, HOCK SWEE HILL, HOLLAND COURT, HOLLAND GARDENS, HOLLAND GREEN, HOLLAND GROVE, HOLLAND GROVE PARK, HOLLAND HILL LODGE, HOLLAND HILL PARK, HOLLAND MEWS, HOLLAND PEAK, HOLLAND RESIDENCES, HOLLAND SUITES, HOLLAND TOWER, HOLLANDSWOOD COURT, HOLLLAND GROVE PARK, HOLLYWOOD APARTMENTS, HOLT RESIDENCES, HOMES AT EASTWOOD PLACE, HOMEY GARDENS, HONG BUILDING, HONG HENG GARDEN, HONG HENG MANSIONS, HONG HENG TERRACE, HONG KONG PARK, HONOLULU TOWER, HOOVER PARK, HORIZON GARDENS, HORIZON GREEN, HORIZON RESIDENCES, HORIZON TOWERS, HOUGANG GREEN, HOW SUN GARDEN, HUA GUAN GARDENS, HUA MEI GARDENS, HUA XIN COURT, HUIT, HUME PARK I, HUME PARK II, HUNDRED PALMS RESIDENCES, HUNDRED TREES, HYLL ON HOLLAND, ICON, ICON @ PASIR PANJANG, IDYLLIC EAST, IDYLLIC RESIDENCES, IDYLLIC SUITES, IKIGAI, ILLOURA, ILLUMINAIRE ON DEVONSHIRE, IMPERIAL HEIGHTS, INFINI AT EAST COAST, INFINIUM, INGGU 6, INTERNATIONAL PLAZA, INTERO, INZ RESIDENCE, IRESIDENCES, IRIDIUM, IRWELL HILL RESIDENCES, ISLAND COUNTRY VILLAS, ISLAND GARDENS, ISLAND PARK, ISLAND VIEW, ISUITES @ MARSHALL, ISUITES @ PALM, ISUITES @ TANI, IVORY, IVORY APARTMENTS, IVORY HEIGHTS, J C DRAYCOTT, J GATEWAY, J'DEN, J@63, JADE GARDEN, JADE MANSION, JADE RESIDENCES, JADE VINE GARDENS, JADESCAPE, JALAN KAYU ESTATE, JANSEN 28, JANSEN 8, JANSEN HOUSE, JANSEN MANSIONS, JARDIN, JAYA TOWER, JAZZ RESIDENCES, JC COURT, JC RESIDENCE, JC VILLE, JERSEY LODGE, JERVOIS GROVE, JERVOIS JADE, JERVOIS LODGE, JERVOIS MANSION, JERVOIS MEADOWS, JERVOIS PRIVE, JERVOIS REGENCY, JERVOIS TREASURES, JERVOIS VIEW, JERVOIS VILLE, JERVOISVILLE, JEWEL @ BUANGKOK, JEWEL @ CHUAN HOE, JEWEL OF BALMORAL, JI CHANG VILLA, JI LIANG GARDENS, JI XIANG COURT, JIA, JIN DING GARDEN, JK BUILDING, JLB RESIDENCES, JOO CHIAT APARTMENT, JOO CHIAT MANSIONS, JOO CHIAT VERBENA, JOOL SUITES, JUI RESIDENCES, JULUCA, JUNIPER AT ARDMORE, JUNIPER HILL, JUPITER 18, JURONG PARK, K SUITES, KAI FOOK MANSION, KALEIDO, KALLANG RIVERSIDE, KANDIS RESIDENCE, KAP RESIDENCES, KARTAR APARTMENTS, KASARA, KASSIA, KASTURINA LODGE, KATONG APARTMENTS, KATONG GARDENS, KATONG REGENCY, KATONG VILLE, KECHUBONG TERRACE, KELLETT COURT, KELLOCK LODGE, KELULUT HILL, KEMBANGAN COURT, KEMBANGAN ESTATE, KEMBANGAN PLAZA, KEMBANGAN SUITES, KEMBANGAN VILLAS, KENG LEE COURT, KENG LEE VIEW, KENSINGTON PARK CONDOMINIUM, KENSINGTON SQUARE, KENT RESIDENCES, KENT RIDGE HILL RESIDENCES, KENTISH COURT, KENTISH GREEN, KENTISH LODGE, KENTVIEW PARK, KERRISDALE, KEW COTTAGES, KEW GATE, KEW GREEN, KEW GROVE, KEW LODGE, KEW PLACE, KEW RESIDENCIA, KEW VALE, KHEAM HOCK GARDENS, KI RESIDENCES AT BROOKVALE, KIARA 10, KILAT 19, KILAT CENTRE, KILAT COURT, KILBURN ESTATE, KILLINEY 118, KIM KEAT GARDENS, KIM KEAT HOUSE, KIM KEAT LODGE, KIM LIN PARK, KIM SIA COURT, KIMNAN PARK, KIMSIA PARK, KINDOL GARDENS, KING'S 8, KING'S COURT, KING'S GARDEN, KING'S LODGE, KING'S MANSION, KINGS APARTMENTS, KINGS VILLE, KINGSFORD . HILLVIEW PEAK, KINGSFORD WATERBAY, KINGSGROVE, KINGSLEY MANSIONS, KINGSTON TERRACE, KISMIS COURT, KISMIS RESIDENCES, KLASSIC COURT, KLIMT CAIRNHILL, KNOX VIEW, KOON SENG COURT, KOON SENG HOUSE, KOPAR AT NEWTON, KOVAN 81, KOVAN APARTMENTS, KOVAN CREST, KOVAN ESQUIRE, KOVAN GARDENS, KOVAN GRANDEUR, KOVAN JEWEL, KOVAN MELODY, KOVAN PRIMERA, KOVAN REGENCY, KOVAN RESIDENCES, KOVANA, KUAN MING GARDENS, KUIE PONG LOFT, KUM HING COURT, L'VIV, LA BELLE, LA BRISA, LA CASA, LA CRYSTAL, LA DOLCE VITA, LA FIESTA, LA FLEUR, LA MAISON, LA MARIPOSA, LA MEYER, LA QUINTA PARK, LA SALLE VILLAS, LA SUISSE, LA VIDA @ 130, LA VILLE, LADYHILL PARK, LAGOON VIEW, LAGUNA 88, LAGUNA GREEN, LAGUNA PARK, LAKE GRANDE, LAKE LIFE, LAKEHOLMZ, LAKEPOINT CONDOMINIUM, LAKESIDE APARTMENTS, LAKESIDE GROVE, LAKESIDE TOWER, LAKEVIEW ESTATE, LAKEVILLE, LANDBAY CONDOMINIUM, LANDED HOUSING DEVELOPMENT, LANDRIDGE CONDOMINIUM, LANGE 28, LANGSTON VILLE, LATITUDE, LATTICE ONE, LAUREL TREE, LAUW & SONS GARDEN, LAVENDER RESIDENCE, LAVERNE'S LOFT, LE ARC, LE CONNEY PARK, LE CRESCENDO, LE GAMBIR, LE HILL CONDOMINIUM, LE LOYANG, LE MARICAN, LE MERRITT, LE NOUVEL ARDMORE, LE QUEST, LE REGAL, LE REVE, LE ROYCE @ LEITH PARK, LE SHANTIER, LE SOMME, LE WILKIE, LE WOOD, LEEDON 2, LEEDON GREEN, LEEDON RESIDENCE, LEGEND @ JANSEN, LEGENDA AT JOO CHIAT, LEICESTER LODGE, LEICESTER SUITES, LEIGHWOODS, LEITH GROVE, LEITH PARK, LENTOR CENTRAL RESIDENCES, LENTOR HILLS RESIDENCES, LENTOR MANSION, LENTOR MODERN, LENTOR VIEW, LENTOR VILLAS, LENTORIA, LEONIE GARDENS, LEONIE HILL RESIDENCES, LEONIE PARC VIEW, LEONIE SUITES, LEONIE TOWERS, LES MAISONS NASSIM, LEVENUE, LEVILLE ISUITES, LI TONG GARDENS, LIBERTE, LIEN TOWERS, LIGHTHOUSE, LIIV RESIDENCES, LILAC PARK, LILYDALE, LIMAU GROVE, LIMAU PARK, LIMAU VILLAS, LINCOLN SUITES, LINK RESIDENCE @ HOLLAND, LION TOWERS, LIRIA TERRACE, LITTLE INDIA CONSERVATION AREA, LIV @ MB, LIV ON SOPHIA, LIV ON WILKIE, LIVIA, LIVINGSTON MANSIONS, LLOYD COURT, LLOYD SIXTYFIVE, LLYN GARDENS, LOFT 33, LOFT @ NATHAN, LOFT @ RANGOON, LOFT @ STEVENS, LOFT@HOLLAND, LORNIE 18, LORNIE GARDENS, LOTUS VILLE, LOWLAND TERRACE, LOWLAND VIEW, LOYANG COURT, LOYANG GARDENS, LOYANG GROVE, LOYANG TOWNHOUSES, LOYANG VALLEY, LOYANG VILLAS, LUCIDA, LUCKY COURT, LUCKY HILL, LUCKY PARK, LUCKY PLAZA, LUMA, LUMIERE, LUMINA GRAND, LUSH ACRES, LUSH ON HOLLAND HILL, LUSHAN GARDEN, LUTHERAN TOWERS, LUXE VILLE, LUXUS HILLS, LYNDENWOODS, LYNDHURST GROVE, LYNNSVILLE 331, LYNWOOD EIGHT, M SUITES, M21, M5, M66, MABELLE, MACHUAN TERRACE, MACKENZIE 138, MACKENZIE 88, MACKENZIE REGENCY, MACPHERSON GARDEN ESTATE, MADEIRA COURT, MADISON RESIDENCES, MALAYSIA PARK, MALVERN SPRINGS, MANDAI GARDEN, MANDALAY MANSION, MANDALAY TOWERS, MANDALE HEIGHTS, MANDARIN GARDENS, MANDARIN PARK, MANHATTAN MANSIONS, MANILA GARDENS, MAPLE WOODS, MARGARET VILLE, MARGATE POINT, MARINA BAY RESIDENCES, MARINA BAY SUITES, MARINA COLLECTION, MARINA ONE RESIDENCES, MARINE BLUE, MARINE GARDEN, MARINE MEADOWS, MARINE VIEW MANSIONS, MARINE VILLE, MARLENE VILLE, MARSHALL LODGE, MARTIA 8, MARTIA RESIDENCE, MARTIN EDGE, MARTIN MODERN, MARTIN NO 38, MARTIN PLACE RESIDENCES, MARTINA MANSIONS, MARYMOUNT VIEW, MATLOCK RESIDENCES, MATTAR RESIDENCES, MAYA, MAYFAIR GARDENS, MAYFAIR MODERN, MAYFAIR PARK, MAYFAIR RESIDENCES, MAYFLOWER GARDENS, MAYFLOWER RESIDENCES, MAYFLOWER VILLE, MAYSPRINGS, MCMAHON PARK, MEADOWLODGE, MEADOWS @ PEIRCE, MEDALLION, MEDGE, MEIER SUITES, MELINIA COURT, MELODY VILLAS, MELOSA, MELROSE PARK, MELROSE VILLE, MELVILLE PARK, MENDON SPRING, MERA EAST, MERA GARDENS, MERA SPRINGS, MERA TERRACE, MERALODGE, MERAPRIME, MERAWOODS, MERIDIAN 38, MERLOT VILLE, METRO LOFT, MEYA LODGE, MEYER BLUE, MEYER MANSION, MEYER PARK, MEYER RESIDENCE, MEYERHOUSE, MI CASA, MICHAELS' RESIDENCES, MIDTOWN BAY, MIDTOWN MODERN, MIDTOWN RESIDENCES, MIDWOOD, MILFORD VILLAS, MILL CREEK, MILL POINT, MILLAGE, MIMOSA GARDENS, MIMOSA PARK, MIMOSA TERRACE, MIMOSA VALE, MIMOSA VILLAS, MINBU COURT, MINBU VILLA, MING PARK, MING TECK PARK, MINT RESIDENCES @ JANSEN, MIRAGE TOWER, MIRAMAR GARDENS, MIRO, MISTRAL PARK, MODA, MODENA, MON JERVOIS, MONARCHY APARTMENTS, MONDO MANSION BUILDING, MONT BOTANIK RESIDENCE, MONT TIMAH, MONTCLAIR @ WHITLEY, MONTEBLEU, MONTEREY PARK CONDOMINIUM, MONTROSA, MONTVIEW, MONVILLE MANSIONS, MOOI RESIDENCES, MOONSTONE RESIDENCES, MOONSTONE ROYALE, MOONSTONE VIEW, MORI, MORIMASA GARDENS, MORO MANSIONS, MOSELLA, MOULMEIN COURT, MOUNT FABER LODGE, MOUNT ROSIE GARDEN, MOUNT SINAI, MOUNT SINAI RESIDENCES, MOUNT SOPHIA SUITES, MOUNTBATTEN LIGHTS, MOUNTBATTEN LODGE, MOUNTBATTEN REGENCY, MOUNTBATTEN SUITES, MUGLISTON HILL, MULBERRY TREE, MUN WAH GARDEN, MURANO, MUTIARA CREST, MUTIARA VIEW, MY MANHATTAN, MYRA, NADIA MANSIONS, NAMLY COURT, NANYANG PARK, NARRA RESIDENCES, NASSIM 9, NASSIM JADE, NASSIM LODGE, NASSIM MANSION, NASSIM PARK RESIDENCES, NATHAN PLACE, NATHAN RESIDENCES, NATHAN SUITES, NATURA@HILLVIEW, NATURALIS, NATURE MANSIONS, NAUNG RESIDENCE, NAVA GROVE, NEEM TREE, NEPTUNE COURT, NESS, NEU AT NOVENA, NEW COURT, NEW FUTURA, NEW SOO CHOW GARDENS, NEWEST, NEWPORT RESIDENCES, NEWTON 18, NEWTON 21, NEWTON EDGE, NEWTON IMPERIAL, NEWTON LODGE, NEWTON ONE, NEWTON SUITES, NICOLE GREEN, NICON GARDENS, NIM COLLECTION, NIM GARDENS, NIN RESIDENCE, NINE RESIDENCES, NINETEEN SHELFORD ROAD, NOMA, NOMU, NORMANTON PARK, NORTH GAIA, NORTH PARK RESIDENCES, NORTHILL, NORTHOAKS, NORTHSHORE BUNGALOWS, NORTHVALE, NORTHWAVE, NORTHWOOD, NORWOOD GRAND, NOTTINGHILL SUITES, NOUVEL 18, NOUVELLE PARK, NOVA 48, NOVA 88, NOVELIS, NOVENA COURT, NOVENA HILL, NOVENA LODGE, NOVENA REGENCY, NOVENA SUITES, NOVO PLACE, NUOVO, NV RESIDENCES, NYON, OAK VILLAS, OASIS @ ELIAS, OASIS @ MULBERRY, OASIS GARDEN, OCEAN 8, OCEAN FRONT SUITES, OCEAN PARK, ODEON SEASIDE PARK, OEI TIONG HAM PARK, OKIO, OLA, OLA RESIDENCES, OLEANAS RESIDENCE, OLEANDER TOWERS, OLLOI, ONAN SUITES, ONE @ PULASAN, ONE AKYAB, ONE AMBER, ONE BALMORAL, ONE BERNAM, ONE CHATSWORTH, ONE CHILTERN, ONE CLAYMORE, ONE DEVONSHIRE, ONE DRAYCOTT, ONE DUCHESS, ONE DUSUN RESIDENCES, ONE EIGHTIES RESIDENCES, ONE FORT, ONE HOLLAND VILLAGE RESIDENCES, ONE JERVOIS, ONE K GREENLANE, ONE LEICESTER, ONE LYNWOOD, ONE MARINA GARDENS, ONE MEYER, ONE OXLEY RISE, ONE PEARL BANK, ONE ROBIN, ONE ROSYTH, ONE SHENTON, ONE ST MICHAEL'S, ONE SURIN, ONE TREE HILL COLLECTION, ONE TREE HILL MANSIONS, ONE TREE HILL RESIDENCE, ONE-NORTH EDEN, ONE-NORTH RESIDENCES, ONEROBEY, ONZE @ TANJONG PAGAR, OPAL SUITES, OPERA ESTATE, OPTIMA @ TANAH MERAH, ORANGE GROVE RESIDENCES, ORCHARD BEL AIR, ORCHARD COURT, ORCHARD SCOTTS, ORCHARD SOPHIA, ORCHARD TOWERS, ORCHARD VIEW, ORCHID APARTMENTS, ORCHID PARK CONDOMINIUM, ORCHID VILLAGE, ORION, OTTO PLACE, OUE TWIN PEAKS, OXFORD SUITES, OXLEY EDGE, OXLEY GARDEN, OXLEY RESIDENCE, PADDY GREEN, PALACIO, PALAZZETTO, PALISADES, PALM GALLERIA, PALM GARDENS, PALM GREEN, PALM GROVE CONDOMINIUM, PALM GROVE REGENCY, PALM GROVE TERRACE, PALM HAVEN, PALM ISLES, PALM LODGE, PALM LOFT, PALM MANSIONS, PALM OASIS, PALM RESIDENCE, PALM SPRING, PALM TREE NINES, PALM VISTA, PALMERA EAST, PALMERA RESIDENCE, PALMS @ SIXTH AVENUE, PALMWOODS, PANDAN VALLEY, PAPILLON, PARADISE ISLAND, PARADISE PALMS, PARBURY HILL CONDOMINIUM, PARC ASTON, PARC BLEU, PARC BOTANNIA, PARC CANBERRA, PARC CENTENNIAL, PARC CENTRAL RESIDENCES, PARC CENTROS, PARC CLEMATIS, PARC ELEGANCE, PARC EMILY, PARC ESTA, PARC GREENWICH, PARC HAVEN, PARC IMPERIAL, PARC KOMO, PARC LIFE, PARC MACKENZIE, PARC MONDRIAN, PARC OASIS, PARC OLYMPIA, PARC PALAIS, PARC RIVIERA, PARC ROSEWOOD, PARC SEABREEZE, PARC SOMME, PARC SOPHIA, PARC STEVENS, PARC VERA, PARC VISTA, PARK 1 SUITES, PARK COLONIAL, PARK COURT, PARK EAST, PARK GREEN, PARK INFINIA AT WEE NAM, PARK NATURA, PARK NOVA, PARK PLACE RESIDENCES AT PLQ, PARK RESIDENCES KOVAN, PARK VIEW MANSION, PARK VILLAS, PARKSHORE, PARKSUITES, PARKTOWN RESIDENCE, PARKVIEW APARTMENTS, PARKVIEW ECLAT, PARKWOOD COLLECTION, PARKWOOD RESIDENCES, PARQ BELLA, PARRY COURT, PARRY GREEN, PARRY PARK, PARRYVILLE, PARVIS, PASADENA, PASIR PANJANG COURT, PASIR PANJANG GARDENS, PASIR PANJANG LODGE, PASIR RIS 8, PASIR RIS BEACH PARK, PASIR VIEW PARK, PATERSON LINC, PATERSON RESIDENCE, PATERSON SUITES, PAVILION 11, PAVILION PARK, PAVILION SQUARE, PAYA LEBAR GARDENS, PAYA LEBAR RESIDENCES, PEACE MANSION, PEACH GARDEN, PEAK RESIDENCE, PEAKVIEW ESTATE, PEAKVILLE PARK, PEBBLE BAY, PEIRCE VALE, PEIRCE VIEW, PEIRCE VILLAS, PENANG SERVICE APARTMENTS, PENRITH, PENROSE, PEOPLE'S GARDEN, PEOPLE'S PARK CENTRE, PEOPLE'S PARK COMPLEX, PEOPLES GARDEN, PEPYS HILL CONDOMINIUM, PERFECT TEN, PETIT JERVOIS, PHILLIPS RESIDENCE, PHOENIX HEIGHTS, PHOENIX RESIDENCES, PICARDY GARDENS, PICCADILLY GRAND, PIERMONT GRAND, PIN MANSIONS, PINE COURT, PINE GROVE, PINEHURST CONDOMINIUM, PINERY RESIDENCES, PINETREE CONDOMINIUM, PINETREE HILL, PINEVALE, PINEWOOD GARDENS, PINEWOOD TERRACE, PINNACLE 16, PLACE-8, PLATINA GARDENS, PLATINUM EDGE, POETS VILLAS, POH HENG COURT, POH HUAT GARDENS, POLLEN & BLEU, POLLEN COLLECTION, POLLEN COLLECTION II, PONGGOL PARK, POPULAR ESTATE, POSHGROVE EAST, PRESIDENT GARDENS, PRESIDIO, PRESTIGE HEIGHTS, PRESTIGE LOFT, PRESTIGE POINT, PRESTIGE RESIDENCE, PRESTO@UPPER SERANGOON, PRIME RESIDENCE, PRIMEDGE, PRIMO RESIDENCES, PRINCESS OF WALES PARK, PRINCETON VALE, PRINCIPAL GARDEN, PRISTINE HEIGHTS, PRIVE, PROMENADE PEAK, PROSPECT GARDEN, PROSPER GARDENS, PROSPERO VILLE, PROVENCE RESIDENCE, PROXIMO, PUBLIC MANSION, PULLMAN RESIDENCES NEWTON, Q BAY RESIDENCES, QUBE SUITES, QUEEN ASTRID GARDENS, QUEEN ASTRID PARK, QUEENS, QUEENS PEAK, QUEENSBERRY LODGE, QUEENSWAY TOWER, QUESTA @ DUNMAN, QUINTERRA, R MAISON, R66 APARTMENTS, RACE COURSE 138, RACE COURSE BUILDING, RACE COURSE MANSION, RADIANCE @ BUKIT TIMAH, RADIX, RAFFLES PARK, RAFFLESIA CONDOMINIUM, RAINTREE VALLEY, RAJAH TOWERS, RANGOON 88, RANGOON APARTMENTS, RANGOON VIEW, RAYA GARDEN, REBECCA PARK, REFLECTIONS AT KEPPEL BAY, REGAL 35, REGAL COURT, REGENCY LODGE, REGENCY PARK, REGENCY SUITES, REGENT GROVE, REGENT HEIGHTS, REGENT PARK, REGENT RESIDENCES, REGENT VILLAS, REGENTVILLE, REGINA HILL, REGIS MANSIONS, REIGNWOOD HAMILTON SCOTTS, RESERVOIR VILLAS, RESIDENCE 118, RESIDENCE 66, RESIDENCE 8, RESIDENCE TWENTY-TWO, RESIDENCES 88, RESIDENCES @ EVELYN, RESIDENCES @ JANSEN, RESIDENCES @ KILLINEY, RESIDENCES @ NOVENA, RESIDENCES @ SOMME, RESIDENCES @ STANGEE, RESIDENCES AT 338A, RESIDENCES AT EMERALD HILL, RESIDENCES BOTANIQUE, RESIDENTIAL APARTMENTS, REZI 24, REZI 26, REZI 35, REZI 3TWO, RHAPSODY ON MOUNT ELIZABETH, RICCHEZZA, RICH EAST GARDEN, RICH MANSIONS, RICH.RESIDENCE, RICHMOND PARK, RICHMOND VILLE, RIDGE COURT, RIDGEVALE GARDENS, RIDGEWOOD, RINDU TERRACE, RIO GARDENS, RIO VISTA, RIPPLE BAY, RIS GRANDEUR, RISING COURT, RISING SUITES, RITZ @ FARRER, RITZ MANSIONS, RITZ REGENCY, RIVAGE, RIVELLE TAMPINES, RIVER GREEN, RIVER ISLES, RIVER MODERN, RIVER PLACE, RIVER VALLEY APARTMENTS, RIVERBANK @ FERNVALE, RIVERBAY, RIVERCOVE RESIDENCES, RIVEREDGE, RIVERFRONT RESIDENCES, RIVERGATE, RIVERIA GARDENS, RIVERPARC RESIDENCE, RIVERSAILS, RIVERSHIRE, RIVERSIDE 48, RIVERSIDE MELODIES, RIVERSOUND RESIDENCE, RIVERTREES RESIDENCES, RIVERVALE CREST, RIVERWALK APARTMENTS, RIVIERA 38, RIVIERA RESIDENCES, RIVIERE, RIZ HAVEN, ROBERTSON 100, ROBERTSON BLUE, ROBERTSON EDGE, ROBIN REGALIA, ROBIN RESIDENCES, ROBIN SUITES, ROBINSON SUITES, ROCCA BALESTIER, ROCHELLE AT NEWTON, ROMAN TERRACE, ROOTS @ TRANSIT, ROSALIA PARK, ROSE MAISON, ROSE VILLE, ROSEVALE, ROSEWOOD, ROSEWOOD SUITES, ROSIE VIEW, ROSYTH LODGE, ROSYTH RESIDENCE, ROSYTH VILLE, ROXY SQUARE, ROYAL COURT, ROYAL HALLMARK, ROYALE MANSIONS, ROYALGREEN, ROYCE RESIDENCES, RV ALTITUDE, RV EDGE, RV POINT, RV RESIDENCES, RV SUITES, RYMDEN 77, SAGE, SALLIM LODGE, SAM KIANG MANSIONS, SANCTUARY @ 813, SANCTUARY GREEN, SANCTUARY@NEWTON, SANDALWOOD, SANDERIANA, SANDILANDS RESIDENCES, SANDY EIGHT, SANDY ISLAND, SANDY PALM, SANFORD PARK, SANNY PARK, SANT RITZ, SANTA FE MANSIONS, SAPPHIRE COURT, SARACA GARDENS, SARACA VILLAS, SARINA PARK, SARINA TERRACE, SAVANNAH CONDOPARK, SAVOY PARK, SCENECA RESIDENCE, SCENIC HEIGHTS, SCK VILLE, SCOTTS 28, SCOTTS HIGHPARK, SCOTTS SQUARE, SCULPTURA ARDMORE, SEA AVENUE MANSIONS, SEA AVENUE RESIDENCES, SEA BREEZE TERRACE, SEA ESTA, SEA HORIZON, SEA PAVILION RESIDENCES, SEA VIEW PARK, SEAHILL, SEASCAPE, SEASIDE PARK, SEASIDE RESIDENCES, SEASONS PARK, SEASONS VIEW, SEASTRAND, SEASUITES, SEAVIEW PARK, SEAVIEW POINT, SECOND AVENUE JUNCTION, SELANTING GREEN, SELBY GARDENS, SELETAR GARDEN, SELETAR HILLS ESTATE, SELETAR PARK, SELETAR PARK RESIDENCE, SELETAR SPRINGS CONDOMINIUM, SELETARIS, SEMBAWANG COTTAGE, SEMBAWANG GARDEN ARCADE, SEMBAWANG HILLS ESTATE, SEMBAWANG PARK, SEMBAWANG SPRINGS ESTATE, SEMBAWANG SQUARE ESTATE, SEMBAWANG STRAITS ESTATE, SEMBAWANG VILLAS, SENG HUA GARDENS, SENG YONG VILLAS, SENGKANG GRAND RESIDENCES, SENNETT ESTATE, SENNETT RESIDENCE, SENTOSA COVE, SENYUM RESIDENCES, SERANGOON GARDEN ESTATE, SERANGOON GARDEN PARK, SERANGOON GARDEN VIEW, SERANGOON PARK, SERAYA 9, SERAYA BREEZE, SERAYA COURT, SERAYA RESIDENCES, SERAYA VILLE, SERENE PARK, SERENE VIEW MANSIONS, SERENITY BREEZE, SERENITY PARK, SETIA RESIDENCES, SEVEN CRESCENT, SEVEN HOLT ROAD, SEVEN OAKS, SEVEN PALMS SENTOSA COVE, SEVENTY SAINT PATRICK'S, SHAMROCK PARK, SHAMROCK VILLAS, SHAN GATE APARTMENTS, SHAN YAO GARDEN, SHANGHAI ONE, SHANGRI-LA PARK, SHAW PLAZA - TWIN HEIGHTS, SHEARES VILLE, SHEBA LODGE, SHELFORD 23, SHELFORD GREEN, SHELFORD REGENCY, SHELFORD SUITES, SHELFORD VIEW, SHEPHERD'S HILL ESTATE, SHERWOOD CONDOMINIUM, SHERWOOD TOWER, SHIRO, SIEW LIM PARK, SIGLAP GARDEN, SIGLAP HILL 33, SIGLAP LODGE, SIGLAP PARK, SIGLAP V, SIGNATURE AT LEWIS, SIGNATURE AT YISHUN, SIGNATURE CREST, SIGNATURE PARK, SIGNATURE RESIDENCE, SILAHIS APARTMENTS, SILAHIS VILLE, SILVER HILL, SILVERSCAPE, SILVERSEA, SIMEI GARDEN, SIMEI GREEN CONDOMINIUM, SIMON PLAZA, SIMS DORADO, SIMS EDGE, SIMS GREEN, SIMS MEADOWS, SIMS POINT, SIMS RESIDENCES, SIMS URBAN OASIS, SIMSVILLE, SIN CHUAN GARDEN, SIN MING CENTRE, SIN MING PLAZA, SING LIAN BUILDING, SINGA HILLS, SIXTEEN35 RESIDENCES, SIXTH AVENUE CENTRE, SIXTH AVENUE VILLE, SKIES MILTONIA, SKT MANSIONS, SKY EDEN@BEDOK, SKY EVERTON, SKY GREEN, SKY HABITAT, SKY VUE, SKY@ELEVEN, SKYE AT HOLLAND, SKYLINE 360 @ SAINT THOMAS WALK, SKYLINE @ ORCHARD BOULEVARD, SKYLINE RESIDENCES, SKYPARK, SKYPARK RESIDENCES, SKYSUITES17, SKYSUITES@ANSON, SKYWATERS RESIDENCES, SLOANE RESIDENCES, SMART SUITES, SOHO 188, SOHO @ FARRER, SOL ACRES, SOLARIS RESIDENCES, SOLEIL @ SINARAN, SOMMERVILLE GRANDEUR, SOMMERVILLE LOFT, SOMMERVILLE PARK, SOMMERVILLE REGENCY, SOMMERVILLE RESIDENCES, SOO CHOW GARDEN, SOPHIA 98, SOPHIA HILLS, SOPHIA LODGE, SOPHIA RESIDENCE, SORA, SOUTH BEACH RESIDENCES, SOUTH UNION PARK, SOUTHAVEN I, SOUTHAVEN II, SOUTHBANK, SPACE @ KOVAN, SPANISH VILLAGE, SPAZIO @ KOVAN, SPOTTISWOODE 18, SPOTTISWOODE PARK, SPOTTISWOODE RESIDENCES, SPOTTISWOODE SUITES, SPRING @ KATONG, SPRING @ LANGSAT, SPRING GARDENS, SPRING GROVE, SPRING PARK ESTATE, SPRING WATERS VILLAS, SPRINGBROOK TERRACE, SPRINGDALE CONDOMINIUM, SPRINGDEW TERRACE, SPRINGHILL, SPRINGLEAF GARDEN, SPRINGLEAF GREEN, SPRINGLEAF RESIDENCE, SPRINGLEAF VILLAS, SPRINGVALE, SPRINGWOOD, SRI MENANTI ESTATE, ST ANNE'S WOOD, ST FRANCIS COURT, ST FRANCIS LODGE, ST MARTIN RESIDENCE, ST MARTIN'S, ST MICHAEL REGENCY, ST MICHAEL'S CONDOMINIUM, ST MICHAEL'S PLACE, ST NICHOLAS VIEW, ST PATRICK'S COURT, ST PATRICK'S GREEN, ST PATRICK'S LOFT, ST PATRICK'S RESIDENCES, ST PATRICK'S ROW, ST REGIS RESIDENCES SINGAPORE, ST THOMAS COURT, ST THOMAS SUITES, STADIA, STARLIGHT SUITES, STARPOINT, STARS OF KOVAN, STARVILLE, STELLAR RV, STEVEN'S COURT, STEVENS LOFT, STEVENS SUITES, STILL 123, STILL MANSIONS, STILLZ RESIDENCE, STIRLING RESIDENCES, STRAITS AT JOO CHIAT, STRAITS GARDENS, STRAITS MANSIONS, STRAITS RESIDENCES, STRATA, STRATFORD COURT, STRATTON GREEN, STRATTON PARK, STRATUM, STUDIO 3, STUDIO8, STUDIOS @ MARNE, STUDIOS@TEMBELING, STURDEE RESIDENCES, STURDEE VIEW, SUFFOLK PREMIER, SUI GENERIS, SUITES 123, SUITES 28, SUITES @ AMBER, SUITES @ EASTCOAST, SUITES @ EUNOS, SUITES @ GUILLEMARD, SUITES @ KOVAN, SUITES @ NEWTON, SUITES @ OWEN, SUITES @ PAYA LEBAR, SUITES @ SHREWSBURY, SUITES @ SIMS, SUITES @ SURREY, SUITES @ TOPAZ, SUITES AT BUKIT TIMAH, SUITES AT ORCHARD, SUITES DE LAUREL, SUITES TWENTY-TWO, SUITES@ KATONG, SUITES@BRADDELL, SUITES@CHANGI, SUMMER GARDENS, SUMMER GREEN, SUMMER GROVE, SUMMER PLACE, SUMMER SCENT, SUMMER VIEW, SUMMER VILLAS, SUMMERDALE, SUMMERHILL, SUMMERLEA GREEN, SUN COURT, SUN PLAZA, SUNBIRD PARK, SUNBIRD VIEW, SUNCOTTAGES, SUNFLOWER COURT, SUNFLOWER GRANDEUR, SUNFLOWER LODGE, SUNFLOWER MANSIONS, SUNFLOWER REGENCY, SUNFLOWER RESIDENCE, SUNFLOWER VIEW, SUNGLADE, SUNGROVE, SUNHAVEN, SUNNY GROVE, SUNNY LODGE, SUNNY PALMS, SUNNY PARC, SUNNYVALE RESIDENCES, SUNRISE GARDENS, SUNRISE VILLA, SUNSET LODGE, SUNSHINE GRANDEUR, SUNSHINE GROVE, SUNSHINE LODGE, SUNSHINE LOFT, SUNSHINE MANSIONS, SUNSHINE PLAZA, SUNSHINE REGENCY, SUNSHINE RESIDENCE, SUNVILLE, SURIN GARDENS, SURIN VILLAS, SUTTON PLACE, SWISS CLUB PARK, SYCAMORE TREE, SYMPHONY HEIGHTS, SYMPHONY SUITES, TAI HWAN GARDEN, TAI HWAN PARK, TAI KENG GARDENS, TAI KENG VILLAS, TAI PENG GARDENS, TAI YUAN GARDEN, TAIPAN GRAND, TAIPAN JADE, TAIPAN REGENCY, TAN TONG MENG TOWER, TANAH MERAH GREEN, TANAH MERAH MANSION, TANAH MERAH PARK, TANAMERA CREST, TANGERINE GROVE, TANGLIN HILL CONDOMINIUM, TANGLIN HILL MEADOWS, TANGLIN HILL VILLAS, TANGLIN PARK, TANGLIN REGENCY, TANGLIN RESIDENCES, TANGLIN VIEW, TANJONG RIA CONDOMINIUM, TANQUEELAN SUITES, TEACHERS' HOUSING ESTATE, TECK GUAN VILLE, TEDGE, TELOK KURAU RIA, TELOK MANSION, TEMBELINA, TEMBELING CENTRE, TEMBELING COURT, TEMBELING GROVE, TEMBELING MANSIONS, TEMBELING RESIDENCE, TEMBUSU GRAND, TEN @ SUFFOLK, TENET, TENGGIRIA, TERESA 8, TERESA VILLAS, TERESA VILLE, TERRA HILL, TERRA VILLAS, TERRASSE, TERRENE AT BUKIT TIMAH, TESSA LODGE, TEXTILE CENTRE, TG MANSION, THE ABERDEEN, THE ABODE AT DEVONSHIRE, THE ACACIAS, THE ADARA, THE ADDITION, THE ALCOVE, THE ALPS RESIDENCES, THE AMARELLE, THE AMBIENCE, THE AMBRA, THE AMBROSIA, THE AMERY, THE AMORE, THE AMSTON, THE ANCHORAGE, THE ANSLEY, THE ANTARES, THE ARC AT DRAYCOTT, THE ARCADIA, THE ARCADY AT BOON KENG, THE ARDEN, THE ARECA, THE ARIEL, THE ARISTO @ AMBER, THE ARIZON, THE ARMADALE, THE ARRIS, THE ARTE, THE ASANA, THE ASTON, THE ATELIER, THE ATRIA AT MEYER, THE AVENIR, THE AXIS, THE AZURE, THE AZZURO, THE BALE, THE BALMORAL, THE BALMORAL SPRING, THE BAYCOURT, THE BAYSHORE, THE BEACON, THE BEACON EDGE, THE BEAUMONT, THE BECCAGAYLE, THE BELLEFORTE, THE BELMONT, THE BELVEDERE, THE BENCOOLEN, THE BENTLY RESIDENCES@KOVAN, THE BERTH BY THE COVE, THE BEVERLY, THE BLISS, THE BLOSSOMVALE, THE BOTANIC ON LLOYD, THE BOTANY AT DAIRY FARM, THE BOULEVARD RESIDENCE, THE BOUTIQ, THE BROOKS I, THE BROOKS II, THE BROWNSTONE, THE CALLISTA, THE CALROSE, THE CALYPSO, THE CANOPY, THE CAPE, THE CAPRI, THE CARPMAELINA, THE CARRARA, THE CASCADIA, THE CASSANDRA, THE CENTREN, THE CENTREPOINT, THE CENTRIO, THE CENTRIS, THE CHAMPAGNE, THE CHANCERY RESIDENCE, THE CHUAN, THE CITRINE, THE CITRON RESIDENCES, THE CLAYMORE, THE CLEARWATER, THE CLEMENT CANOPY, THE CLEMENTVALE, THE CLIFT, THE COAST AT SENTOSA COVE, THE COLLECTIVE AT ONE SOPHIA, THE COMMODORE, THE CONTINUUM, THE CORNWALL, THE COSMOPOLITAN, THE COTERIE @ HOLLAND, THE COTZ, THE COUNTRYSIDE, THE COURTYARD, THE CREEK @ BUKIT, THE CREST, THE CRISTALLO, THE CRITERION, THE DAFFODIL, THE DAIRY FARM, THE DEW, THE DIAMOND, THE DOMAIN, THE DRAYCOTT, THE EASTSIDE, THE EBONY, THE EDEN AT TAMPINES, THE EDGE ON CAIRNHILL, THE EDGEWATER, THE ELEGANCE @ CHANGI, THE ELEMENT @ STEVENS, THE ELYSIA, THE ENCLAVE . HOLLAND, THE EQUATORIAL, THE ESPARIS, THE ESPIRA, THE ESSENCE, THE ESTA, THE ESTIVA, THE ESTUARY, THE FERNHILL, THE FLORAVALE, THE FLORENCE RESIDENCES, THE FLORENTINE, THE FLORIDA, THE FOLIAGE, THE FORD @ HOLLAND, THE FORESTA @ MOUNT FABER, THE GALE, THE GARDEN RESIDENCES, THE GARDENS AT BISHAN, THE GARDENS AT GERALD, THE GATZ, THE GAZANIA, THE GERANIUM, THE GLACIER, THE GLADES, THE GLYNDEBOURNE, THE GRANDHILL, THE GRANDIFLORA, THE GRANGE, THE GREENWICH, THE GREENWOOD, THE HACIENDA, THE HELICONIA, THE HERMITAGE, THE HILL @ONE-NORTH, THE HILLFORD, THE HILLIER, THE HILLOFT, THE HILLSHORE, THE HILLSIDE, THE HOLLAND COLLECTION, THE HORIZON, THE HUNTINGTON, THE HYDE, THE IMPERIAL, THE INFINITI, THE INFLORA, THE INGLEWOOD, THE INSPIRA, THE INTERLACE, THE INTERWEAVE, THE IVERIA, THE JADE, THE JARDINE RESIDENCES, THE JOVELL, THE LADYHILL, THE LAKEFRONT RESIDENCES, THE LAKEGARDEN RESIDENCES, THE LAKESHORE, THE LANAI, THE LANDMARK, THE LATTIZ, THE LAURELS, THE LEGACY, THE LEGEND, THE LENOX, THE LEVELZ, THE LIGHT @ CAIRNHILL, THE LILIUM, THE LINC, THE LINCOLN MODERN, THE LINCOLN RESIDENCES, THE LINE @ TANJONG RHU, THE LINEAR, THE LINQ @ BEAUTY WORLD, THE LOFT, THE LUCENT, THE LUMOS, THE LUSH, THE LUXURIE, THE M, THE MADEIRA, THE MAKENA, THE MARBELLA, THE MARQ ON PATERSON HILL, THE MARQUE @ IRRAWADDY, THE MAYFAIR, THE MAYLEA, THE MEDLEY, THE MERASAGA, THE MERCURY, THE MERLOT, THE METROPOLITAN CONDOMINIUM, THE METZ, THE MEYER PLACE, THE MEYERISE, THE MEZZO, THE MIDAS, THE MILTONIA RESIDENCES, THE MINT RESIDENCES, THE MINTON, THE MKZ, THE MONDRIAN, THE MONTAGE, THE MONTANA, THE MORNING DEW, THE MORNING GLORY, THE MORNINGSIDE, THE MORNINGTON, THE MORRIS RESIDENCES, THE MYST, THE NASSIM, THE NAUTICAL, THE NAVIAN, THE NCLAVE, THE NEXUS, THE OCEANFRONT @ SENTOSA COVE, THE OCTET, THE ODEON KATONG, THE OLD HOUSE, THE OLIV, THE ORANGE GROVE, THE ORCHARD RESIDENCES, THE ORIE, THE ORIENT, THE PALETTE, THE PALLADIUM, THE PANORAMA, THE PARC CONDOMINIUM, THE PARK VALE, THE PATERSON, THE PATERSON EDGE, THE PEAK, THE PEAK @ CAIRNHILL I, THE PEAK @ CAIRNHILL II, THE PEAK@BALMEG, THE PEARL @ MOUNT FABER, THE PETALS, THE PIER AT ROBERTSON, THE PLAZA, THE POIZ RESIDENCES, THE PRINCETON, THE PROMENADE@PELIKAT, THE PROMINENCE, THE PROMONT, THE QUARTZ, THE QUAYSIDE, THE QUINN, THE QUINTET, THE RAINFOREST, THE RAINTREE, THE RAMFORD, THE RED HOUSE, THE REEF AT KING'S DOCK, THE REGALIA, THE REGENCY AT TIONG BAHRU, THE RESERVE RESIDENCES, THE RESIDENCES AT BARKER, THE RESIDENCES AT W SINGAPORE SENTOSA COVE, THE RICHMOND, THE RISE @ OXLEY - RESIDENCES, THE RITZ-CARLTON RESIDENCES SINGAPORE CAIRNHILL, THE RIVERINA, THE RIVERINE BY THE PARK, THE RIVERSIDE PIAZZA, THE RIVERVALE, THE ROBERTSON OPUS, THE ROCHESTER RESIDENCES, THE SAIL @ MARINA BAY, THE SANCTUARY @ GEYLANG, THE SANTORINI, THE SCALA, THE SCENIC @ BRADDELL, THE SCOTTS TOWER, THE SEA VIEW, THE SEAFRONT ON MEYER, THE SEAWIND, THE SEN, THE SENSORIA, THE SERENADE @ HOLLAND, THE SERENNIA, THE SERENNO, THE SHAUGHNESSY, THE SHELFORD, THE SHORE RESIDENCES, THE SHOREFRONT, THE SHORELINE RESIDENCES I, THE SHORELINE RESIDENCES II, THE SIENA, THE SIERRA, THE SILVER FIR, THE SILVER SPURZ, THE SILVERTON, THE SIXTH AVENUE RESIDENCES, THE SKYWOODS, THE SOLITAIRE, THE SORRENTO, THE SOUND, THE SOVEREIGN, THE SPECTRUM, THE SPINNAKER, THE SPRINGBLOOM, THE SPRINGFIELD, THE SPRINGS, THE SPRINGSIDE, THE STELLAR, THE STERLING, THE STRADIA, THE SUITES AT CENTRAL, THE SUMMIT, THE SUNFLOWER, THE SUNNIDORA, THE SUNNIFLORA, THE SUNNY SPRING, THE SUNNYDALE, THE SUNSHINE, THE TAIPAN, THE TAMPINES TRILLIANT, THE TANAMERA, THE TAPESTRY, THE TATE RESIDENCES, THE TEMBUSU, THE TENERIFFE, THE TENNERY, THE TERRACE, THE TESSARINA, THE TIER, THE TOMLINSON, THE TOP RESIDENCE, THE TOPIARY, THE TRE VER, THE TREELINE, THE TRESOR, THE TREVOSE, THE TRILINQ, THE TRILLIUM, THE TRIZON, THE TROPIC GARDENS, THE TROPICA, THE TRUMPS, THE TWINS, THE URBANITE, THE VALES, THE VANDERLINT, THE VENUE RESIDENCES, THE VERANDAH RESIDENCES, THE VERMONT ON CAIRNHILL, THE VERTE, THE VERV @ RV, THE VERVE, THE VESTA, THE VIEW @ MEYER, THE VILLAS @ SENTOSA COVE, THE VINES, THE VIRIDIAN, THE VISION, THE VISIONAIRE, THE VUE, THE WARREN, THE WATER EDGE, THE WATERGARDENS AT CANBERRA, THE WATERINA, THE WATERLINE, THE WATERSIDE, THE WHARF RESIDENCE, THE WHITLEY RESIDENCES, THE WINDSOR, THE WISTERIA, THE WOODGROVE, THE WOODLEIGH RESIDENCES, THE WOODS, THE YARDLEY, THOMSON 800, THOMSON EURO-ASIA, THOMSON GARDEN ESTATE, THOMSON GRAND, THOMSON GROVE, THOMSON HILLS ESTATE, THOMSON IMPERIAL COURT, THOMSON IMPRESSIONS, THOMSON PARK, THOMSON PLAZA, THOMSON RIDGE, THOMSON RISE ESTATE, THOMSON THREE, THOMSON V ONE, THOMSON V TWO, THOMSON VIEW CONDOMINIUM, THREE 11, THREE BALMORAL, THREE BUCKLEY, THREE THREE ROBIN, TIARA, TIARA VISTA, TIERRA VUE, TIONG BAHRU ESTATE, TIVOLI GARDENS, TIVOLI GRANDE, TK ONE, TMW MAXWELL, TOH ESTATE, TOH TUCK GARDEN, TOH TUCK LODGE, TOH YI COURT, TOMLINSON HEIGHTS, TOP TEN, TOPAZ MANSIONS, TORIE MANSIONS, TORIEVIEW MANSIONS, TORIEVILLE, TOWNHOUSE APARTMENTS, TRANQUILIA @ KISMIS, TRE RESIDENCES, TREASURE AT TAMPINES, TREASURE CREST, TREASURE GARDENS, TREASURE LOFT, TREASURE MANSIONS, TREASURE ON BALMORAL, TREASURE PLACE, TREASURES @ G20, TREASURES@G19, TREASURES@G6, TREE HOUSE, TREESCAPE, TRELLIS TOWERS, TRESALVEO, TREVISTA, TREVOSE PARK, TRIBECA, TRILIGHT, TRILIVE, TROPICAL SPRING, TROPICANA CONDOMINIUM, TROPICS @ HAIGSVILLE, TROPIKA EAST, TRUSSVILLE, TUAN SING PARK, TUDOR TEN, TURQUOISE, TWENTYONE ANGULLIA PARK, TWIN FOUNTAINS, TWIN REGENCY, TWIN VEW, TWIN WATERFALLS, TWO8ONE STUDIO, TYRWHITT 139, UBER 388, UE SQUARE, UNI BUILDING, UNION SQUARE RESIDENCES, UNIQUE GARDEN, UNIT 8, UNITED MANSION, UNIVERSITY PARK, UP@ROBERTSON QUAY, UPPER SERANGOON SHOPPING CENTRE, UPPERHOUSE AT ORCHARD BOULEVARD, UPTOWN @ FARRER, URBAN EDGE @ HOLLAND V, URBAN HERITAGE, URBAN LOFTS, URBAN RESIDENCES, URBAN RESORT CONDOMINIUM, URBAN SUITES, URBAN TREASURES, URBAN VISTA, URBANA, V ON SHENTON, VA RESIDENCES, VACANZA @ EAST, VALLEY MANSION, VALLEY PARK, VALVISTA, VAN HOLLAND, VANADIUM, VARSITY PARK CONDOMINIUM, VAUGHAN GARDEN, VENEZIO, VENTANA, VENTANA VILLAS, VENTUNO BALMORAL, VENTURA HEIGHTS, VENTURA VIEW, VERANDA, VERDALE, VERDANA VILLAS, VERDOR RESIDENCES, VERDURE, VERDURE VILLAS, VERSAILLES, VERSILIA ON HAIG, VERTICUS, VERTIS, VETRO, VIBES @ EAST COAST, VIBES @ KOVAN, VIBES@UPPER SERANGOON, VICENTA LODGE, VICTORIA PARK VILLAS, VICTORY HEIGHTS, VICTORY VILLE, VIDA, VIENTO, VIEW AT KISMIS, VIIO @ BALESTIER, VILLA AZURA, VILLA BEGONIA, VILLA CHANCERY, VILLA DE WEST, VILLA DELLE ROSE, VILLA DES FLORES, VILLA MARINA, VILLA MARTIA, VILLA PONDER ROSA, VILLA VERDE, VILLAEA VISTA, VILLAGE @ PASIR PANJANG, VILLAGE TOWER, VILLAS @ GILSTEAD, VILLAS LA VUE, VILLAS LAGUNA, VILLAS SIX, VILLE ROYALE, VINA LODGE, VISIONCREST, VISTA GARDEN, VISTA RESIDENCES, VITRA, VIVA, VIVA VISTA, VIVACE, VIZ AT HOLLAND, VOGX, VOLARI, VUE 8 RESIDENCE, W RESIDENCES MARINA VIEW - SINGAPORE, WALLICH RESIDENCE, WAN THO LODGE, WANDERVALE, WANG LODGE, WARNER COURT, WASHINGTON VILLA, WATER PLACE, WATER TERRACE, WATER VILLAS, WATERBANK AT DAKOTA, WATERBAY, WATERCOLOURS, WATERCOVE, WATERCREST, WATERFALL GARDENS, WATERFORD RESIDENCE, WATERFRONT @ FABER, WATERFRONT GOLD, WATERFRONT ISLE, WATERFRONT KEY, WATERFRONT WAVES, WATERLOO VIEW, WATERMARK ROBERTSON QUAY, WATERSCAPE AT CAVENAGH, WATERTOWN, WATERVIEW, WATERWOODS, WATTEN ESTATE, WATTEN ESTATE CONDOMINIUM, WATTEN HILL, WATTEN HOUSE, WATTEN RESIDENCES, WELLINGTON PARK, WEMBLY RESIDENCES, WEST BAY CONDOMINIUM, WEST COAST GARDENS, WEST COAST VIEW, WEST PARK REGENCY, WEST POINT PEARL GARDEN, WEST SEA GARDENS, WEST SHORE RESIDENCES, WEST-N, WESTCOVE CONDOMINIUM, WESTLAKE GARDENS, WESTMERE, WESTPEAK TERRACE, WESTRIDGE, WESTSIDE 33, WESTVILLE, WESTWOOD PARK, WESTWOOD RESIDENCES, WHARTON VALE, WHISTLER GRAND, WHITE HOUSE PARK, WHITEHAVEN, WHITESCAPE, WHITEWATER, WHITLEY VILLAS, WHITLEYVILLE, WILKIE 48, WILKIE 80, WILKIE 87, WILKIE COURT, WILKIE REGENCY, WILKIE STUDIO, WILLYN VILLE, WILSHIRE RESIDENCES, WINDERMERE, WINDSOR PARK, WINDSOR PARK ESTATE, WINDY HEIGHTS, WING FONG BUILDING, WING FONG COURT, WING FONG MANSIONS, WING ON LIFE GARDEN, WOLSKEL LODGE, WOO MON CHEW COURT, WOODGROVE CONDOMINIUM, WOODGROVE ESTATE, WOODHAVEN, WOODLANDS PARK, WOODSVALE, WOODSVILLE 28, WOODSVILLE MANSIONS, WOOLLERTON PARK, WORTHINGTON, WU DE BUILDING, YEW LIAN PARK, YEW MEI GREEN, YEWTEE RESIDENCES, YGK GARDEN, YIKAI COURT, YIO CHU KANG TERRACE, YISHUN EMERALD, YISHUN SAPPHIRE, YONG AN PARK, YONG SENG ESTATE, YONG SIAK COURT, YONG SIAK VIEW, YUGI GARDEN, YUNNAN GARDENS, ZEDGE, ZENITH, ZEPHYR PARK, ZYANYA, ZYON GRAND</div>
+
+<script>
+window.addEventListener('load', function() {
+  if(!document.getElementById('macroChart')) return;
+  const ctx = document.getElementById('macroChart').getContext('2d');
+  
+  
+  // Dynamic Chart Logic
+  const raw_data = {
+    "CCR": {"2015": 2525000, "2016": 2449000, "2017": 2424000, "2018": 2626000, "2019": 2676000, "2020": 2727000, "2021": 3012487.44, "2022": 3296486.82, "2023": 3271091.4, "2024": 3105310.44, "2025": 3034964.83, "2026": 3360068.56}, 
+    "RCR": {"2015": 1530000, "2016": 1484000, "2017": 1469000, "2018": 1591000, "2019": 1622000, "2020": 1653000, "2021": 1819111.78, "2022": 1940072.1, "2023": 2049842.52, "2024": 2202317.66, "2025": 2347062.88, "2026": 2426525.7}, 
+    "OCR": {"2015": 1244000, "2016": 1207000, "2017": 1194000, "2018": 1294000, "2019": 1319000, "2020": 1344000, "2021": 1479955.91, "2022": 1686715.1, "2023": 1690002.06, "2024": 1782955.74, "2025": 1903214.9, "2026": 2014524.79}
+  };
+  
+  // Create UI controls
+  const chartContainer = document.getElementById('macroChart').parentElement;
+  const controlsDiv = document.createElement('div');
+  controlsDiv.style.cssText = 'position:absolute; top:20px; right:24px; z-index:10; display:flex; gap:10px; background:var(--panel); padding:8px 12px; border-radius:8px; border:1px solid var(--border);';
+  
+  controlsDiv.innerHTML = `
+    <div style="display:flex; align-items:center; gap:5px;">
+      <label style="color:var(--muted); font-size:12px;">基准年:</label>
+      <select id="startYear" style="background:var(--navy); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 5px; font-size:12px; cursor:pointer;">
+        <option value="2015">2015</option>
+        <option value="2016">2016</option>
+        <option value="2017">2017</option>
+        <option value="2018">2018</option>
+        <option value="2019">2019</option>
+        <option value="2020">2020</option>
+        <option value="2021" selected>2021</option>
+        <option value="2022">2022</option>
+        <option value="2023">2023</option>
+        <option value="2024">2024</option>
+      </select>
+    </div>
+    <div style="display:flex; align-items:center; gap:5px;">
+      <label style="color:var(--muted); font-size:12px;">预估至:</label>
+      <select id="endYear" style="background:var(--navy); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 5px; font-size:12px; cursor:pointer;">
+        <option value="2025">2025</option>
+        <option value="2026">2026</option>
+        <option value="2027">2027</option>
+        <option value="2028" selected>2028</option>
+      </select>
+    </div>
+  `;
+  chartContainer.appendChild(controlsDiv);
+
+  let macroChartInstance = null;
+
+  function updateChart() {
+    const sYear = parseInt(document.getElementById('startYear').value);
+    const eYear = parseInt(document.getElementById('endYear').value);
+    
+    // Validate
+    if (eYear <= sYear) {
+      document.getElementById('endYear').value = (sYear + 1).toString();
+      return updateChart();
+    }
+
+    const labels = [];
+    const ccrData = [];
+    const rcrData = [];
+    const ocrData = [];
+    const fdData = [];
+    const cpiData = [];
+    
+    // Historical FD (approx) and CPI (approx) starting from 2021
+    const fdRates = {2015:0.3, 2016:0.3, 2017:0.3, 2018:0.4, 2019:0.6, 2020:0.4, 2021:0.5, 2022:1.5, 2023:3.2, 2024:3.2, 2025:2.8, 2026:2.5, 2027:2.5, 2028:2.5};
+    const cpiRates = {2015:-0.5, 2016:-0.5, 2017:0.6, 2018:0.4, 2019:0.6, 2020:-0.2, 2021:0.9, 2022:4.1, 2023:4.2, 2024:3.1, 2025:2.5, 2026:2.0, 2027:2.0, 2028:2.0};
+
+    let fdIndex = 100.0;
+    let cpiIndex = 100.0;
+    
+    const baseCcr = raw_data.CCR[sYear];
+    const baseRcr = raw_data.RCR[sYear];
+    const baseOcr = raw_data.OCR[sYear];
+
+    for (let y = sYear; y <= eYear; y++) {
+      labels.push(y > 2025 ? y + ' (预估)' : y.toString());
+      
+      // Calculate Index
+      if (y === sYear) {
+        ccrData.push(100.0);
+        rcrData.push(100.0);
+        ocrData.push(100.0);
+        fdData.push(100.0);
+        cpiData.push(100.0);
+      } else {
+        fdIndex = fdIndex * (1 + fdRates[y]/100);
+        cpiIndex = cpiIndex * (1 + cpiRates[y]/100);
+        fdData.push(parseFloat(fdIndex.toFixed(1)));
+        cpiData.push(parseFloat(cpiIndex.toFixed(1)));
+        
+        if (y <= 2025) {
+            ccrData.push(parseFloat(((raw_data.CCR[y] / baseCcr) * 100).toFixed(1)));
+            rcrData.push(parseFloat(((raw_data.RCR[y] / baseRcr) * 100).toFixed(1)));
+            ocrData.push(parseFloat(((raw_data.OCR[y] / baseOcr) * 100).toFixed(1)));
+        } else {
+            // Project using 2021-2025 CAGR
+            const ccrCagr = Math.pow(raw_data.CCR[2025] / raw_data.CCR[2021], 1/4) - 1;
+            const rcrCagr = Math.pow(raw_data.RCR[2025] / raw_data.RCR[2021], 1/4) - 1;
+            const ocrCagr = Math.pow(raw_data.OCR[2025] / raw_data.OCR[2021], 1/4) - 1;
+            
+            const lastCcr = ccrData[ccrData.length - 1];
+            const lastRcr = rcrData[rcrData.length - 1];
+            const lastOcr = ocrData[ocrData.length - 1];
+            
+            ccrData.push(parseFloat((lastCcr * (1 + ccrCagr)).toFixed(1)));
+            rcrData.push(parseFloat((lastRcr * (1 + rcrCagr)).toFixed(1)));
+            ocrData.push(parseFloat((lastOcr * (1 + ocrCagr)).toFixed(1)));
+        }
+      }
+    }
+
+    if (macroChartInstance) {
+  macroChartInstance.destroy();
+}
+
+    
+    // === Add CAGR Table ===
+    let cagrTable = document.getElementById('cagrTable');
+    if (!cagrTable) {
+      cagrTable = document.createElement('div');
+      cagrTable.id = 'cagrTable';
+      cagrTable.style.cssText = 'margin-top:15px; padding:15px; background:var(--navy); border-radius:8px; border:1px solid var(--border); overflow-x:auto;';
+      chartContainer.appendChild(cagrTable);
+    }
+    
+    function calcCagr(startVal, endVal, years) {
+      if(years <= 0 || !startVal) return '0.0%';
+      const rate = (Math.pow(endVal / startVal, 1 / years) - 1) * 100;
+      return (rate > 0 ? '+' : '') + rate.toFixed(1) + '%';
+    }
+    
+    const yearsDiff = eYear - sYear;
+    const ccrCagr = calcCagr(100.0, ccrData[ccrData.length-1], yearsDiff);
+    const rcrCagr = calcCagr(100.0, rcrData[rcrData.length-1], yearsDiff);
+    const ocrCagr = calcCagr(100.0, ocrData[ocrData.length-1], yearsDiff);
+    const fdCagr = calcCagr(100.0, fdData[fdData.length-1], yearsDiff);
+    const cpiCagr = calcCagr(100.0, cpiData[cpiData.length-1], yearsDiff);
+    
+    cagrTable.innerHTML = `
+      <h4 style="margin:0 0 10px 0; color:var(--text); font-size:14px;">区间平均年化复合增长率 (CAGR): ${sYear} ~ ${eYear}</h4>
+      <table style="width:100%; text-align:center; font-size:13px; border-collapse:collapse;">
+        <tr style="border-bottom:1px solid var(--border); color:var(--muted);">
+          <th style="padding:5px;">CCR (核心中央区)</th>
+          <th style="padding:5px;">RCR (中央区以外)</th>
+          <th style="padding:5px;">OCR (中央区外围)</th>
+          <th style="padding:5px;">定存利率</th>
+          <th style="padding:5px;">通货膨胀</th>
+        </tr>
+        <tr>
+          <td style="padding:8px; font-weight:bold; color:#a0aec0;">${ccrCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#f0c84a;">${rcrCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#9f7aea;">${ocrCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#63b3ed;">${fdCagr}</td>
+          <td style="padding:8px; font-weight:bold; color:#fc8181;">${cpiCagr}</td>
+        </tr>
+      </table>
+    `;
+
+    macroChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'RCR (中央区以外) 房市', data: rcrData, borderColor: '#f0c84a', backgroundColor: 'rgba(240, 200, 74, 0.1)', borderWidth: 3, tension: 0.3, fill: true },
+          { label: 'OCR (中央区外围) 房市', data: ocrData, borderColor: '#9f7aea', borderWidth: 3, tension: 0.3 },
+          { label: 'CCR (核心中央区) 房市', data: ccrData, borderColor: '#a0aec0', borderWidth: 3, tension: 0.3 },
+          { label: '定存利率 (Fixed Deposit)', data: fdData, borderColor: '#63b3ed', borderWidth: 2, borderDash: [5, 5], tension: 0.1 },
+          { label: '通货膨胀率 (Inflation)', data: cpiData, borderColor: '#fc8181', borderWidth: 2, borderDash: [5, 5], tension: 0.1 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, color: '#8899bb',
+        plugins: {
+          legend: { position: 'top', labels: { color: '#e8f0fe', usePointStyle: true, boxWidth: 8 } },
+          tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(10,14,26,0.9)', titleColor: '#f0c84a', bodyColor: '#e8f0fe', borderColor: 'rgba(99,179,237,0.3)', borderWidth: 1 }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(99,179,237,0.1)' }, ticks: { color: '#8899bb' } },
+          y: { grid: { color: 'rgba(99,179,237,0.1)' }, ticks: { color: '#8899bb' }, title: { display: true, text: `累积指数 (${sYear}=100)`, color: '#8899bb' } }
+        },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+      }
+    });
+  }
+
+  document.getElementById('startYear').addEventListener('change', updateChart);
+  document.getElementById('endYear').addEventListener('change', updateChart);
+  updateChart();
+});
+</script>
+
+<!-- SEO Hidden Keywords -->
+<div style="display:none;" aria-hidden="true"># 1 LOFT, # 1 SUITES, 1 CANBERRA, 1 KING ALBERT PARK, 1 MOULMEIN RISE, 10 EVELYN, 10 SHELFORD, 11 AMBER ROAD, 111 EMERALD HILL, 120 GRANGE, 15 HOLLAND HILL, 16 @ AMBER, 18 SHELFORD, 18 WOODSVILLE, 183 LONGHAUS, 19 NASSIM, 1919, 1953, 2 RVG, 21 ANDERSON, 21 RICHARDS, 21 SHELFORD, 24 ONE RESIDENCES, 26 NEWTON, 28 IMPERIAL RESIDENCES, 28 RC SUITES, 28 SHELFORD, 283 STUDIO, 3 CUSCADEN, 3 ORCHARD BY-THE-PARK, 32 GILSTEAD, 33 RESIDENCES, 35 GILSTEAD, 368 THOMSON, 38 I SUITES, 38 JERVOIS, 3@PHILLIPS, 3@SANDILANDS, 3BHC, 448@EAST COAST, 57 @ KOVAN, 6 DERBYSHIRE, 75BR, 76 SHENTON, 77 @ EAST COAST, 8 @ MOUNT SOPHIA, 8 @ STRATTON, 8 BASSEIN, 8 EDEN GROVE, 8 FARRER SUITES, 8 HULLET, 8 NAPIER, 8 ON CHUAN, 8 RAJA, 8 RODYK, 8 SAINT THOMAS, 833 M B RESIDENCES, 8@BT, 8@WOODLEIGH, 8M RESIDENCES, 91 MARSHALL, A TREASURE TROVE, AALTO, ADAM PARK CONDOMINIUM, ADAM PLACE, ADANA @ THOMSON, ADELPHI PARK ESTATE, ADRIA, AFFINITY AT SERANGOON, AFFLUENCE COURT, AIRSTREAM, AIRVIEW PARK, ALANA, ALBA, ALEGRIA, ALESSANDREA, ALEX RESIDENCES, ALEXIS, ALLAMANDA GROVE, ALLSWORTH PARK, ALPHA APARTMENTS, ALTEZ, ALTURA, ALWYN PARK, AMANINDA, AMARANDA GARDENS, AMARYLLIS VILLE, AMBER 45, AMBER HOUSE, AMBER PARK, AMBER POINT, AMBER RESIDENCES, AMBER SKYE, AMO RESIDENCE, AMPAS APARTMENTS, ANGULLIA PARK RESIDENCES @ ORCHARD, APLETON VIEW, APOLLO GARDENS, AQUARINE GARDENS, AQUARIUS BY THE PARK, AQUENE, ARC AT TAMPINES, ARCHIPELAGO, ARDISIA GARDENS, ARDMORE II, ARDMORE PARK, ARDMORE THREE, ARDOR RESIDENCE, ARENA RESIDENCES, ARINA EAST RESIDENCES, ARIVA ON SHAN SERVICED RESIDENCE, ARTHUR 118, ARTHUR MANSIONS, ARTISAN 8, ARTRA, ASCENT @ 456, ASCENTIA SKY, ASPEN HEIGHTS, ASPEN LINQ, ASPEN LOFT, ASTON GREEN, ASTON LODGE, ASTON MANSIONS, ASTON RESIDENCE, ASTOR, ASTOR GREEN, ASTORIA PARK, ASTRID MEADOWS, ASTRIDVILLE, ATELIER VILLAS, ATLASSIA, ATRIUM RESIDENCES, ATTITUDE AT KIM YAM, AURA 83, AURALIS, AUREA, AURELLE OF TAMPINES, AUSTVILLE RESIDENCES, AVA TOWERS, AVALON, AVANT PARC, AVANT RESIDENCES, AVENUE SOUTH RESIDENCE, AVILA GARDENS, AVILA TERRACE, AVON PARK, AXIS @ SIGLAP, AZALEA PARK CONDOMINIUM, BAGNALL COURT, BAGNALL HAUS, BALCON EAST, BALESTIER 288, BALESTIER PLAZA, BALESTIER POINT, BALESTIER REGENCY, BALLOTA PARK CONDOMINIUM, BALMORAL 8, BALMORAL CREST, BALMORAL GATE, BALMORAL HEIGHTS, BALMORAL HILLS, BALMORAL PLAZA, BALMORAL POINT, BALMORAL RESIDENCES, BALMY COURT, BAN GUAN PARK, BANYAN CONDOMINIUM, BANYAN PARK, BANYAN VILLAS, BAODE BUILDING, BARKER 9, BARKER VILLE, BAROSSA GARDENS, BARTLEY RESIDENCES, BARTLEY RIDGE, BARTLEY RISE, BARTLEY RISE ESTATE, BARTLEY VILLAS, BARTLEY VUE, BASSEIN COURT, BAYOU RESIDENCE, BAYSHORE PARK, BAYVILLE CONDOMINIUM, BAYWATER, BAYWIND RESIDENCES, BEACON HEIGHTS, BEAU VISTA, BEAUFORT ON NASSIM, BEAUTY GARDEN, BEAUTY WORLD CENTRE, BEAUTY WORLD PLAZA, BEAVERTON COURT, BEDOK COURT, BEDOK GROVE, BEDOK PARK, BEDOK PESARI, BEDOK RESIDENCES, BEDOK RIA, BEDOK SHOPPING COMPLEX, BEDOKVILLE, BEECHWOOD TERRACE, BELGRAVIA ACE, BELGRAVIA GREEN, BELGRAVIA PARK, BELGRAVIA VILLAS, BELLA CASITA, BELLA VISTA, BELLAVILLE, BELLE VUE RESIDENCES, BELLERIVE, BELLEWATERS, BELLEWOODS, BELLEZZA @ KATONG, BELMOND GREEN, BELMONDO VIEW, BELYSA, BENA PARK, BENG TONG MANSION, BERKELEY RESIDENCES, BETA GROVE, BEVERLY HILL, BIJOU, BINJAI CREST, BINJAI PARK, BIRCHWOOD MANSIONS, BIRMINGHAM MANSIONS, BISHAN 8, BISHAN LOFT, BISHAN PARK CONDOMINIUM, BISHAN POINT, BISHOPSGATE RESIDENCES, BLAIR PLAIN CONSERVATION AREA, BLEU @ EAST COAST, BLISS LOFT, BLISS REGALIA, BLISS RESIDENCES, BLISS VILLE, BLISS@KOVAN, BLOOMSBURY RESIDENCES, BLOSSOM MANSIONS, BLOSSOM RESIDENCES, BLOSSOM VIEW, BLOSSOMS @ WOODLEIGH, BLOSSOMS BY THE PARK, BLU CORAL, BLUE HORIZON, BLUWATERS, BLUWATERS 2, BOAT QUAY CONSERVATION AREA, BOATHOUSE RESIDENCES, BOON COURT, BOON TECK APARTMENTS, BOON TECK TOWER, BOONVIEW, BOTANIC @ CLUNY PARK, BOTANIC GARDENS MANSION, BOTANIC GARDENS VIEW, BOTANIKA, BOTANIQUE AT BARTLEY, BOTANNIA, BOUGAINVILLA APARTMENTS, BOULEVARD 88, BOULEVARD VUE, BOWMONT CENTRE, BRADDELL HEIGHTS ESTATE, BRADDELL VIEW, BREEZE BY THE EAST, BREEZEWAYS, BREEZY MANSIONS, BRIGHT GARDEN, BRIGHTHILL RESIDENCES, BRIGHTON CREST, BRISTOL LODGE, BUCKLEY 18, BUCKLEY CLASSIQUE, BUCKLEY RESIDENCE, BUKIT 828, BUKIT LOYANG ESTATE, BUKIT REGENCY, BULLION PARK, BUONA LODGE, BUONA VISTA GARDENS, BURGHLEY DRIVE, BURGUNDY HILL, BURLINGTON SQUARE, BUTTERWORTH 8, BUTTERWORTH VIEW, CABANA, CACTUS GREEN, CADENCE LIGHT, CAIFU VIEW, CAIRNHILL 16, CAIRNHILL ASTORIA, CAIRNHILL CONSERVATION AREA, CAIRNHILL CREST, CAIRNHILL NINE, CAIRNHILL PLAZA, CAIRNHILL RESIDENCES, CALARASI, CALDECOTT HILL ESTATE, CALIN MANSIONS, CALLIDORA VILLE, CAMBIO SUITES, CAMBRIDGE VILLAGE, CAMDEN PARK, CAMELIA PARK, CAMELLIA LODGE, CAMELODGE, CAMELOT BY-THE-WATER, CANAAN, CANARY PARK, CANARY VILLE, CANBERLIN APARTMENTS, CANBERLIN LODGE, CANBERRA CRESCENT RESIDENCES, CANBERRA RESIDENCES, CANDEVILLE, CANNAVILLE, CANNE LODGE, CANNINGHILL PIERS, CANTIZ @ RAMBAI, CAPE ROYALE, CAPITOL PARK, CARABELLE, CARDIFF RESIDENCE, CARIBBEAN AT KEPPEL BAY, CARISSA PARK CONDOMINIUM, CARLYX GREEN, CARLYX RESIDENCE, CARMI MANSIONS, CARMINE COLLECTION, CARPMAEL THIRTY-EIGHT, CASA AERATA, CASA AL MARE, CASA AROMA, CASA CAIRNHILL, CASA CAMBIO, CASA EMERALD, CASA ESPANIA, CASA ESPERANZA, CASA FELIZ, CASA FIDELIO, CASA FLORA, CASA FORTUNA, CASA IRRAWADDY, CASA JERVOIS, CASA MERAH, CASA MEYA, CASA NOVACREST, CASA PASIR RIS, CASA RIVIERA, CASA ROSA, CASA SARINA, CASA SERENO, CASABELLA, CASABLANCA, CASAFINA, CASCADALE, CASCATA, CASERO @ DUNMAN, CASHEW ESTATE, CASHEW GREEN, CASHEW HEIGHTS CONDOMINIUM, CASHEW PARK CONDOMINIUM, CASHEW VILLAS, CASPIAN, CASSIA EDGE, CASSIA VIEW, CASTLE GREEN, CASTLE LOFT, CASUARINA COVE, CATHAY GARDEN, CAVAN SUITES, CAVENAGH COURT, CAVENAGH GARDENS, CAVENAGH HOUSE, CAVENDISH PARK, CAYMAN RESIDENCES, CELADON VIEW, CELESTIA, CENTENNIA SUITES, CENTRA HEIGHTS, CENTRA LOFT, CENTRA RESIDENCE, CENTRA STUDIOS, CENTRA SUITES, CENTRAL GREEN CONDOMINIUM, CENTRAL GROVE, CENTRAL IMPERIAL, CENTRAL MEADOWS, CENTRAL VIEW, CENTRINA, CENTRO MANSIONS, CENTRO RESIDENCES, CENTURION 12, CENTURION RESIDENCES, CENTURY MANSIONS, CENTURY WOODS, CERELIA VISTA, CEYLON COURT, CEYLON CREST, CHANCERY ESQUIRE, CHANCERY HILL VILLAS, CHANCERY PARK, CHANGI COURT, CHANGI GREEN, CHANGI GROVE, CHANGI HEIGHTS, CHANGI RISE CONDOMINIUM, CHANTILLY RISE, CHAPEL COURT, CHAPEL LODGE, CHARISMA VIEW, CHARLESTON, CHARLTON 18, CHARLTON 27, CHARLTON CORNER, CHARLTON PARK, CHARLTON RESIDENCES, CHARLTON VILLAS, CHARMING GARDEN, CHATEAU LA SALLE, CHATEAU LE FAME, CHATELET, CHELSEA GARDENS, CHELSEA GROVE, CHELSEA LODGE, CHELSEA VILLAGE, CHEN FANG MANSIONS, CHENG SOON GARDEN, CHEOW KENG GARDEN, CHEPSTOW VILLE, CHERRY GARDENS, CHERRYHILL, CHESTER PARK, CHESTERVALE, CHESTNUT GARDENS, CHESTNUT RESIDENCES, CHESTNUT VILLE, CHIKU MANSIONS, CHILTERN PARK, CHIP BEE GARDENS, CHIP HOCK GARDENS, CHIP THYE GARDEN, CHISELHURST GREEN, CHIVERTON, CHOON KIM HOUSE, CHOON SING GARDEN, CHUAN GARDEN, CHUAN GREEN, CHUAN PARK, CHUAN PARK (DEMOLISHED), CHUAN TERRACE, CHUAN VALE, CHUAN VILLAS, CHUAN VILLE, CHUAN VISTA II, CHUAN YUAN, CHUVILLE, CHWEE CHIAN VIEW, CITIGATE RESIDENCE, CITY EDGE, CITY GATE, CITY LOFT, CITY PLAZA, CITY REGENCY, CITY SQUARE RESIDENCES, CITY STUDIOS, CITY SUITES, CITYLIFE@TAMPINES, CITYLIGHTS, CITYSCAPE @FARRER PARK, CITYVALE, CITYVISTA RESIDENCES, CLAREMONT, CLASSICAL TERRACE, CLAVON, CLAYDENCE, CLAYMORE PLAZA, CLEMENTI GREEN, CLEMENTI PARK, CLEMENTIWOODS CONDOMINIUM, CLIFTEN, CLIVEDEN AT GRANGE, CLOVER BY THE PARK, CLOVER PARK, CLUNY PARK RESIDENCE, CLYDES RESIDENCE, CLYDESCOVE, CLYDESVIEW, CLYDESWOOD, COASTAL BREEZE RESIDENCES, COASTAL CABANA, COASTAL VIEW RESIDENCES, COASTAL VILLAS, COASTARINA, COASTLINE RESIDENCES, COCO PALMS, COLCHESTER PARK, COMFORT GARDEN, COMMONWEALTH TOWERS, COMPASS HEIGHTS, CONCOURSE SKYLINE, CONDOMINIUM DEVELOPMENT, COPEN GRAND, CORAL ISLAND, CORAL PARK, CORALIS, CORALS AT KEPPEL BAY, CORONA VILLE, CORONATION ARCADE, CORONATION GARDENS, CORONATION GROVE, CORONATION SHOPPING PLAZA, CORONATION VILLAGE, CORONATION VILLE, COSMO, COSTA DEL SOL, COSTA ESTE, COSTA RHU, COSY 23, COSY LODGE, COTE D'AZUR, COTSWOLD VILLAS, COUNTRY ESQUIRE, COUNTRY GRANDEUR, COUNTRY PARK CONDOMINIUM, COUNTRYVIEW, CRADELS, CRAIG PLACE, CRANE COURT, CRESCENDO BUILDING, CRESCENDO PARK, CRYSTAL COURT, CRYSTAL DEW, CRYSTAL HEIGHTS, CRYSTAL LODGE, CRYSTAL MANSIONS, CRYSTAL RHU, CUBE 8, CUBIK, CUSCADEN RESERVE, CUSCADEN RESIDENCES, CYAN, D - HERITAGE APARTMENTS, D' ALMIRA, D' CASITA, D' CASTILIA, D' DALVEY, D' FRESCO, D' IXORAS, D' KENARIS, D' PALMA, D'BANYAN, D'CAMBRIDGE, D'CHATEAU @ SHELFORD, D'ECOSIA, D'ELIAS, D'EVELYN, D'GALLERY, D'GROVE VILLAS, D'HIRO@HILLSIDE, D'LEEDON, D'LOTUS, D'MANOR, D'MIRA, D'NEST, D'OASIA, D'PAVILION, D'SAVILLE, D'SUNRISE, D'WEAVE, D'WILKINSON, D'ZIRE, D-MANSIONS, DA SILVA VILLAS, DAHLIA PARK CONDOMINIUM, DAINTREE RESIDENCE, DAIRY FARM RESIDENCES, DAISY LODGE, DAISY PARK, DAISY SUITES, DAISY TERRACE, DAKOTA RESIDENCES, DALLA VALE, DALVEY COURT, DALVEY HAUS, DALVEY VILLAS, DAWN VILLE, DE CASALLE, DE CENTURION, DE LENTE, DE PARADISO, DE ROYALE, DEDAP GARDENS, DELFI ORCHARD, DELIGHT COURT, DENG FU VILLE, DERBYSHIRE HEIGHTS, DEVONSHIRE 12, DEVONSHIRE RESIDENCES, DLV., DOMAIN 21, DOMUS, DORMER PARK, DORSET MANSIONS, DORSETT RESIDENCES, DOUBLE BAY RESIDENCES, DOVER PARKVIEW, DRAGON VIEW PARK, DRAYCOTT EIGHT, DUBLIN LODGE, DUBLIN ROAD FLATS, DUCHESS CREST, DUCHESS GARDEN, DUCHESS MANOR, DUCHESS RESIDENCES, DUCHESS ROYALE, DUET, DUKE'S GARDEN, DUKES RESIDENCE, DUKU APARTMENTS, DUNEARN 386, DUNEARN ESTATE, DUNEARN LODGE, DUNEARN SUITES, DUNMAN GARDEN, DUNMAN GROVE, DUNMAN PLACE, DUNMAN REGENCY, DUNMAN VIEW, DUNSFOLD 18, DUNSFOLD RESIDENCES, DUO RESIDENCES, DYNASTY GARDEN, DYNASTY LODGE, E MAISON, E-SPACE, E7 LODGE, EALINE PARK, EAST 25 APARTMENTS, EAST BAY GARDENS, EAST COAST HILL, EAST COAST PARK, EAST COAST RESIDENCES, EAST COURT, EAST ELEGANCE, EAST GALLERIA, EAST GROVE, EAST MEADOWS, EAST MEWS, EAST PALM, EAST SHINE, EAST SIGNATURE, EAST TUDOR, EAST VIEW, EAST VIEW 18, EAST VIEW GARDEN, EAST VILLAGE, EASTBAY, EASTCOVE RESIDENCES, EASTERN GARDEN, EASTERN GROVE, EASTERN LAGOON, EASTERN RESIDENCE, EASTPAC BUILDING, EASTPOINT GREEN, EASTREES, EASTSIDE LOFT, EASTVALE, EASTVILLE APARTMENTS, EASTWIND MANSIONS, EASTWOOD CENTRE, EASTWOOD GARDENS, EASTWOOD GREEN, EASTWOOD GREEN TERRACES, EASTWOOD LODGE, EASTWOOD PARK, EASTWOOD REGENCY, EASTWOOD TERRACE, EASTWOOD VILLE, EASTWOOD WALK GARDENS, EATON PARK, EBONY MANSIONS, ECHELON, ECO, ECO SANCTUARY, ECOPOLITAN, ECOVILLE, EDELWEISS PARK CONDOMINIUM, EDEN CREST, EDEN PARK, EDEN RESIDENCES CAPITOL, EDEN VIEW, EDENZ LOFT, EDENZ SUITES, EIGHT @ EAST COAST, EIGHT COURTYARDS, EIGHT RIVERSUITES, EIS RESIDENCES, ELEVEN @ HOLLAND, ELIAS GREEN, ELIAS TERRACE, ELITE COURT, ELITE RESIDENCES, ELIZABETH HEIGHTS, ELIZABETH TOWER, ELLIOT AT THE EAST COAST, ELTA, EMERALD EAST, EMERALD GARDEN, EMERALD HILL CONSERVATION AREA, EMERALD OF KATONG, EMERALD PARK, EMERY POINT, EMILY RESIDENCE, EMPRADO SUITES, EN FU MANSIONS, ENCHANT�‰, ENG AUN MANSION, ENG AUN PARK, ENG HOON MANSIONS, ENG KONG GREEN, ENG KONG PARK, ENGLISH VILLAS, ENVIO, EON SHENTON, EQUATORIAL APARTMENTS, ESCADA VIEW, ESPA, ESPADA, ESPARINA RESIDENCES, ESPIRA RESIDENCE, ESPIRA SPRING, ESPIRA SUITES, ESTA RUBY, ESTE VILLA, ESTELLA GARDENS, ESTERINA, ESTILO, ESTIQUE, ESTRIVILLAS, ETON COURT, EUHABITAT, EUNOS PARK, EUPHONY GARDENS, EURO-ASIA APARTMENTS, EURO-ASIA COURT, EURO-ASIA LODGE, EURO-ASIA PARK, EVANIA, EVELYN MANSIONS, EVERGREEN GARDEN, EVERGREEN PARK, EVERGREEN VIEW, EVERITT EDGE, EWE BOON REGENT, EXCELSIOR GARDENS, FABER CREST, FABER GARDEN, FABER GARDEN CONDOMINIUM, FABER HILLS, FABER RESIDENCE, FAIRLODGE, FAIRMOUNT CONDOMINIUM, FAME COURT, FAMILIE MANSIONS, FANTA GARDEN, FAR HORIZON GARDENS, FARRER PARK SUITES, FENGLI GARDENS, FERN LODGE, FERNHILL COTTAGE, FERNWOOD TERRACES, FERNWOOD TOWERS, FERRARIA PARK CONDOMINIUM, FERRELL RESIDENCES, FIFTH AVENUE CONDOMINIUM, FIFTY-TWO STEVENS, FINLAND GARDENS, FIORENZA, FIVE CHANCERY, FIVENINE, FLAME TREE PARK, FLAMINGO VALLEY, FLO RESIDENCE, FLORA EAST, FLORAVIEW, FLORAVILLE, FLORENCE GARDENS, FLORENCE GROVE, FLORENCE TERRACE, FLORIDA PARK, FLORIDIAN, FLORISSA PARK, FLYNN PARK, FOH PIN GARDEN, FONTAINE PARRY, FONTANA HEIGHTS, FOOK HAI BUILDING, FORESQUE RESIDENCES, FOREST HILLS CONDOMINIUM, FOREST WOODS, FORESTVILLE, FORETT@BUKIT TIMAH, FORT GARDENS, FORTE SUITES, FORTUNA GARDEN, FORTUNA GARDENS, FORTUNA HILL, FORTUNA SEAVIEW VILLAS, FORTUNE JADE, FORTUNE PARK, FORTUNE VIEW, FOUR SEASONS PARK, FOURTH AVENUE RESIDENCES, FRAGRANCE COURT, FRAGRANT GARDENS, FRANKEL ESTATE, FREESIA WOODS, FRUITION, FUDU PARK, FULCRUM, FULTON HILL, FUYONG ESTATE, FUYUEN COURT, FYVE DERBYSHIRE, G RESIDENCES, GABRIEL VILLAS, GAIA, GALAXY TOWERS, GALLERY 8, GALLERY FIFTEEN, GALLOP GABLES, GALLOP GREEN, GALLOP VILLAS, GAMBIER COURT, GAMBIR RIDGE, GAMBIR TERRACE, GAO MING HUA YUAN, GARDEN APARTMENTS, GARDEN PARK RESIDENCES, GARDEN VIEW ESTATE, GARDENVILLE, GARDENVISTA, GARLICK PARK, GEM RESIDENCES, GEMINI APARTMENTS, GEMS VILLE, GENTLE REFLECTIONS, GENTLE VILLAS, GERALD GARDENS, GERALD MUGLISTON, GERALD MUGLISTON ESTATE, GERALD RESIDENCE, GEYLANG CONSERVATION AREA, GEYLANG HERITAGE, GIDEON'S LODGE, GIFFARD MANSIONS, GILLENIA, GILSTEAD 38, GILSTEAD BROOKS, GILSTEAD COURT, GILSTEAD MANSION, GILSTEAD TWO, GISBORNE LIGHT, GLAMOUR VILLE, GLASGOW GREEN, GLASGOW RESIDENCE, GLENDALE PARK, GLENTREES, GLOBAL VILLE, GLORIA MANSION, GLOUCESTER MANSIONS, GOLD COAST CONDOMINIUM, GOLD LEAF MANSIONS, GOLDEN HEIGHTS, GOLDEN HILL ESTATE, GOLDEN RISE ESTATE, GOLDENHILL PARK CONDOMINIUM, GOLDENHILL VILLAS, GOLDHILL GARDEN, GOLDHILL GARDENS, GOLDHILL TOWERS, GOLDLEAF GARDENS, GOLDWOOD GARDENS, GOODLINK PARK, GOODMAN CREST, GOODVIEW APARTMENTS, GOODWILL COURT, GOODWOOD GARDENS, GOODWOOD GRAND, GOODWOOD RESIDENCE, GOVT CO-OP HOUSING ESTATE, GPL TERRACE, GRACE COURT, GRACE GARDEN, GRACE PARK, GRAMERCY PARK, GRAND CHATEAU, GRAND DUCHESS AT ST PATRICK'S, GRAND DUNMAN, GRAND REGALIA, GRAND REGENCY, GRANDE VISTA, GRANDEUR 8, GRANDEUR PARK RESIDENCES, GRANDIOSO 8, GRANDLINK SQUARE, GRANDVIEW SUITES, GRANGE 1866, GRANGE HEIGHTS, GRANGE INFINITE, GRANGE RESIDENCES, GREEN  HILL ESTATE, GREEN COURT, GREEN HILL ESTATE, GREEN PARK, GREEN SPRINGS, GREENBANK PARK, GREENDALE COURT, GREENLANE APARTMENT, GREENRIDGE, GREENWOOD MEWS, GREENWOOD VILLAS, GROSVENOR VIEW, GROVE RESIDENCE, GUAN SOON TERRACE, GUAN SOON VILLAS, GUILIN COURT, GUILIN MANSIONS, GUILIN VIEW, GUILLEMARD EDGE, GUILLEMARD SUITES, GUILLEMARD VIEW, H RESIDENCES, H2O RESIDENCES, HAI SING PARK, HAIG 162, HAIG APARTMENTS, HAIG COURT, HAIG ELEVEN, HAIG LODGE, HAIG RESIDENCES, HAIG TEN, HALLMARK RESIDENCES, HAPPY ESTATE, HAPPY GARDENS, HAPPY MANSION, HAPPY PARK, HARBOUR RESIDENCES, HARBOUR SUITES, HARBOUR VIEW GARDENS, HARBOUR VIEW TOWERS, HARBOURLIGHTS, HARMONY @ 1A, HARVEST MANSIONS, HARVEY VIEW, HAUS ON HANDY, HAUS@SERANGOON GARDEN, HAWAII TOWER, HAZEL PARK CONDOMINIUM, HAZEL PARK TERRACE, HEDGES PARK CONDOMINIUM, HEETON CLASSIC, HEETON PARK, HEJI GARDENS, HELIOS RESIDENCES, HENLEY GARDENS, HENRY PARK, HERITAGE 9, HERITAGE EAST, HERITAGE RESIDENCES, HERITAGE VIEW, HERON BAY, HERTFORD COLLECTION, HERTFORD MANSION, HIGH OAK CONDOMINIUM, HIGH PARK RESIDENCES, HIGH STREET CENTRE, HIGHGATE, HIGHGATE PARK, HIGHLAND CENTRE, HIGHLAND CONDOMINIUM, HIGHLAND COTTAGES, HIGHLAND ROW, HIGHLINE RESIDENCES, HIJAUAN, HILBRE28, HILL HOUSE, HILLBROOKS, HILLCREST ARCADIA, HILLCREST PARK, HILLCREST VILLA, HILLHAVEN, HILLINGTON GREEN, HILLION RESIDENCES, HILLOCK GREEN, HILLS APARTMENT, HILLS TWOONE, HILLSGROVE, HILLSIDE MANSIONS, HILLSTA, HILLTOP GROVE, HILLTOPS, HILLVIEW 128, HILLVIEW APARTMENTS, HILLVIEW ESTATE, HILLVIEW GARDEN ESTATE, HILLVIEW GREEN, HILLVIEW HEIGHTS, HILLVIEW PARK, HILLVIEW REGENCY, HILLVIEW RESIDENCE, HILLVIEW VILLAS, HILLVISTA, HOA NAM BUILDING, HOCK MANSION, HOCK SENG PARK, HOCK SWEE HILL, HOLLAND COURT, HOLLAND GARDENS, HOLLAND GREEN, HOLLAND GROVE, HOLLAND GROVE PARK, HOLLAND HILL LODGE, HOLLAND HILL PARK, HOLLAND MEWS, HOLLAND PEAK, HOLLAND RESIDENCES, HOLLAND SUITES, HOLLAND TOWER, HOLLANDSWOOD COURT, HOLLLAND GROVE PARK, HOLLYWOOD APARTMENTS, HOLT RESIDENCES, HOMES AT EASTWOOD PLACE, HOMEY GARDENS, HONG BUILDING, HONG HENG GARDEN, HONG HENG MANSIONS, HONG HENG TERRACE, HONG KONG PARK, HONOLULU TOWER, HOOVER PARK, HORIZON GARDENS, HORIZON GREEN, HORIZON RESIDENCES, HORIZON TOWERS, HOUGANG GREEN, HOW SUN GARDEN, HUA GUAN GARDENS, HUA MEI GARDENS, HUA XIN COURT, HUIT, HUME PARK I, HUME PARK II, HUNDRED PALMS RESIDENCES, HUNDRED TREES, HYLL ON HOLLAND, ICON, ICON @ PASIR PANJANG, IDYLLIC EAST, IDYLLIC RESIDENCES, IDYLLIC SUITES, IKIGAI, ILLOURA, ILLUMINAIRE ON DEVONSHIRE, IMPERIAL HEIGHTS, INFINI AT EAST COAST, INFINIUM, INGGU 6, INTERNATIONAL PLAZA, INTERO, INZ RESIDENCE, IRESIDENCES, IRIDIUM, IRWELL HILL RESIDENCES, ISLAND COUNTRY VILLAS, ISLAND GARDENS, ISLAND PARK, ISLAND VIEW, ISUITES @ MARSHALL, ISUITES @ PALM, ISUITES @ TANI, IVORY, IVORY APARTMENTS, IVORY HEIGHTS, J C DRAYCOTT, J GATEWAY, J'DEN, J@63, JADE GARDEN, JADE MANSION, JADE RESIDENCES, JADE VINE GARDENS, JADESCAPE, JALAN KAYU ESTATE, JANSEN 28, JANSEN 8, JANSEN HOUSE, JANSEN MANSIONS, JARDIN, JAYA TOWER, JAZZ RESIDENCES, JC COURT, JC RESIDENCE, JC VILLE, JERSEY LODGE, JERVOIS GROVE, JERVOIS JADE, JERVOIS LODGE, JERVOIS MANSION, JERVOIS MEADOWS, JERVOIS PRIVE, JERVOIS REGENCY, JERVOIS TREASURES, JERVOIS VIEW, JERVOIS VILLE, JERVOISVILLE, JEWEL @ BUANGKOK, JEWEL @ CHUAN HOE, JEWEL OF BALMORAL, JI CHANG VILLA, JI LIANG GARDENS, JI XIANG COURT, JIA, JIN DING GARDEN, JK BUILDING, JLB RESIDENCES, JOO CHIAT APARTMENT, JOO CHIAT MANSIONS, JOO CHIAT VERBENA, JOOL SUITES, JUI RESIDENCES, JULUCA, JUNIPER AT ARDMORE, JUNIPER HILL, JUPITER 18, JURONG PARK, K SUITES, KAI FOOK MANSION, KALEIDO, KALLANG RIVERSIDE, KANDIS RESIDENCE, KAP RESIDENCES, KARTAR APARTMENTS, KASARA, KASSIA, KASTURINA LODGE, KATONG APARTMENTS, KATONG GARDENS, KATONG REGENCY, KATONG VILLE, KECHUBONG TERRACE, KELLETT COURT, KELLOCK LODGE, KELULUT HILL, KEMBANGAN COURT, KEMBANGAN ESTATE, KEMBANGAN PLAZA, KEMBANGAN SUITES, KEMBANGAN VILLAS, KENG LEE COURT, KENG LEE VIEW, KENSINGTON PARK CONDOMINIUM, KENSINGTON SQUARE, KENT RESIDENCES, KENT RIDGE HILL RESIDENCES, KENTISH COURT, KENTISH GREEN, KENTISH LODGE, KENTVIEW PARK, KERRISDALE, KEW COTTAGES, KEW GATE, KEW GREEN, KEW GROVE, KEW LODGE, KEW PLACE, KEW RESIDENCIA, KEW VALE, KHEAM HOCK GARDENS, KI RESIDENCES AT BROOKVALE, KIARA 10, KILAT 19, KILAT CENTRE, KILAT COURT, KILBURN ESTATE, KILLINEY 118, KIM KEAT GARDENS, KIM KEAT HOUSE, KIM KEAT LODGE, KIM LIN PARK, KIM SIA COURT, KIMNAN PARK, KIMSIA PARK, KINDOL GARDENS, KING'S 8, KING'S COURT, KING'S GARDEN, KING'S LODGE, KING'S MANSION, KINGS APARTMENTS, KINGS VILLE, KINGSFORD . HILLVIEW PEAK, KINGSFORD WATERBAY, KINGSGROVE, KINGSLEY MANSIONS, KINGSTON TERRACE, KISMIS COURT, KISMIS RESIDENCES, KLASSIC COURT, KLIMT CAIRNHILL, KNOX VIEW, KOON SENG COURT, KOON SENG HOUSE, KOPAR AT NEWTON, KOVAN 81, KOVAN APARTMENTS, KOVAN CREST, KOVAN ESQUIRE, KOVAN GARDENS, KOVAN GRANDEUR, KOVAN JEWEL, KOVAN MELODY, KOVAN PRIMERA, KOVAN REGENCY, KOVAN RESIDENCES, KOVANA, KUAN MING GARDENS, KUIE PONG LOFT, KUM HING COURT, L'VIV, LA BELLE, LA BRISA, LA CASA, LA CRYSTAL, LA DOLCE VITA, LA FIESTA, LA FLEUR, LA MAISON, LA MARIPOSA, LA MEYER, LA QUINTA PARK, LA SALLE VILLAS, LA SUISSE, LA VIDA @ 130, LA VILLE, LADYHILL PARK, LAGOON VIEW, LAGUNA 88, LAGUNA GREEN, LAGUNA PARK, LAKE GRANDE, LAKE LIFE, LAKEHOLMZ, LAKEPOINT CONDOMINIUM, LAKESIDE APARTMENTS, LAKESIDE GROVE, LAKESIDE TOWER, LAKEVIEW ESTATE, LAKEVILLE, LANDBAY CONDOMINIUM, LANDED HOUSING DEVELOPMENT, LANDRIDGE CONDOMINIUM, LANGE 28, LANGSTON VILLE, LATITUDE, LATTICE ONE, LAUREL TREE, LAUW & SONS GARDEN, LAVENDER RESIDENCE, LAVERNE'S LOFT, LE ARC, LE CONNEY PARK, LE CRESCENDO, LE GAMBIR, LE HILL CONDOMINIUM, LE LOYANG, LE MARICAN, LE MERRITT, LE NOUVEL ARDMORE, LE QUEST, LE REGAL, LE REVE, LE ROYCE @ LEITH PARK, LE SHANTIER, LE SOMME, LE WILKIE, LE WOOD, LEEDON 2, LEEDON GREEN, LEEDON RESIDENCE, LEGEND @ JANSEN, LEGENDA AT JOO CHIAT, LEICESTER LODGE, LEICESTER SUITES, LEIGHWOODS, LEITH GROVE, LEITH PARK, LENTOR CENTRAL RESIDENCES, LENTOR HILLS RESIDENCES, LENTOR MANSION, LENTOR MODERN, LENTOR VIEW, LENTOR VILLAS, LENTORIA, LEONIE GARDENS, LEONIE HILL RESIDENCES, LEONIE PARC VIEW, LEONIE SUITES, LEONIE TOWERS, LES MAISONS NASSIM, LEVENUE, LEVILLE ISUITES, LI TONG GARDENS, LIBERTE, LIEN TOWERS, LIGHTHOUSE, LIIV RESIDENCES, LILAC PARK, LILYDALE, LIMAU GROVE, LIMAU PARK, LIMAU VILLAS, LINCOLN SUITES, LINK RESIDENCE @ HOLLAND, LION TOWERS, LIRIA TERRACE, LITTLE INDIA CONSERVATION AREA, LIV @ MB, LIV ON SOPHIA, LIV ON WILKIE, LIVIA, LIVINGSTON MANSIONS, LLOYD COURT, LLOYD SIXTYFIVE, LLYN GARDENS, LOFT 33, LOFT @ NATHAN, LOFT @ RANGOON, LOFT @ STEVENS, LOFT@HOLLAND, LORNIE 18, LORNIE GARDENS, LOTUS VILLE, LOWLAND TERRACE, LOWLAND VIEW, LOYANG COURT, LOYANG GARDENS, LOYANG GROVE, LOYANG TOWNHOUSES, LOYANG VALLEY, LOYANG VILLAS, LUCIDA, LUCKY COURT, LUCKY HILL, LUCKY PARK, LUCKY PLAZA, LUMA, LUMIERE, LUMINA GRAND, LUSH ACRES, LUSH ON HOLLAND HILL, LUSHAN GARDEN, LUTHERAN TOWERS, LUXE VILLE, LUXUS HILLS, LYNDENWOODS, LYNDHURST GROVE, LYNNSVILLE 331, LYNWOOD EIGHT, M SUITES, M21, M5, M66, MABELLE, MACHUAN TERRACE, MACKENZIE 138, MACKENZIE 88, MACKENZIE REGENCY, MACPHERSON GARDEN ESTATE, MADEIRA COURT, MADISON RESIDENCES, MALAYSIA PARK, MALVERN SPRINGS, MANDAI GARDEN, MANDALAY MANSION, MANDALAY TOWERS, MANDALE HEIGHTS, MANDARIN GARDENS, MANDARIN PARK, MANHATTAN MANSIONS, MANILA GARDENS, MAPLE WOODS, MARGARET VILLE, MARGATE POINT, MARINA BAY RESIDENCES, MARINA BAY SUITES, MARINA COLLECTION, MARINA ONE RESIDENCES, MARINE BLUE, MARINE GARDEN, MARINE MEADOWS, MARINE VIEW MANSIONS, MARINE VILLE, MARLENE VILLE, MARSHALL LODGE, MARTIA 8, MARTIA RESIDENCE, MARTIN EDGE, MARTIN MODERN, MARTIN NO 38, MARTIN PLACE RESIDENCES, MARTINA MANSIONS, MARYMOUNT VIEW, MATLOCK RESIDENCES, MATTAR RESIDENCES, MAYA, MAYFAIR GARDENS, MAYFAIR MODERN, MAYFAIR PARK, MAYFAIR RESIDENCES, MAYFLOWER GARDENS, MAYFLOWER RESIDENCES, MAYFLOWER VILLE, MAYSPRINGS, MCMAHON PARK, MEADOWLODGE, MEADOWS @ PEIRCE, MEDALLION, MEDGE, MEIER SUITES, MELINIA COURT, MELODY VILLAS, MELOSA, MELROSE PARK, MELROSE VILLE, MELVILLE PARK, MENDON SPRING, MERA EAST, MERA GARDENS, MERA SPRINGS, MERA TERRACE, MERALODGE, MERAPRIME, MERAWOODS, MERIDIAN 38, MERLOT VILLE, METRO LOFT, MEYA LODGE, MEYER BLUE, MEYER MANSION, MEYER PARK, MEYER RESIDENCE, MEYERHOUSE, MI CASA, MICHAELS' RESIDENCES, MIDTOWN BAY, MIDTOWN MODERN, MIDTOWN RESIDENCES, MIDWOOD, MILFORD VILLAS, MILL CREEK, MILL POINT, MILLAGE, MIMOSA GARDENS, MIMOSA PARK, MIMOSA TERRACE, MIMOSA VALE, MIMOSA VILLAS, MINBU COURT, MINBU VILLA, MING PARK, MING TECK PARK, MINT RESIDENCES @ JANSEN, MIRAGE TOWER, MIRAMAR GARDENS, MIRO, MISTRAL PARK, MODA, MODENA, MON JERVOIS, MONARCHY APARTMENTS, MONDO MANSION BUILDING, MONT BOTANIK RESIDENCE, MONT TIMAH, MONTCLAIR @ WHITLEY, MONTEBLEU, MONTEREY PARK CONDOMINIUM, MONTROSA, MONTVIEW, MONVILLE MANSIONS, MOOI RESIDENCES, MOONSTONE RESIDENCES, MOONSTONE ROYALE, MOONSTONE VIEW, MORI, MORIMASA GARDENS, MORO MANSIONS, MOSELLA, MOULMEIN COURT, MOUNT FABER LODGE, MOUNT ROSIE GARDEN, MOUNT SINAI, MOUNT SINAI RESIDENCES, MOUNT SOPHIA SUITES, MOUNTBATTEN LIGHTS, MOUNTBATTEN LODGE, MOUNTBATTEN REGENCY, MOUNTBATTEN SUITES, MUGLISTON HILL, MULBERRY TREE, MUN WAH GARDEN, MURANO, MUTIARA CREST, MUTIARA VIEW, MY MANHATTAN, MYRA, NADIA MANSIONS, NAMLY COURT, NANYANG PARK, NARRA RESIDENCES, NASSIM 9, NASSIM JADE, NASSIM LODGE, NASSIM MANSION, NASSIM PARK RESIDENCES, NATHAN PLACE, NATHAN RESIDENCES, NATHAN SUITES, NATURA@HILLVIEW, NATURALIS, NATURE MANSIONS, NAUNG RESIDENCE, NAVA GROVE, NEEM TREE, NEPTUNE COURT, NESS, NEU AT NOVENA, NEW COURT, NEW FUTURA, NEW SOO CHOW GARDENS, NEWEST, NEWPORT RESIDENCES, NEWTON 18, NEWTON 21, NEWTON EDGE, NEWTON IMPERIAL, NEWTON LODGE, NEWTON ONE, NEWTON SUITES, NICOLE GREEN, NICON GARDENS, NIM COLLECTION, NIM GARDENS, NIN RESIDENCE, NINE RESIDENCES, NINETEEN SHELFORD ROAD, NOMA, NOMU, NORMANTON PARK, NORTH GAIA, NORTH PARK RESIDENCES, NORTHILL, NORTHOAKS, NORTHSHORE BUNGALOWS, NORTHVALE, NORTHWAVE, NORTHWOOD, NORWOOD GRAND, NOTTINGHILL SUITES, NOUVEL 18, NOUVELLE PARK, NOVA 48, NOVA 88, NOVELIS, NOVENA COURT, NOVENA HILL, NOVENA LODGE, NOVENA REGENCY, NOVENA SUITES, NOVO PLACE, NUOVO, NV RESIDENCES, NYON, OAK VILLAS, OASIS @ ELIAS, OASIS @ MULBERRY, OASIS GARDEN, OCEAN 8, OCEAN FRONT SUITES, OCEAN PARK, ODEON SEASIDE PARK, OEI TIONG HAM PARK, OKIO, OLA, OLA RESIDENCES, OLEANAS RESIDENCE, OLEANDER TOWERS, OLLOI, ONAN SUITES, ONE @ PULASAN, ONE AKYAB, ONE AMBER, ONE BALMORAL, ONE BERNAM, ONE CHATSWORTH, ONE CHILTERN, ONE CLAYMORE, ONE DEVONSHIRE, ONE DRAYCOTT, ONE DUCHESS, ONE DUSUN RESIDENCES, ONE EIGHTIES RESIDENCES, ONE FORT, ONE HOLLAND VILLAGE RESIDENCES, ONE JERVOIS, ONE K GREENLANE, ONE LEICESTER, ONE LYNWOOD, ONE MARINA GARDENS, ONE MEYER, ONE OXLEY RISE, ONE PEARL BANK, ONE ROBIN, ONE ROSYTH, ONE SHENTON, ONE ST MICHAEL'S, ONE SURIN, ONE TREE HILL COLLECTION, ONE TREE HILL MANSIONS, ONE TREE HILL RESIDENCE, ONE-NORTH EDEN, ONE-NORTH RESIDENCES, ONEROBEY, ONZE @ TANJONG PAGAR, OPAL SUITES, OPERA ESTATE, OPTIMA @ TANAH MERAH, ORANGE GROVE RESIDENCES, ORCHARD BEL AIR, ORCHARD COURT, ORCHARD SCOTTS, ORCHARD SOPHIA, ORCHARD TOWERS, ORCHARD VIEW, ORCHID APARTMENTS, ORCHID PARK CONDOMINIUM, ORCHID VILLAGE, ORION, OTTO PLACE, OUE TWIN PEAKS, OXFORD SUITES, OXLEY EDGE, OXLEY GARDEN, OXLEY RESIDENCE, PADDY GREEN, PALACIO, PALAZZETTO, PALISADES, PALM GALLERIA, PALM GARDENS, PALM GREEN, PALM GROVE CONDOMINIUM, PALM GROVE REGENCY, PALM GROVE TERRACE, PALM HAVEN, PALM ISLES, PALM LODGE, PALM LOFT, PALM MANSIONS, PALM OASIS, PALM RESIDENCE, PALM SPRING, PALM TREE NINES, PALM VISTA, PALMERA EAST, PALMERA RESIDENCE, PALMS @ SIXTH AVENUE, PALMWOODS, PANDAN VALLEY, PAPILLON, PARADISE ISLAND, PARADISE PALMS, PARBURY HILL CONDOMINIUM, PARC ASTON, PARC BLEU, PARC BOTANNIA, PARC CANBERRA, PARC CENTENNIAL, PARC CENTRAL RESIDENCES, PARC CENTROS, PARC CLEMATIS, PARC ELEGANCE, PARC EMILY, PARC ESTA, PARC GREENWICH, PARC HAVEN, PARC IMPERIAL, PARC KOMO, PARC LIFE, PARC MACKENZIE, PARC MONDRIAN, PARC OASIS, PARC OLYMPIA, PARC PALAIS, PARC RIVIERA, PARC ROSEWOOD, PARC SEABREEZE, PARC SOMME, PARC SOPHIA, PARC STEVENS, PARC VERA, PARC VISTA, PARK 1 SUITES, PARK COLONIAL, PARK COURT, PARK EAST, PARK GREEN, PARK INFINIA AT WEE NAM, PARK NATURA, PARK NOVA, PARK PLACE RESIDENCES AT PLQ, PARK RESIDENCES KOVAN, PARK VIEW MANSION, PARK VILLAS, PARKSHORE, PARKSUITES, PARKTOWN RESIDENCE, PARKVIEW APARTMENTS, PARKVIEW ECLAT, PARKWOOD COLLECTION, PARKWOOD RESIDENCES, PARQ BELLA, PARRY COURT, PARRY GREEN, PARRY PARK, PARRYVILLE, PARVIS, PASADENA, PASIR PANJANG COURT, PASIR PANJANG GARDENS, PASIR PANJANG LODGE, PASIR RIS 8, PASIR RIS BEACH PARK, PASIR VIEW PARK, PATERSON LINC, PATERSON RESIDENCE, PATERSON SUITES, PAVILION 11, PAVILION PARK, PAVILION SQUARE, PAYA LEBAR GARDENS, PAYA LEBAR RESIDENCES, PEACE MANSION, PEACH GARDEN, PEAK RESIDENCE, PEAKVIEW ESTATE, PEAKVILLE PARK, PEBBLE BAY, PEIRCE VALE, PEIRCE VIEW, PEIRCE VILLAS, PENANG SERVICE APARTMENTS, PENRITH, PENROSE, PEOPLE'S GARDEN, PEOPLE'S PARK CENTRE, PEOPLE'S PARK COMPLEX, PEOPLES GARDEN, PEPYS HILL CONDOMINIUM, PERFECT TEN, PETIT JERVOIS, PHILLIPS RESIDENCE, PHOENIX HEIGHTS, PHOENIX RESIDENCES, PICARDY GARDENS, PICCADILLY GRAND, PIERMONT GRAND, PIN MANSIONS, PINE COURT, PINE GROVE, PINEHURST CONDOMINIUM, PINERY RESIDENCES, PINETREE CONDOMINIUM, PINETREE HILL, PINEVALE, PINEWOOD GARDENS, PINEWOOD TERRACE, PINNACLE 16, PLACE-8, PLATINA GARDENS, PLATINUM EDGE, POETS VILLAS, POH HENG COURT, POH HUAT GARDENS, POLLEN & BLEU, POLLEN COLLECTION, POLLEN COLLECTION II, PONGGOL PARK, POPULAR ESTATE, POSHGROVE EAST, PRESIDENT GARDENS, PRESIDIO, PRESTIGE HEIGHTS, PRESTIGE LOFT, PRESTIGE POINT, PRESTIGE RESIDENCE, PRESTO@UPPER SERANGOON, PRIME RESIDENCE, PRIMEDGE, PRIMO RESIDENCES, PRINCESS OF WALES PARK, PRINCETON VALE, PRINCIPAL GARDEN, PRISTINE HEIGHTS, PRIVE, PROMENADE PEAK, PROSPECT GARDEN, PROSPER GARDENS, PROSPERO VILLE, PROVENCE RESIDENCE, PROXIMO, PUBLIC MANSION, PULLMAN RESIDENCES NEWTON, Q BAY RESIDENCES, QUBE SUITES, QUEEN ASTRID GARDENS, QUEEN ASTRID PARK, QUEENS, QUEENS PEAK, QUEENSBERRY LODGE, QUEENSWAY TOWER, QUESTA @ DUNMAN, QUINTERRA, R MAISON, R66 APARTMENTS, RACE COURSE 138, RACE COURSE BUILDING, RACE COURSE MANSION, RADIANCE @ BUKIT TIMAH, RADIX, RAFFLES PARK, RAFFLESIA CONDOMINIUM, RAINTREE VALLEY, RAJAH TOWERS, RANGOON 88, RANGOON APARTMENTS, RANGOON VIEW, RAYA GARDEN, REBECCA PARK, REFLECTIONS AT KEPPEL BAY, REGAL 35, REGAL COURT, REGENCY LODGE, REGENCY PARK, REGENCY SUITES, REGENT GROVE, REGENT HEIGHTS, REGENT PARK, REGENT RESIDENCES, REGENT VILLAS, REGENTVILLE, REGINA HILL, REGIS MANSIONS, REIGNWOOD HAMILTON SCOTTS, RESERVOIR VILLAS, RESIDENCE 118, RESIDENCE 66, RESIDENCE 8, RESIDENCE TWENTY-TWO, RESIDENCES 88, RESIDENCES @ EVELYN, RESIDENCES @ JANSEN, RESIDENCES @ KILLINEY, RESIDENCES @ NOVENA, RESIDENCES @ SOMME, RESIDENCES @ STANGEE, RESIDENCES AT 338A, RESIDENCES AT EMERALD HILL, RESIDENCES BOTANIQUE, RESIDENTIAL APARTMENTS, REZI 24, REZI 26, REZI 35, REZI 3TWO, RHAPSODY ON MOUNT ELIZABETH, RICCHEZZA, RICH EAST GARDEN, RICH MANSIONS, RICH.RESIDENCE, RICHMOND PARK, RICHMOND VILLE, RIDGE COURT, RIDGEVALE GARDENS, RIDGEWOOD, RINDU TERRACE, RIO GARDENS, RIO VISTA, RIPPLE BAY, RIS GRANDEUR, RISING COURT, RISING SUITES, RITZ @ FARRER, RITZ MANSIONS, RITZ REGENCY, RIVAGE, RIVELLE TAMPINES, RIVER GREEN, RIVER ISLES, RIVER MODERN, RIVER PLACE, RIVER VALLEY APARTMENTS, RIVERBANK @ FERNVALE, RIVERBAY, RIVERCOVE RESIDENCES, RIVEREDGE, RIVERFRONT RESIDENCES, RIVERGATE, RIVERIA GARDENS, RIVERPARC RESIDENCE, RIVERSAILS, RIVERSHIRE, RIVERSIDE 48, RIVERSIDE MELODIES, RIVERSOUND RESIDENCE, RIVERTREES RESIDENCES, RIVERVALE CREST, RIVERWALK APARTMENTS, RIVIERA 38, RIVIERA RESIDENCES, RIVIERE, RIZ HAVEN, ROBERTSON 100, ROBERTSON BLUE, ROBERTSON EDGE, ROBIN REGALIA, ROBIN RESIDENCES, ROBIN SUITES, ROBINSON SUITES, ROCCA BALESTIER, ROCHELLE AT NEWTON, ROMAN TERRACE, ROOTS @ TRANSIT, ROSALIA PARK, ROSE MAISON, ROSE VILLE, ROSEVALE, ROSEWOOD, ROSEWOOD SUITES, ROSIE VIEW, ROSYTH LODGE, ROSYTH RESIDENCE, ROSYTH VILLE, ROXY SQUARE, ROYAL COURT, ROYAL HALLMARK, ROYALE MANSIONS, ROYALGREEN, ROYCE RESIDENCES, RV ALTITUDE, RV EDGE, RV POINT, RV RESIDENCES, RV SUITES, RYMDEN 77, SAGE, SALLIM LODGE, SAM KIANG MANSIONS, SANCTUARY @ 813, SANCTUARY GREEN, SANCTUARY@NEWTON, SANDALWOOD, SANDERIANA, SANDILANDS RESIDENCES, SANDY EIGHT, SANDY ISLAND, SANDY PALM, SANFORD PARK, SANNY PARK, SANT RITZ, SANTA FE MANSIONS, SAPPHIRE COURT, SARACA GARDENS, SARACA VILLAS, SARINA PARK, SARINA TERRACE, SAVANNAH CONDOPARK, SAVOY PARK, SCENECA RESIDENCE, SCENIC HEIGHTS, SCK VILLE, SCOTTS 28, SCOTTS HIGHPARK, SCOTTS SQUARE, SCULPTURA ARDMORE, SEA AVENUE MANSIONS, SEA AVENUE RESIDENCES, SEA BREEZE TERRACE, SEA ESTA, SEA HORIZON, SEA PAVILION RESIDENCES, SEA VIEW PARK, SEAHILL, SEASCAPE, SEASIDE PARK, SEASIDE RESIDENCES, SEASONS PARK, SEASONS VIEW, SEASTRAND, SEASUITES, SEAVIEW PARK, SEAVIEW POINT, SECOND AVENUE JUNCTION, SELANTING GREEN, SELBY GARDENS, SELETAR GARDEN, SELETAR HILLS ESTATE, SELETAR PARK, SELETAR PARK RESIDENCE, SELETAR SPRINGS CONDOMINIUM, SELETARIS, SEMBAWANG COTTAGE, SEMBAWANG GARDEN ARCADE, SEMBAWANG HILLS ESTATE, SEMBAWANG PARK, SEMBAWANG SPRINGS ESTATE, SEMBAWANG SQUARE ESTATE, SEMBAWANG STRAITS ESTATE, SEMBAWANG VILLAS, SENG HUA GARDENS, SENG YONG VILLAS, SENGKANG GRAND RESIDENCES, SENNETT ESTATE, SENNETT RESIDENCE, SENTOSA COVE, SENYUM RESIDENCES, SERANGOON GARDEN ESTATE, SERANGOON GARDEN PARK, SERANGOON GARDEN VIEW, SERANGOON PARK, SERAYA 9, SERAYA BREEZE, SERAYA COURT, SERAYA RESIDENCES, SERAYA VILLE, SERENE PARK, SERENE VIEW MANSIONS, SERENITY BREEZE, SERENITY PARK, SETIA RESIDENCES, SEVEN CRESCENT, SEVEN HOLT ROAD, SEVEN OAKS, SEVEN PALMS SENTOSA COVE, SEVENTY SAINT PATRICK'S, SHAMROCK PARK, SHAMROCK VILLAS, SHAN GATE APARTMENTS, SHAN YAO GARDEN, SHANGHAI ONE, SHANGRI-LA PARK, SHAW PLAZA - TWIN HEIGHTS, SHEARES VILLE, SHEBA LODGE, SHELFORD 23, SHELFORD GREEN, SHELFORD REGENCY, SHELFORD SUITES, SHELFORD VIEW, SHEPHERD'S HILL ESTATE, SHERWOOD CONDOMINIUM, SHERWOOD TOWER, SHIRO, SIEW LIM PARK, SIGLAP GARDEN, SIGLAP HILL 33, SIGLAP LODGE, SIGLAP PARK, SIGLAP V, SIGNATURE AT LEWIS, SIGNATURE AT YISHUN, SIGNATURE CREST, SIGNATURE PARK, SIGNATURE RESIDENCE, SILAHIS APARTMENTS, SILAHIS VILLE, SILVER HILL, SILVERSCAPE, SILVERSEA, SIMEI GARDEN, SIMEI GREEN CONDOMINIUM, SIMON PLAZA, SIMS DORADO, SIMS EDGE, SIMS GREEN, SIMS MEADOWS, SIMS POINT, SIMS RESIDENCES, SIMS URBAN OASIS, SIMSVILLE, SIN CHUAN GARDEN, SIN MING CENTRE, SIN MING PLAZA, SING LIAN BUILDING, SINGA HILLS, SIXTEEN35 RESIDENCES, SIXTH AVENUE CENTRE, SIXTH AVENUE VILLE, SKIES MILTONIA, SKT MANSIONS, SKY EDEN@BEDOK, SKY EVERTON, SKY GREEN, SKY HABITAT, SKY VUE, SKY@ELEVEN, SKYE AT HOLLAND, SKYLINE 360 @ SAINT THOMAS WALK, SKYLINE @ ORCHARD BOULEVARD, SKYLINE RESIDENCES, SKYPARK, SKYPARK RESIDENCES, SKYSUITES17, SKYSUITES@ANSON, SKYWATERS RESIDENCES, SLOANE RESIDENCES, SMART SUITES, SOHO 188, SOHO @ FARRER, SOL ACRES, SOLARIS RESIDENCES, SOLEIL @ SINARAN, SOMMERVILLE GRANDEUR, SOMMERVILLE LOFT, SOMMERVILLE PARK, SOMMERVILLE REGENCY, SOMMERVILLE RESIDENCES, SOO CHOW GARDEN, SOPHIA 98, SOPHIA HILLS, SOPHIA LODGE, SOPHIA RESIDENCE, SORA, SOUTH BEACH RESIDENCES, SOUTH UNION PARK, SOUTHAVEN I, SOUTHAVEN II, SOUTHBANK, SPACE @ KOVAN, SPANISH VILLAGE, SPAZIO @ KOVAN, SPOTTISWOODE 18, SPOTTISWOODE PARK, SPOTTISWOODE RESIDENCES, SPOTTISWOODE SUITES, SPRING @ KATONG, SPRING @ LANGSAT, SPRING GARDENS, SPRING GROVE, SPRING PARK ESTATE, SPRING WATERS VILLAS, SPRINGBROOK TERRACE, SPRINGDALE CONDOMINIUM, SPRINGDEW TERRACE, SPRINGHILL, SPRINGLEAF GARDEN, SPRINGLEAF GREEN, SPRINGLEAF RESIDENCE, SPRINGLEAF VILLAS, SPRINGVALE, SPRINGWOOD, SRI MENANTI ESTATE, ST ANNE'S WOOD, ST FRANCIS COURT, ST FRANCIS LODGE, ST MARTIN RESIDENCE, ST MARTIN'S, ST MICHAEL REGENCY, ST MICHAEL'S CONDOMINIUM, ST MICHAEL'S PLACE, ST NICHOLAS VIEW, ST PATRICK'S COURT, ST PATRICK'S GREEN, ST PATRICK'S LOFT, ST PATRICK'S RESIDENCES, ST PATRICK'S ROW, ST REGIS RESIDENCES SINGAPORE, ST THOMAS COURT, ST THOMAS SUITES, STADIA, STARLIGHT SUITES, STARPOINT, STARS OF KOVAN, STARVILLE, STELLAR RV, STEVEN'S COURT, STEVENS LOFT, STEVENS SUITES, STILL 123, STILL MANSIONS, STILLZ RESIDENCE, STIRLING RESIDENCES, STRAITS AT JOO CHIAT, STRAITS GARDENS, STRAITS MANSIONS, STRAITS RESIDENCES, STRATA, STRATFORD COURT, STRATTON GREEN, STRATTON PARK, STRATUM, STUDIO 3, STUDIO8, STUDIOS @ MARNE, STUDIOS@TEMBELING, STURDEE RESIDENCES, STURDEE VIEW, SUFFOLK PREMIER, SUI GENERIS, SUITES 123, SUITES 28, SUITES @ AMBER, SUITES @ EASTCOAST, SUITES @ EUNOS, SUITES @ GUILLEMARD, SUITES @ KOVAN, SUITES @ NEWTON, SUITES @ OWEN, SUITES @ PAYA LEBAR, SUITES @ SHREWSBURY, SUITES @ SIMS, SUITES @ SURREY, SUITES @ TOPAZ, SUITES AT BUKIT TIMAH, SUITES AT ORCHARD, SUITES DE LAUREL, SUITES TWENTY-TWO, SUITES@ KATONG, SUITES@BRADDELL, SUITES@CHANGI, SUMMER GARDENS, SUMMER GREEN, SUMMER GROVE, SUMMER PLACE, SUMMER SCENT, SUMMER VIEW, SUMMER VILLAS, SUMMERDALE, SUMMERHILL, SUMMERLEA GREEN, SUN COURT, SUN PLAZA, SUNBIRD PARK, SUNBIRD VIEW, SUNCOTTAGES, SUNFLOWER COURT, SUNFLOWER GRANDEUR, SUNFLOWER LODGE, SUNFLOWER MANSIONS, SUNFLOWER REGENCY, SUNFLOWER RESIDENCE, SUNFLOWER VIEW, SUNGLADE, SUNGROVE, SUNHAVEN, SUNNY GROVE, SUNNY LODGE, SUNNY PALMS, SUNNY PARC, SUNNYVALE RESIDENCES, SUNRISE GARDENS, SUNRISE VILLA, SUNSET LODGE, SUNSHINE GRANDEUR, SUNSHINE GROVE, SUNSHINE LODGE, SUNSHINE LOFT, SUNSHINE MANSIONS, SUNSHINE PLAZA, SUNSHINE REGENCY, SUNSHINE RESIDENCE, SUNVILLE, SURIN GARDENS, SURIN VILLAS, SUTTON PLACE, SWISS CLUB PARK, SYCAMORE TREE, SYMPHONY HEIGHTS, SYMPHONY SUITES, TAI HWAN GARDEN, TAI HWAN PARK, TAI KENG GARDENS, TAI KENG VILLAS, TAI PENG GARDENS, TAI YUAN GARDEN, TAIPAN GRAND, TAIPAN JADE, TAIPAN REGENCY, TAN TONG MENG TOWER, TANAH MERAH GREEN, TANAH MERAH MANSION, TANAH MERAH PARK, TANAMERA CREST, TANGERINE GROVE, TANGLIN HILL CONDOMINIUM, TANGLIN HILL MEADOWS, TANGLIN HILL VILLAS, TANGLIN PARK, TANGLIN REGENCY, TANGLIN RESIDENCES, TANGLIN VIEW, TANJONG RIA CONDOMINIUM, TANQUEELAN SUITES, TEACHERS' HOUSING ESTATE, TECK GUAN VILLE, TEDGE, TELOK KURAU RIA, TELOK MANSION, TEMBELINA, TEMBELING CENTRE, TEMBELING COURT, TEMBELING GROVE, TEMBELING MANSIONS, TEMBELING RESIDENCE, TEMBUSU GRAND, TEN @ SUFFOLK, TENET, TENGGIRIA, TERESA 8, TERESA VILLAS, TERESA VILLE, TERRA HILL, TERRA VILLAS, TERRASSE, TERRENE AT BUKIT TIMAH, TESSA LODGE, TEXTILE CENTRE, TG MANSION, THE ABERDEEN, THE ABODE AT DEVONSHIRE, THE ACACIAS, THE ADARA, THE ADDITION, THE ALCOVE, THE ALPS RESIDENCES, THE AMARELLE, THE AMBIENCE, THE AMBRA, THE AMBROSIA, THE AMERY, THE AMORE, THE AMSTON, THE ANCHORAGE, THE ANSLEY, THE ANTARES, THE ARC AT DRAYCOTT, THE ARCADIA, THE ARCADY AT BOON KENG, THE ARDEN, THE ARECA, THE ARIEL, THE ARISTO @ AMBER, THE ARIZON, THE ARMADALE, THE ARRIS, THE ARTE, THE ASANA, THE ASTON, THE ATELIER, THE ATRIA AT MEYER, THE AVENIR, THE AXIS, THE AZURE, THE AZZURO, THE BALE, THE BALMORAL, THE BALMORAL SPRING, THE BAYCOURT, THE BAYSHORE, THE BEACON, THE BEACON EDGE, THE BEAUMONT, THE BECCAGAYLE, THE BELLEFORTE, THE BELMONT, THE BELVEDERE, THE BENCOOLEN, THE BENTLY RESIDENCES@KOVAN, THE BERTH BY THE COVE, THE BEVERLY, THE BLISS, THE BLOSSOMVALE, THE BOTANIC ON LLOYD, THE BOTANY AT DAIRY FARM, THE BOULEVARD RESIDENCE, THE BOUTIQ, THE BROOKS I, THE BROOKS II, THE BROWNSTONE, THE CALLISTA, THE CALROSE, THE CALYPSO, THE CANOPY, THE CAPE, THE CAPRI, THE CARPMAELINA, THE CARRARA, THE CASCADIA, THE CASSANDRA, THE CENTREN, THE CENTREPOINT, THE CENTRIO, THE CENTRIS, THE CHAMPAGNE, THE CHANCERY RESIDENCE, THE CHUAN, THE CITRINE, THE CITRON RESIDENCES, THE CLAYMORE, THE CLEARWATER, THE CLEMENT CANOPY, THE CLEMENTVALE, THE CLIFT, THE COAST AT SENTOSA COVE, THE COLLECTIVE AT ONE SOPHIA, THE COMMODORE, THE CONTINUUM, THE CORNWALL, THE COSMOPOLITAN, THE COTERIE @ HOLLAND, THE COTZ, THE COUNTRYSIDE, THE COURTYARD, THE CREEK @ BUKIT, THE CREST, THE CRISTALLO, THE CRITERION, THE DAFFODIL, THE DAIRY FARM, THE DEW, THE DIAMOND, THE DOMAIN, THE DRAYCOTT, THE EASTSIDE, THE EBONY, THE EDEN AT TAMPINES, THE EDGE ON CAIRNHILL, THE EDGEWATER, THE ELEGANCE @ CHANGI, THE ELEMENT @ STEVENS, THE ELYSIA, THE ENCLAVE . HOLLAND, THE EQUATORIAL, THE ESPARIS, THE ESPIRA, THE ESSENCE, THE ESTA, THE ESTIVA, THE ESTUARY, THE FERNHILL, THE FLORAVALE, THE FLORENCE RESIDENCES, THE FLORENTINE, THE FLORIDA, THE FOLIAGE, THE FORD @ HOLLAND, THE FORESTA @ MOUNT FABER, THE GALE, THE GARDEN RESIDENCES, THE GARDENS AT BISHAN, THE GARDENS AT GERALD, THE GATZ, THE GAZANIA, THE GERANIUM, THE GLACIER, THE GLADES, THE GLYNDEBOURNE, THE GRANDHILL, THE GRANDIFLORA, THE GRANGE, THE GREENWICH, THE GREENWOOD, THE HACIENDA, THE HELICONIA, THE HERMITAGE, THE HILL @ONE-NORTH, THE HILLFORD, THE HILLIER, THE HILLOFT, THE HILLSHORE, THE HILLSIDE, THE HOLLAND COLLECTION, THE HORIZON, THE HUNTINGTON, THE HYDE, THE IMPERIAL, THE INFINITI, THE INFLORA, THE INGLEWOOD, THE INSPIRA, THE INTERLACE, THE INTERWEAVE, THE IVERIA, THE JADE, THE JARDINE RESIDENCES, THE JOVELL, THE LADYHILL, THE LAKEFRONT RESIDENCES, THE LAKEGARDEN RESIDENCES, THE LAKESHORE, THE LANAI, THE LANDMARK, THE LATTIZ, THE LAURELS, THE LEGACY, THE LEGEND, THE LENOX, THE LEVELZ, THE LIGHT @ CAIRNHILL, THE LILIUM, THE LINC, THE LINCOLN MODERN, THE LINCOLN RESIDENCES, THE LINE @ TANJONG RHU, THE LINEAR, THE LINQ @ BEAUTY WORLD, THE LOFT, THE LUCENT, THE LUMOS, THE LUSH, THE LUXURIE, THE M, THE MADEIRA, THE MAKENA, THE MARBELLA, THE MARQ ON PATERSON HILL, THE MARQUE @ IRRAWADDY, THE MAYFAIR, THE MAYLEA, THE MEDLEY, THE MERASAGA, THE MERCURY, THE MERLOT, THE METROPOLITAN CONDOMINIUM, THE METZ, THE MEYER PLACE, THE MEYERISE, THE MEZZO, THE MIDAS, THE MILTONIA RESIDENCES, THE MINT RESIDENCES, THE MINTON, THE MKZ, THE MONDRIAN, THE MONTAGE, THE MONTANA, THE MORNING DEW, THE MORNING GLORY, THE MORNINGSIDE, THE MORNINGTON, THE MORRIS RESIDENCES, THE MYST, THE NASSIM, THE NAUTICAL, THE NAVIAN, THE NCLAVE, THE NEXUS, THE OCEANFRONT @ SENTOSA COVE, THE OCTET, THE ODEON KATONG, THE OLD HOUSE, THE OLIV, THE ORANGE GROVE, THE ORCHARD RESIDENCES, THE ORIE, THE ORIENT, THE PALETTE, THE PALLADIUM, THE PANORAMA, THE PARC CONDOMINIUM, THE PARK VALE, THE PATERSON, THE PATERSON EDGE, THE PEAK, THE PEAK @ CAIRNHILL I, THE PEAK @ CAIRNHILL II, THE PEAK@BALMEG, THE PEARL @ MOUNT FABER, THE PETALS, THE PIER AT ROBERTSON, THE PLAZA, THE POIZ RESIDENCES, THE PRINCETON, THE PROMENADE@PELIKAT, THE PROMINENCE, THE PROMONT, THE QUARTZ, THE QUAYSIDE, THE QUINN, THE QUINTET, THE RAINFOREST, THE RAINTREE, THE RAMFORD, THE RED HOUSE, THE REEF AT KING'S DOCK, THE REGALIA, THE REGENCY AT TIONG BAHRU, THE RESERVE RESIDENCES, THE RESIDENCES AT BARKER, THE RESIDENCES AT W SINGAPORE SENTOSA COVE, THE RICHMOND, THE RISE @ OXLEY - RESIDENCES, THE RITZ-CARLTON RESIDENCES SINGAPORE CAIRNHILL, THE RIVERINA, THE RIVERINE BY THE PARK, THE RIVERSIDE PIAZZA, THE RIVERVALE, THE ROBERTSON OPUS, THE ROCHESTER RESIDENCES, THE SAIL @ MARINA BAY, THE SANCTUARY @ GEYLANG, THE SANTORINI, THE SCALA, THE SCENIC @ BRADDELL, THE SCOTTS TOWER, THE SEA VIEW, THE SEAFRONT ON MEYER, THE SEAWIND, THE SEN, THE SENSORIA, THE SERENADE @ HOLLAND, THE SERENNIA, THE SERENNO, THE SHAUGHNESSY, THE SHELFORD, THE SHORE RESIDENCES, THE SHOREFRONT, THE SHORELINE RESIDENCES I, THE SHORELINE RESIDENCES II, THE SIENA, THE SIERRA, THE SILVER FIR, THE SILVER SPURZ, THE SILVERTON, THE SIXTH AVENUE RESIDENCES, THE SKYWOODS, THE SOLITAIRE, THE SORRENTO, THE SOUND, THE SOVEREIGN, THE SPECTRUM, THE SPINNAKER, THE SPRINGBLOOM, THE SPRINGFIELD, THE SPRINGS, THE SPRINGSIDE, THE STELLAR, THE STERLING, THE STRADIA, THE SUITES AT CENTRAL, THE SUMMIT, THE SUNFLOWER, THE SUNNIDORA, THE SUNNIFLORA, THE SUNNY SPRING, THE SUNNYDALE, THE SUNSHINE, THE TAIPAN, THE TAMPINES TRILLIANT, THE TANAMERA, THE TAPESTRY, THE TATE RESIDENCES, THE TEMBUSU, THE TENERIFFE, THE TENNERY, THE TERRACE, THE TESSARINA, THE TIER, THE TOMLINSON, THE TOP RESIDENCE, THE TOPIARY, THE TRE VER, THE TREELINE, THE TRESOR, THE TREVOSE, THE TRILINQ, THE TRILLIUM, THE TRIZON, THE TROPIC GARDENS, THE TROPICA, THE TRUMPS, THE TWINS, THE URBANITE, THE VALES, THE VANDERLINT, THE VENUE RESIDENCES, THE VERANDAH RESIDENCES, THE VERMONT ON CAIRNHILL, THE VERTE, THE VERV @ RV, THE VERVE, THE VESTA, THE VIEW @ MEYER, THE VILLAS @ SENTOSA COVE, THE VINES, THE VIRIDIAN, THE VISION, THE VISIONAIRE, THE VUE, THE WARREN, THE WATER EDGE, THE WATERGARDENS AT CANBERRA, THE WATERINA, THE WATERLINE, THE WATERSIDE, THE WHARF RESIDENCE, THE WHITLEY RESIDENCES, THE WINDSOR, THE WISTERIA, THE WOODGROVE, THE WOODLEIGH RESIDENCES, THE WOODS, THE YARDLEY, THOMSON 800, THOMSON EURO-ASIA, THOMSON GARDEN ESTATE, THOMSON GRAND, THOMSON GROVE, THOMSON HILLS ESTATE, THOMSON IMPERIAL COURT, THOMSON IMPRESSIONS, THOMSON PARK, THOMSON PLAZA, THOMSON RIDGE, THOMSON RISE ESTATE, THOMSON THREE, THOMSON V ONE, THOMSON V TWO, THOMSON VIEW CONDOMINIUM, THREE 11, THREE BALMORAL, THREE BUCKLEY, THREE THREE ROBIN, TIARA, TIARA VISTA, TIERRA VUE, TIONG BAHRU ESTATE, TIVOLI GARDENS, TIVOLI GRANDE, TK ONE, TMW MAXWELL, TOH ESTATE, TOH TUCK GARDEN, TOH TUCK LODGE, TOH YI COURT, TOMLINSON HEIGHTS, TOP TEN, TOPAZ MANSIONS, TORIE MANSIONS, TORIEVIEW MANSIONS, TORIEVILLE, TOWNHOUSE APARTMENTS, TRANQUILIA @ KISMIS, TRE RESIDENCES, TREASURE AT TAMPINES, TREASURE CREST, TREASURE GARDENS, TREASURE LOFT, TREASURE MANSIONS, TREASURE ON BALMORAL, TREASURE PLACE, TREASURES @ G20, TREASURES@G19, TREASURES@G6, TREE HOUSE, TREESCAPE, TRELLIS TOWERS, TRESALVEO, TREVISTA, TREVOSE PARK, TRIBECA, TRILIGHT, TRILIVE, TROPICAL SPRING, TROPICANA CONDOMINIUM, TROPICS @ HAIGSVILLE, TROPIKA EAST, TRUSSVILLE, TUAN SING PARK, TUDOR TEN, TURQUOISE, TWENTYONE ANGULLIA PARK, TWIN FOUNTAINS, TWIN REGENCY, TWIN VEW, TWIN WATERFALLS, TWO8ONE STUDIO, TYRWHITT 139, UBER 388, UE SQUARE, UNI BUILDING, UNION SQUARE RESIDENCES, UNIQUE GARDEN, UNIT 8, UNITED MANSION, UNIVERSITY PARK, UP@ROBERTSON QUAY, UPPER SERANGOON SHOPPING CENTRE, UPPERHOUSE AT ORCHARD BOULEVARD, UPTOWN @ FARRER, URBAN EDGE @ HOLLAND V, URBAN HERITAGE, URBAN LOFTS, URBAN RESIDENCES, URBAN RESORT CONDOMINIUM, URBAN SUITES, URBAN TREASURES, URBAN VISTA, URBANA, V ON SHENTON, VA RESIDENCES, VACANZA @ EAST, VALLEY MANSION, VALLEY PARK, VALVISTA, VAN HOLLAND, VANADIUM, VARSITY PARK CONDOMINIUM, VAUGHAN GARDEN, VENEZIO, VENTANA, VENTANA VILLAS, VENTUNO BALMORAL, VENTURA HEIGHTS, VENTURA VIEW, VERANDA, VERDALE, VERDANA VILLAS, VERDOR RESIDENCES, VERDURE, VERDURE VILLAS, VERSAILLES, VERSILIA ON HAIG, VERTICUS, VERTIS, VETRO, VIBES @ EAST COAST, VIBES @ KOVAN, VIBES@UPPER SERANGOON, VICENTA LODGE, VICTORIA PARK VILLAS, VICTORY HEIGHTS, VICTORY VILLE, VIDA, VIENTO, VIEW AT KISMIS, VIIO @ BALESTIER, VILLA AZURA, VILLA BEGONIA, VILLA CHANCERY, VILLA DE WEST, VILLA DELLE ROSE, VILLA DES FLORES, VILLA MARINA, VILLA MARTIA, VILLA PONDER ROSA, VILLA VERDE, VILLAEA VISTA, VILLAGE @ PASIR PANJANG, VILLAGE TOWER, VILLAS @ GILSTEAD, VILLAS LA VUE, VILLAS LAGUNA, VILLAS SIX, VILLE ROYALE, VINA LODGE, VISIONCREST, VISTA GARDEN, VISTA RESIDENCES, VITRA, VIVA, VIVA VISTA, VIVACE, VIZ AT HOLLAND, VOGX, VOLARI, VUE 8 RESIDENCE, W RESIDENCES MARINA VIEW - SINGAPORE, WALLICH RESIDENCE, WAN THO LODGE, WANDERVALE, WANG LODGE, WARNER COURT, WASHINGTON VILLA, WATER PLACE, WATER TERRACE, WATER VILLAS, WATERBANK AT DAKOTA, WATERBAY, WATERCOLOURS, WATERCOVE, WATERCREST, WATERFALL GARDENS, WATERFORD RESIDENCE, WATERFRONT @ FABER, WATERFRONT GOLD, WATERFRONT ISLE, WATERFRONT KEY, WATERFRONT WAVES, WATERLOO VIEW, WATERMARK ROBERTSON QUAY, WATERSCAPE AT CAVENAGH, WATERTOWN, WATERVIEW, WATERWOODS, WATTEN ESTATE, WATTEN ESTATE CONDOMINIUM, WATTEN HILL, WATTEN HOUSE, WATTEN RESIDENCES, WELLINGTON PARK, WEMBLY RESIDENCES, WEST BAY CONDOMINIUM, WEST COAST GARDENS, WEST COAST VIEW, WEST PARK REGENCY, WEST POINT PEARL GARDEN, WEST SEA GARDENS, WEST SHORE RESIDENCES, WEST-N, WESTCOVE CONDOMINIUM, WESTLAKE GARDENS, WESTMERE, WESTPEAK TERRACE, WESTRIDGE, WESTSIDE 33, WESTVILLE, WESTWOOD PARK, WESTWOOD RESIDENCES, WHARTON VALE, WHISTLER GRAND, WHITE HOUSE PARK, WHITEHAVEN, WHITESCAPE, WHITEWATER, WHITLEY VILLAS, WHITLEYVILLE, WILKIE 48, WILKIE 80, WILKIE 87, WILKIE COURT, WILKIE REGENCY, WILKIE STUDIO, WILLYN VILLE, WILSHIRE RESIDENCES, WINDERMERE, WINDSOR PARK, WINDSOR PARK ESTATE, WINDY HEIGHTS, WING FONG BUILDING, WING FONG COURT, WING FONG MANSIONS, WING ON LIFE GARDEN, WOLSKEL LODGE, WOO MON CHEW COURT, WOODGROVE CONDOMINIUM, WOODGROVE ESTATE, WOODHAVEN, WOODLANDS PARK, WOODSVALE, WOODSVILLE 28, WOODSVILLE MANSIONS, WOOLLERTON PARK, WORTHINGTON, WU DE BUILDING, YEW LIAN PARK, YEW MEI GREEN, YEWTEE RESIDENCES, YGK GARDEN, YIKAI COURT, YIO CHU KANG TERRACE, YISHUN EMERALD, YISHUN SAPPHIRE, YONG AN PARK, YONG SENG ESTATE, YONG SIAK COURT, YONG SIAK VIEW, YUGI GARDEN, YUNNAN GARDENS, ZEDGE, ZENITH, ZEPHYR PARK, ZYANYA, ZYON GRAND</div>
+
+
+
+  <script>
+    // 注册 PWA Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('ServiceWorker 注册成功，范围:', reg.scope))
+          .catch(err => console.log('ServiceWorker 注册失败:', err));
+      });
+    }
+  </script>
+
+
+  <script>
+    document.getElementById('contact-form')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var name  = document.getElementById('form-name').value.trim();
+      var email = document.getElementById('form-email').value.trim();
+      var phone = document.getElementById('form-phone').value.trim();
+      var msg   = document.getElementById('form-msg').value.trim();
+      if (!name || !email || !msg) return;
+
+      const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfGbeQpRYOG_D2p9O77kjEDcu6OR8bo9Fby4etsG9PP5N2ltQ/formResponse';
+      const formData = new FormData();
+      formData.append('entry.388183165', name);   // 替换为「姓名」的 entry ID
+      formData.append('entry.1534663245', email);  // 替换为「Email」的 entry ID
+      formData.append('entry.1160830898', phone);  // 替换为「电话」的 entry ID
+      formData.append('entry.871062696', msg);    // 替换为「讯息」的 entry ID
+
+      fetch(GOOGLE_FORM_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: formData
+      }).then(() => {
+        console.log('Google Form submitted implicitly.');
+      }).catch(err => {
+        console.error('Form submission error:', err);
+      });
+
+      document.getElementById('contact-form').style.opacity = '0.3';
+      document.getElementById('form-success').style.display = 'block';
+      setTimeout(function() {
+        document.getElementById('contact-form').reset();
+        document.getElementById('contact-form').style.opacity = '1';
+        document.getElementById('form-success').style.display = 'none';
+      }, 4000);
+    });
+  
+    let devDataFull = [];
+    let devSortCol = 'total_projects';
+    let devSortAsc = false;
+
+    async function loadDevelopers() {
+      try {
+        var resp = await fetch(API_BASE + '/api/developer_stats', FETCH_OPTS);
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        var json = await resp.json();
+        
+        if (json.status === 'success' && json.data) {
+          devDataFull = json.data;
+          renderDevTable();
+        } else {
+          throw new Error(json.message || "Unknown error");
+        }
+      } catch (e) {
+        let tbody = document.getElementById('dev-tbody');
+        if(tbody) tbody.innerHTML = '<tr><td colspan="5" class="no-data">无法载入：' + e.message + '</td></tr>';
+      }
+    }
+
+    function sortDevTable(col) {
+      if (devSortCol === col) {
+        devSortAsc = !devSortAsc; 
+      } else {
+        devSortCol = col;
+        devSortAsc = false; 
+      }
+      
+      devDataFull.sort((a, b) => {
+        let valA = a[col];
+        let valB = b[col];
+        if (valA < valB) return devSortAsc ? -1 : 1;
+        if (valA > valB) return devSortAsc ? 1 : -1;
+        return 0;
+      });
+      
+      renderDevTable();
+    }
+
+    function renderDevTable() {
+      var tbody = document.getElementById('dev-tbody');
+      if(!tbody) return;
+      var html = '';
+      
+      devDataFull.forEach(function(d, index) {
+        var cagrColor = d.avg_cagr >= 0 ? 'color-up' : 'color-down';
+        var cagrArrow = d.avg_cagr >= 0 ? '&#9650;' : '&#9660;';
+        
+        html += '<tr data-row="1" style="cursor:pointer; transition: background 0.2s;" onclick="showDevProjects(\'' + d.developer.replace(/'/g, "\\'") + '\')" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">';
+        html += '<td>' + (index + 1) + '</td>';
+        html += '<td><strong>' + d.developer + '</strong></td>';
+        html += '<td>' + d.total_projects + '</td>';
+        html += '<td>S$ ' + d.avg_price.toLocaleString() + '</td>';
+        html += '<td class="' + cagrColor + '"><strong>' + cagrArrow + ' ' + Math.abs(d.avg_cagr).toFixed(1) + '% / 年</strong></td>';
+        html += '</tr>';
+      });
+      
+      tbody.innerHTML = html;
+      let countEl = document.getElementById('dev-count');
+      if(countEl) countEl.textContent = devDataFull.length + ' 个开发商';
+      
+      filterTable('dev-table','dev-search','dev-count');
+    }
+
+
+    function showDevProjects(devName) {
+      if (!window.uraDataFull) return;
+      
+      let subTableDiv = document.getElementById('dev-projects-container');
+      if (!subTableDiv) {
+        subTableDiv = document.createElement('div');
+        subTableDiv.id = 'dev-projects-container';
+        subTableDiv.style.cssText = 'margin-top: 20px; padding: 15px; background: var(--navy); border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.3);';
+        // Append it to dev-tab
+        let devTab = document.getElementById('dev-tab');
+        if(devTab) devTab.appendChild(subTableDiv);
+      }
+      
+      // Filter uraDataFull
+      let projects = window.uraDataFull.filter(p => p.developer === devName);
+      
+      // Render HTML
+      let html = '<h3 style="margin-top:0; color:var(--text); font-size:16px;">&#127960;&#65039; ' + devName + ' 的旗下楼盘 (' + projects.length + ')</h3>';
+      html += '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">';
+      html += '<thead><tr style="border-bottom:1px solid var(--border); color:var(--muted);"><th style="padding:8px;">#</th><th style="padding:8px;">楼盘名称</th><th style="padding:8px;">最新均价 (S$)</th><th style="padding:8px;">年均涨幅</th></tr></thead><tbody>';
+      
+      if(projects.length === 0) {
+         html += '<tr><td colspan="4" style="padding:8px;text-align:center;color:var(--muted);">此开发商暂无对应的 URA 成交纪录</td></tr>';
+      } else {
+         projects.forEach((p, i) => {
+           var cagrCls = p.cagr > 3 ? 'color-up' : (p.cagr < -3 ? 'color-down' : '');
+           var cagrArrow = p.cagr >= 0 ? '&#9650;' : '&#9660;';
+           var priceStr = p.latest_price ? 'S$ ' + p.latest_price.toLocaleString() : '—';
+           var cagrStr = (p.cagr !== null && p.cagr !== undefined) ? cagrArrow + ' ' + Math.abs(p.cagr).toFixed(1) + '% / 年' : '—';
+           
+           html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer; transition: background 0.2s;" onclick="jumpToUraProject('${(p.project || '').replace(/'/g, "\\'")}')" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">`;
+           html += '<td style="padding:8px; color:var(--muted);">' + (i+1) + '</td>';
+           html += '<td style="padding:8px;"><strong>' + p.project + '</strong></td>';
+           html += '<td style="padding:8px;" class="price">' + priceStr + '</td>';
+           html += '<td style="padding:8px;" class="' + cagrCls + '">' + cagrStr + '</td>';
+           html += '</tr>';
+         });
+      }
+      
+      html += '</tbody></table></div>';
+      subTableDiv.innerHTML = html;
+      
+      subTableDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function jumpToUraProject(projectName) {
+      if(!projectName) return;
+      
+      // 1. Switch to URA tab
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      
+      let uraBtn = document.querySelector('[data-tab="ura-tab"]');
+      let uraTab = document.getElementById('ura-tab');
+      if(uraBtn) uraBtn.classList.add('active');
+      if(uraTab) uraTab.classList.add('active');
+      
+      // 2. Set search filter
+      let searchInput = document.getElementById('ura-search');
+      if (searchInput) {
+        searchInput.value = projectName;
+        // manually call filterTable
+        filterTable('ura-table', 'ura-search', 'ura-count');
+      }
+      
+      window.scrollTo({ top: uraTab.offsetTop - 50, behavior: 'smooth' });
+    }
+
+  var comDataFull = [];
+  var comSortCol = 'price';
+  var comSortAsc = false;
+
+  async function loadCommercialData() {
+    try {
+      var resp = await fetch(API_BASE + '/api/commercial_transactions', FETCH_OPTS);
+      var json = await resp.json();
+      if (json.status !== 'success') throw new Error(json.message || '资料载入失败');
+      
+      comDataFull = json.data || [];
+      renderComTable();
+    } catch(e) {
+      document.getElementById('com-tbody').innerHTML = '<tr><td colspan="9" class="no-data">无法载入：' + e.message + '</td></tr>';
+    }
+  }
+
+  function sortComTable(col) {
+    if (comSortCol === col) {
+      comSortAsc = !comSortAsc;
+    } else {
+      comSortCol = col;
+      comSortAsc = false; // default desc
+    }
+    
+    comDataFull.sort(function(a, b) {
+      var valA, valB;
+      if (col === 'price') {
+        valA = a.price_sgd || 0;
+        valB = b.price_sgd || 0;
+      } else if (col === 'psf') {
+        valA = a.psf_sgd || 0;
+        valB = b.psf_sgd || 0;
+      } else if (col === 'date') {
+        // Date format might be MMM-YYYY, parsing it is tricky so we do basic string compare or parse Date
+        // Actually URA returns MM-YYYY or similar. Let's do string compare as fallback, or parse if possible.
+        var dA = new Date(a.contract_date);
+        var dB = new Date(b.contract_date);
+        valA = isNaN(dA) ? a.contract_date : dA.getTime();
+        valB = isNaN(dB) ? b.contract_date : dB.getTime();
+      }
+      
+      if (valA < valB) return comSortAsc ? -1 : 1;
+      if (valA > valB) return comSortAsc ? 1 : -1;
+      return 0;
+    });
+    
+    renderComTable();
+    // Re-apply filter if exists
+    filterTable('com-table', 'com-search', 'com-count');
+  }
+
+  function renderComTable() {
+    var tbody = document.getElementById('com-tbody');
+    if (!comDataFull.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data">暂无商办/店面资料，请执行爬虫抓取</td></tr>';
+      return;
+    }
+    
+    var html = '';
+    comDataFull.forEach(function(d, i) {
+      var priceStr = d.price_sgd ? 'S$ ' + d.price_sgd.toLocaleString() : '—';
+      var psfStr = d.psf_sgd ? 'S$ ' + d.psf_sgd.toLocaleString() : '—';
+      var typeColor = d.property_type.toLowerCase().includes('office') ? 'color: #63b3ed;' : 'color: #f0c84a;';
+      
+      html += '<tr data-row="1">';
+      html += '<td style="color:var(--muted)">' + (i+1) + '</td>';
+      html += '<td><strong>' + d.project_name + '</strong></td>';
+      html += '<td>' + d.street_name + '</td>';
+      html += '<td style="font-weight:bold; ' + typeColor + '">' + d.property_type + '</td>';
+      html += '<td style="color:var(--muted); font-size:12px;">' + d.tenure + '</td>';
+      html += '<td>' + d.area_sqm + '</td>';
+      html += '<td class="price" style="color:#4ade80">' + priceStr + '</td>';
+      html += '<td style="color:var(--muted)">' + psfStr + '</td>';
+      html += '<td style="font-size:12px;">' + d.contract_date + '</td>';
+      html += '</tr>';
+    });
+    tbody.innerHTML = html;
+    document.getElementById('com-count').textContent = comDataFull.length + ' 笔商办/店面资料';
+  }
+    
+</script>
+</body>
+</html>

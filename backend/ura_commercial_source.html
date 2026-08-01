@@ -1,0 +1,718 @@
+<script  nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=">
+(function () {
+    if (window.__ttPolicyCreated) {
+        return;
+    }
+
+    if (window.trustedTypes && trustedTypes.createPolicy) {
+        try {
+            trustedTypes.createPolicy('default', {
+                createHTML: s => s,
+                createScript: s => s,
+                createScriptURL: s => s
+            });
+            window.__ttPolicyCreated = true;
+        } catch (e) {
+            // Ignore duplicate creation attempts
+        }
+    }
+})();
+</script>
+
+
+
+
+
+
+
+<!-- layout.html -->
+<!DOCTYPE html>
+<html lang="en">
+<!-- Head -->
+<head>
+
+	
+      
+      <title>Commercial Property Transactions - Property Market Information</title>
+    
+
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="_csrf" content="476015fa-11eb-4c2c-a731-26d4dd2bc7b0"/>
+	<meta name="_csrf_header" content="X-CSRF-TOKEN"/>
+	<meta name="description" content="Free-to-use platform with information such as property prices, rentals, vacancies, supply and stock of private residential and commercial properties."/>
+	
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/vendor/jquery-3.6.0.min.js"></script>
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/vendor/bootstrap/js/bootstrap.min.js"></script>
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/vendor/bootstrap-multiselect/bootstrap-multiselect.js"></script>
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/vendor/chart.js/Chart.bundle.min.js"></script>
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/vendor/chart.js/utils.js"></script>   
+    <link href="/property-market-information/vendor/chart.js/Chart.min.css" rel="stylesheet" />
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/vendor/jquery-ui-1.13.2/jquery-ui.min.js"></script>   
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/vendor/select2/js/select2.min.js"></script>
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/vendor/jquery-ui-touch-punch-0.2.3/jquery.ui.touch-punch.min.js"></script>
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/vendor/DataTables/datatables.min.js"></script>
+    
+	<script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/js/uramain.js"></script>
+    <script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src="/property-market-information/js/pmi/main.js"></script>
+
+    
+    <link rel="stylesheet" href="/property-market-information/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/property-market-information/vendor/bootstrap-multiselect/bootstrap-multiselect.css" type="text/css"/>
+    <link rel="stylesheet" href="/property-market-information/vendor/jquery-ui-1.13.2/jquery-ui.min.css" >
+    <link rel="stylesheet" href="/property-market-information/vendor/select2/css/select2.min.css" />
+    <link rel="stylesheet" href="/property-market-information/vendor/DataTables/datatables.min.css" type="text/css"/>
+	<link rel="stylesheet" href="/property-market-information/css/pmi/clean.css" type="text/css"/>
+	
+	<link rel="stylesheet" href="/property-market-information/css/pmi/main.css" type="text/css"/>  
+
+    
+			
+		<link rel="stylesheet" href="/property-market-information/css/sgds.css"></link>
+			
+	
+
+    <link rel="shortcut icon" href="/property-market-information/asset/img/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/property-market-information/asset/img/favicon.ico" type="image/x-icon">
+</head>
+
+<body  data-session-end-date="">
+    <div class="pageholder pageholderFull">
+        <div id="fontSize">
+            <button id="incFontSize">A+</button>
+            <button id="decFontSize">A-</button>
+        </div>
+
+        <button id="goTop" title="Go to top" class="hidden"><i class="glyphicon glyphicon-chevron-up"></i>Top</button>
+
+
+
+
+
+<script nonce="Y+pHQk8ycAPv+JjvYd8oU4WjCIKd7lgCc5QxUrcivlA=" src='/property-market-information/js/pmi/util.js'></script>
+
+<header></header>
+
+<div id="clearheader" class="clearfix"></div>
+
+<nav id="navbar-primary" class="navbar navbar-default" data-style="background-color: white;">
+	<div class="container-fluid pmi-header">
+		<button aria-label="Menu" type="button" class="navbar-toggle" data-toggle="collapse" data-target="#main-menu">
+			<span class="sr-only"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+		</button>
+
+		<div class="navbar-header">
+			<h3><a target="_blank" href="https://www.ura.gov.sg/Corporate/Property/Property-Data" rel="noopener noreferrer">Property Data</a></h3>
+		</div>
+
+		<div class="collapse navbar-collapse" id="main-menu">
+			<ul class="nav navbar-nav">
+				
+					<li class="dropdown">
+						<a class="dropdown-toggle" data-toggle="dropdown" href="#">Private Residential <span class="caret"></span></a>
+						
+						<ul class="dropdown-menu">
+							
+								
+									<li>
+										<a href="/property-market-information/pmiResidentialTransactionSearch" >Transaction</a>
+									</li>
+								
+
+								
+							
+								
+
+								
+									<li class="dropdown dropdown-submenu">
+										<a class="dropdown-toggle" data-toggle="dropdown" href="#">Rental</a>
+
+										<ul class="dropdown-menu">
+											
+												
+											
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialRentalSearch">Rental Search</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialRentalStatisticsForNonLanded">Rental Statistics for Non-Landed Private Residential Properties by Project Name</a>
+													</li>
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+										</ul>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/property-market-information/pmiResidentialDeveloperSalesPrice" >Developers&#039; Sales</a>
+									</li>
+								
+
+								
+							
+								
+
+								
+									<li class="dropdown dropdown-submenu">
+										<a class="dropdown-toggle" data-toggle="dropdown" href="#">Supply in the Pipeline</a>
+
+										<ul class="dropdown-menu">
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialProjectUncompleted">Uncompleted Private Residential and Executive Condominium Projects with Approvals for Development</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialPipelinePrivateExecutive">Pipeline Supply of Private Residential Units and Executive Condominiums by Expected Year of Completion</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiResidentialPipelinePrivateUnits">Pipeline Supply of Private Residential Units by Market Segment, Development Status and Expected Year of Completion</a>
+													</li>
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+										</ul>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/property-market-information/pmiResidentialTimeseries" >Time Series Statistics</a>
+									</li>
+								
+
+								
+							
+						</ul>
+					</li>
+				
+					<li class="dropdown">
+						<a class="dropdown-toggle" data-toggle="dropdown" href="#">Commercial <span class="caret"></span></a>
+						
+						<ul class="dropdown-menu">
+							
+								
+									<li>
+										<a href="/property-market-information/pmiCommercialTransactionSearch" >Transaction</a>
+									</li>
+								
+
+								
+							
+								
+
+								
+									<li class="dropdown dropdown-submenu">
+										<a class="dropdown-toggle" data-toggle="dropdown" href="#">Rental</a>
+
+										<ul class="dropdown-menu">
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialRentalRetailAnalysis">Retail Rental Analysis</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialRentalOfficeAnalysis">Office Rental Analysis</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialRentalStatsByStreet">Rental Statistics for Office and Retail Space by Street</a>
+													</li>
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+										</ul>
+									</li>
+								
+							
+								
+
+								
+									<li class="dropdown dropdown-submenu">
+										<a class="dropdown-toggle" data-toggle="dropdown" href="#">Supply in the Pipeline</a>
+
+										<ul class="dropdown-menu">
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialProjectUncompleted">Uncompleted Commercial Projects with Approvals for Development</a>
+													</li>
+												
+											
+												
+													<li>
+														<a href="/property-market-information/pmiCommercialPipelineOfficeRetailHotel">Pipeline Supply of Office, Retail Space and Hotel Room by Development Status and Expected Year of Completion</a>
+													</li>
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+												
+											
+										</ul>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/property-market-information/pmiCommercialStockCompletedQuarter" >Commercial Projects Completed in the Quarter</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="/property-market-information/pmiCommercialTimeseries" >Time Series Statistics</a>
+									</li>
+								
+
+								
+							
+						</ul>
+					</li>
+				
+					<li class="dropdown">
+						<a class="dropdown-toggle" data-toggle="dropdown" href="#">Help <span class="caret"></span></a>
+						
+						<ul class="dropdown-menu">
+							
+								
+									<li>
+										<a href="https://www.ura.gov.sg/Corporate/Property/Property-Data/definition-of-data-terms" target='_blank'  rel='noopener noreferrer' >Glossary of Terms</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="https://www.ura.gov.sg/Corporate/Property/Property-Data/Data-Release-Calendar" target='_blank'  rel='noopener noreferrer' >Data Release Calendar</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="https://eservice.ura.gov.sg/reis/index" target='_blank'  rel='noopener noreferrer' >Subscribe to REALIS</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="https://www.ura.gov.sg/Corporate/Terms-Conditions" target='_blank'  rel='noopener noreferrer' >Terms and Conditions</a>
+									</li>
+								
+
+								
+							
+								
+									<li>
+										<a href="https://www.ura.gov.sg/Corporate/Contact-Us" target='_blank'  rel='noopener noreferrer' >Contact Us</a>
+									</li>
+								
+
+								
+							
+						</ul>
+					</li>
+				
+			</ul>
+		</div>
+	</div>
+</nav>
+
+
+	<ol class="breadcrumb" data-style="background-color:white;">
+		
+		<li>
+			Commercial
+		</li>
+
+		
+
+		
+			
+				<li class="active">
+					Transaction
+				</li>
+			
+			
+		
+	</ol>
+
+
+
+
+
+<div id="locationDetails" class="modal fade padding-left-0" role="dialog" data-url="pmiSearchCommercialTransactionLocationPopup">
+	<div class="inProgress"><div class="spinner"></div></div>
+</div>
+
+<div class="container-fluid formContent">
+	<div class="stepsHolder clear clearfix mgTop1">
+	<span class="stepHeading">Step</span>
+	<ul class="stepsContainer">
+		<li class="stepActive">
+			<a href="#">
+				<span>1</span>
+			</a>
+		</li>
+		<li class="noMargin">
+			<a href="#">
+				<span>2</span>
+			</a>
+		</li>
+		<li class="stepsBackLine"></li>
+	</ul>
+</div>
+
+	
+	<h2>Commercial Property Transactions</h2>
+	
+	<div class="panel panel-default infoPanelHolder panelHolder">
+	<div class="panel-heading">
+		<h3 class="panel-title">
+			Information
+			<span class="glyphicon floatright expClpIcon glyphicon-plus-sign glyphicon-custom"></span>
+		</h3>
+	</div>
+	<div class="panel-body">
+		<div class="initialPanelContent">
+			<ol>
+				<li>This e-Service comprises statistics on commercial property transactions with caveats lodged within the last 60 months.</li>
+			</ol>
+		</div>
+
+		<div class="mainPanelContent">
+			<ol>
+				
+					<li>
+						This e-Service comprises statistics on commercial property transactions with caveats lodged within the last 60 months.
+					</li>
+				
+					<li>
+						Caveats are legal documents lodged by purchasers with the Singapore Land Authority to register their legal interest in the property. Caveats are usually lodged by purchasers after the Option to Purchase is exercised or the Sales and Purchase agreement is signed.
+					</li>
+				
+					<li>
+						It is not mandatory to lodge a caveat. As such, some transacted properties may not have caveats lodged against them.
+					</li>
+				
+					<li>
+						A maximum of 5 projects can be selected at a time. To search for transactions by postal districts, the property type field is compulsory. <a href="https://www.ura.gov.sg/Corporate/-/media/Corporate/Property/PMI-Online/List_Of_Postal_Districts.pdf" target="_blank" rel="noopener noreferrer">Please click here to view a list of postal districts and their general locations.</a>
+					</li>
+				
+					<li>
+						Information is updated twice a week on every Tuesday and Friday. If the scheduled update falls on a public holiday, it will be updated on the following working day.
+					</li>
+				
+					<li>
+						More detailed real estate statistics are available from URA's Real Estate Information System (REALIS). Subscription to REALIS can be done via the following link: <a href="/reis" target="_blank" rel="noopener noreferrer">eservice.ura.gov.sg/reis</a>.
+					</li>
+				
+			</ol>
+		</div>
+		<div class="text-right">
+			<a href="#" class="initialPanelContent readLinkPanel">Read more</a>
+			<a href="#" class="mainPanelContent readLinkPanel">Read less</a>
+		</div>
+	</div>
+</div>
+
+
+	<form id="appForm" data-target="#searchResult" data-pkg="pmi" action="/property-market-information/pmiCommercialTransactionSearch" method="post">
+		<input id="resultPerPage" name="resultPerPage" type="hidden" value="20"/>
+		<input id="displayResult" name="displayResult" type="hidden" value="true"/>
+		<input id="displayResultHeader" name="displayResultHeader" type="hidden" value="true"/>
+		<input id="loadAnalysis" name="loadAnalysis" type="hidden" value="true"/>
+		<input id="displayAnalysis" name="displayAnalysis" type="hidden" value="false"/>
+		<input id="displayChart" name="displayChart" type="hidden" value="true"/>
+		<input id="displayAnalysisFilters" name="displayAnalysisFilters" type="hidden" value="true"/>
+		<input id="dashboardDisplay" name="dashboardDisplay" type="hidden" value="false"/>
+
+		<div class="form-row">
+			<div class="form-group col-lg-6">
+				<label class="must">Project or Location</label>
+				<div class="input-group">
+					<span class="input-group-addon select-span"
+						data-toggle="modal" data-target="#locationDetails" data-backdrop="static" data-placeholder="Select project or postal district">
+						Select project or postal district
+					</span>
+					<span class="input-group-btn">
+						<input id="s_locationDetails" name="locationDetails" type="hidden" value="[]"/>
+						<button aria-label="Project or Location" class="btn btn-default followGroupHeight search-popup-btn" type="button" data-toggle="modal" data-target="#locationDetails">
+							<i class="glyphicon glyphicon-menu-right"></i>
+						</button>
+					</span>
+				</div>
+			</div>
+
+			<div class="form-group col-sm-6 col-lg-3">
+				<label data-must-for-postal-district>Property Type</label>
+					<select aria-label="Property Type" id="propertyTypeNo" name="propertyTypeNo" class="form-control" size="1" data-reset-default>
+						<option value="" label="Select property type"/>
+						
+							<option value="1">Retail</option>
+						
+							<option value="2">Office</option>
+						
+							<option value="3">Shophouses</option>
+						
+					</select>
+			</div>
+
+			<div class="form-group col-sm-6 col-lg-3">
+				<label class="must">Sale Date</label> <br>
+				<select id="saleYearFrom" name="saleYearFrom" data-reset-default="2021" class="form-control search-filter-select" aria-label="Sale Year From">
+					<option value="">Year</option>
+					<option value="2021" selected="selected">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
+				</select><select id="saleMonthFrom" name="saleMonthFrom" data-reset-default="7" class="form-control search-filter-select" aria-label="Sale Month From">
+					<option value="">Mth</option>
+					<option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7" selected="selected">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+				</select>
+					- <span class="text-nowrap">
+					<select id="saleYearTo" name="saleYearTo" data-reset-default="2026" class="form-control search-filter-select" aria-label="Sale Year To">
+						<option value="">Year</option>
+						<option value="2021">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected="selected">2026</option>
+					</select><select id="saleMonthTo" name="saleMonthTo" data-reset-default="7" class="form-control search-filter-select" aria-label="Sale Month To">
+						<option value="">Mth</option>
+						<option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7" selected="selected">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+					</select>
+				</span>
+
+				
+			</div>
+		</div>
+
+		<div class="form-group">
+			By clicking "Search" you are agreeing to <a href="https://www.ura.gov.sg/Corporate/Terms-Conditions" target="_blank" rel="noopener noreferrer">URA Terms and Conditions</a>.
+
+			<div class="text-right">
+				<span class="btn-group-span">
+					<button type="reset" class="btn btn-warning" value="Reset" id="resetSearchs"><span class="glyphicon glyphicon-repeat"></span> Reset</button>
+					<button type="submit" class="btn btn-primary" data-init-wogaa="eserviceura-5504"><span class="glyphicon glyphicon-search"></span> Search</button>
+				</span>
+			</div>
+		</div>
+	<div>
+<input type="hidden" name="_csrf" value="476015fa-11eb-4c2c-a731-26d4dd2bc7b0" />
+</div></form>
+</div>
+
+<div id="searchResult" class="container-fluid"></div>
+
+
+
+
+
+<footer class="footer container-fluid text-left">
+	<div class="clearfix">
+		<div data-style="font-size:105%" class="pull-left">REALIS</div>
+	</div>
+	
+	<div class="text-right">
+		&copy; 2026 Urban Redevelopment Authority<br>
+		Last updated: 24 Jul 2026
+	</div>
+</footer>
+</div>
+</body>
+</html>
+
+
