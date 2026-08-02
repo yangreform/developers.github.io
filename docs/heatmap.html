@@ -127,31 +127,23 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .loading-text{font-size:14px;color:var(--text-muted)}
 
-    /* ── Stats Panel ── */
+    /* ── Combined Legend & Stats Panel ── */
     #stats-panel{
-      position:fixed;bottom:28px;left:20px;z-index:1000;
+      position:fixed;bottom:28px;right:20px;z-index:1000;
       background:var(--panel-bg);border:1px solid var(--panel-border);
       border-radius:16px;padding:16px 20px;
       backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-      box-shadow:var(--shadow-glow);min-width:200px;
+      box-shadow:var(--shadow-glow);min-width:210px;
     }
-    .stats-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px}
-    .stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .stats-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px}
+    .stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
     .stat-row:last-child{margin-bottom:0}
     .stat-key{font-size:12px;color:var(--text-muted)}
     .stat-val{font-size:13px;font-weight:600;color:var(--text-primary)}
     .stat-val.ura{color:#63b3ed}.stat-val.commercial{color:#f6ad55}
 
-    /* ── Legend ── */
-    #legend{
-      position:fixed;bottom:28px;right:20px;z-index:1000;
-      background:var(--panel-bg);border:1px solid var(--panel-border);
-      border-radius:16px;padding:16px 20px;
-      backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-      box-shadow:var(--shadow-glow);
-    }
-    .legend-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px}
-    .legend-gradient{width:160px;height:10px;border-radius:5px;margin-bottom:6px;background:linear-gradient(to right,#0000ff,#00ffff 25%,#00ff00 50%,#ffff00 75%,#ff0000)}
+    .legend-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px}
+    .legend-gradient{width:100%;height:8px;border-radius:4px;margin-bottom:6px;background:linear-gradient(to right,#0000ff,#00ffff 25%,#00ff00 50%,#ffff00 75%,#ff0000)}
     .legend-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted)}
 
     /* ── Tooltip ── */
@@ -180,8 +172,7 @@
     @media(max-width:640px){
       #topbar{gap:8px;padding:10px 14px}
       .logo-sub,.divider-v{display:none}
-      #stats-panel{bottom:auto;top:76px;left:12px;min-width:0}
-      #legend{bottom:12px;right:12px}
+      #stats-panel{bottom:12px;right:12px;left:auto;min-width:180px;padding:12px 14px}
     }
   </style>
 </head>
@@ -252,21 +243,21 @@
 </div>
 
 <div id="stats-panel">
+  <div class="legend-title" style="display:flex;justify-content:space-between;align-items:center;">
+    <span>热度指标</span>
+    <span id="legend-metric-label" style="font-size:11px;color:#63b3ed;text-transform:none;font-weight:600;">平均成交价</span>
+  </div>
+  <div class="legend-gradient"></div>
+  <div class="legend-labels" style="margin-bottom:12px;">
+    <span>低</span>
+    <span>高</span>
+  </div>
+  <div style="height:1px;background:var(--panel-border);margin-bottom:12px;"></div>
   <div class="stats-title">&#128202; 资料统计</div>
   <div class="stat-row"><span class="stat-key">资料笔数</span><span class="stat-val" id="stat-count">—</span></div>
   <div class="stat-row"><span class="stat-key">URA 私宅</span><span class="stat-val ura" id="stat-ura">—</span></div>
   <div class="stat-row"><span class="stat-key">商办 / 店面</span><span class="stat-val commercial" id="stat-commercial">—</span></div>
   <div class="stat-row"><span class="stat-key">最高值</span><span class="stat-val" id="stat-max">—</span></div>
-</div>
-
-<div id="legend">
-  <div class="legend-title">热度指标</div>
-  <div class="legend-gradient"></div>
-  <div class="legend-labels">
-    <span>低</span>
-    <span id="legend-metric-label">平均成交价</span>
-    <span>高</span>
-  </div>
 </div>
 
 <div id="toast"></div>

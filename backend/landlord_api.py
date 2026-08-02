@@ -884,7 +884,7 @@ def get_developer_stats():
 
         for proj, year_data in project_years.items():
             dev = project_developer[proj]
-            if dev == '—' or dev.startswith('Unknown'):
+            if not dev or dev in ('—', 'N/A', 'NA', 'None', 'null', '') or dev.strip().upper() == 'N/A' or dev.startswith('Unknown'):
                 continue
                 
             years_sorted = sorted(year_data.keys())

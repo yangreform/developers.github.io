@@ -222,77 +222,11 @@
   <a class="nav-brand" href="LandlordSG.html">LandlordSG &#127968;</a>
   <div class="nav-links">
     <a class="nav-link" href="heatmap.html">&#128200; 热力图</a>
-    <!-- <a class="nav-link btn-cta" href="about.html">&#11088; 优质百万团队</a> -->
   </div>
 </nav>
 
-<!-- Hero -->
-<section class="hero">
-  <div class="hero-pill"><i class="bi bi-database-fill"></i>&nbsp; 新加坡房产资料平台</div>
-  <h1>
-    <span class="blue">新加坡</span>房产<br>
-    <span class="gold">即时行情</span>资料库
-  </h1>
-  <p class="hero-desc">
-    涵盖 <strong>22.7 万笔</strong> HDB 组屋成交、<strong>13.9 万笔</strong> URA 私宅交易，<br>
-    搭配热力图视觉化，一眼掌握全岛房市脉动。
-  </p>
-  <!--div class="hero-btns">
-    <a href="heatmap.html" class="btn-primary-lg"><i class="bi bi-map-fill"></i> 开启热力图</a>
-    <!-- <a href="about.html" class="btn-gold-lg"><i class="bi bi-person-fill"></i> 联络顾问</a> -->
-  </div-->
-</section>
-
-<!-- Stats Bar>
-<div class="stats-bar">
-  <div class="stat-item">
-    <div class="stat-num blue">227,521</div>
-    <div class="stat-desc">HDB 组屋成交笔数</div>
-  </div>
-  <div class="stat-item">
-    <div class="stat-num gold">139,624</div>
-    <div class="stat-desc">URA 私宅成交笔数</div>
-  </div>
-  <div class="stat-item">
-    <div class="stat-num green">2,997</div>
-    <div class="stat-desc">私宅楼盘座标资料</div>
-  </div>
-  <div class="stat-item">
-    <div class="stat-num purple">54,415</div>
-    <div class="stat-desc">HDB 租赁纪录</div>
-  </div>
-</div>
-
-<div class="features">
-  <div class="section-eyebrow">核心功能</div>
-  <h2 class="section-h">全方位掌握<br>新加坡房市</h2>
-  <p class="section-sub">从热力图到逐笔资料查询，提供最直观的房市分析工具。</p>
-
-  <div class="feat-grid">
-    <a href="heatmap.html" class="feat-card">
-      <div class="feat-icon blue">&#128200;</div>
-      <div class="feat-title">成交热力图</div>
-      <div class="feat-desc">以地图视觉化呈现全岛 URA 私宅与 HDB 组屋的成交价格、呎价与交易量分布，一目了然掌握热点区域。</div>
-      <span class="feat-link">立即查看 &#8594;</span>
-    </a>
-    <!-- <a href="about.html" class="feat-card gold-hover">
-      <div class="feat-icon gold">&#127775;</div>
-      <div class="feat-title">优质百万团队</div>
-      <div class="feat-desc">由资深顾问台湾小伶 Melody 带领，提供 HDB 组屋、URA 私宅与海外买家全程服务，中英双语，贴心到位。</div>
-      <span class="feat-link">了解更多 &#8594;</span>
-    </a> -->
-    <div class="feat-card" style="cursor:default">
-      <div class="feat-icon green">&#128202;</div>
-      <div class="feat-title">即时行情资料</div>
-      <div class="feat-desc">整合政府公开资料，涵盖 2017 至今的完整成交纪录，支援依市镇、类型、年份等多维度筛选查询。</div>
-      <span class="feat-link" style="color:var(--green)">见下方资料表 &#8595;</span>
-    </div>
-  </div>
-</div-->
-
-
 <!-- Macro Chart -->
-<div class="features" style="padding-top:0;">
+<div class="features" style="padding-top:40px;">
   <div class="section-eyebrow">宏观经济比较</div>
   <h2 class="section-h">新加坡房市与宏观指标趋势</h2>
   <p class="section-sub">对比过去各地区房市平均涨幅与定存、通膨走势，并依基准年动态预估未来发展。</p>
@@ -603,8 +537,7 @@ window.addEventListener('load', function() {
       <select id="endYear" style="background:var(--navy); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 5px; font-size:12px; cursor:pointer;">
         <option value="2025">2025</option>
         <option value="2026">2026</option>
-        <option value="2027">2027</option>
-        <option value="2028" selected>2028</option>
+        <option value="2027" selected>2027</option>
       </select>
     </div>
   `;
@@ -641,7 +574,7 @@ window.addEventListener('load', function() {
     const baseOcr = raw_data.OCR[sYear];
 
     for (let y = sYear; y <= eYear; y++) {
-      labels.push(y > 2025 ? y + ' (预估)' : y.toString());
+      labels.push(y >= 2027 ? y + ' (预估)' : y.toString());
       
       // Calculate Index
       if (y === sYear) {
@@ -656,15 +589,15 @@ window.addEventListener('load', function() {
         fdData.push(parseFloat(fdIndex.toFixed(1)));
         cpiData.push(parseFloat(cpiIndex.toFixed(1)));
         
-        if (y <= 2025) {
+        if (y <= 2026) {
             ccrData.push(parseFloat(((raw_data.CCR[y] / baseCcr) * 100).toFixed(1)));
             rcrData.push(parseFloat(((raw_data.RCR[y] / baseRcr) * 100).toFixed(1)));
             ocrData.push(parseFloat(((raw_data.OCR[y] / baseOcr) * 100).toFixed(1)));
         } else {
-            // Project using 2021-2025 CAGR
-            const ccrCagr = Math.pow(raw_data.CCR[2025] / raw_data.CCR[2021], 1/4) - 1;
-            const rcrCagr = Math.pow(raw_data.RCR[2025] / raw_data.RCR[2021], 1/4) - 1;
-            const ocrCagr = Math.pow(raw_data.OCR[2025] / raw_data.OCR[2021], 1/4) - 1;
+            // Project using 2021-2026 CAGR
+            const ccrCagr = Math.pow(raw_data.CCR[2026] / raw_data.CCR[2021], 1/5) - 1;
+            const rcrCagr = Math.pow(raw_data.RCR[2026] / raw_data.RCR[2021], 1/5) - 1;
+            const ocrCagr = Math.pow(raw_data.OCR[2026] / raw_data.OCR[2021], 1/5) - 1;
             
             const lastCcr = ccrData[ccrData.length - 1];
             const lastRcr = rcrData[rcrData.length - 1];
@@ -820,7 +753,9 @@ window.addEventListener('load', function() {
         var json = await resp.json();
         
         if (json.status === 'success' && json.data) {
-          devDataFull = json.data;
+          devDataFull = json.data.filter(function(d) {
+            return d.developer && d.developer !== 'N/A' && d.developer !== '—' && !d.developer.startsWith('Unknown');
+          });
           renderDevTable();
         } else {
           throw new Error(json.message || "Unknown error");
