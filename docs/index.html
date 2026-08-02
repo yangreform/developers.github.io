@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -156,6 +157,100 @@
       .cta { padding: 30px 24px; }
       h1 { font-size: 3rem; }
     }
+  
+    .site-footer{margin-top:28px;padding:54px 0 34px;background:#12211e;color:rgba(255,255,255,.82);text-align:left}
+    .footer-brand{display:flex;align-items:center;gap:18px;margin-bottom:22px}
+    .footer-brand strong{display:block;font-size:1.55rem;color:#fff}
+    .propnex-wordmark{font-size:2rem!important;letter-spacing:-.03em;font-weight:800}
+    .footer-brand span{display:block;margin-top:2px;color:rgba(255,255,255,.62);font-size:.92rem}
+    .agent-line{padding:18px 0 22px;border-top:1px solid rgba(255,255,255,.12);border-bottom:1px solid rgba(255,255,255,.12);line-height:1.9}
+    .agent-line b{color:#fff}
+    .agent-line a,.footer-links a{color:#9fb7ff}
+    .footer-links{display:flex;flex-wrap:wrap;gap:10px 22px;margin:24px 0 26px;font-weight:700}
+    .disclaimer h3{margin:0 0 12px;color:#fff;font-size:1.2rem}
+    .disclaimer p{margin:0 0 10px;color:rgba(255,255,255,.72);font-size:.95rem}
+    .footer-note{margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);font-size:.82rem;text-align:center}
+
+  
+    .social-card{
+      display:grid;
+      grid-template-columns:1.15fr .85fr;
+      gap:30px;
+      align-items:center;
+      padding:34px;
+      border-radius:28px;
+      background:linear-gradient(135deg,#ffffff 0%,#edf6f1 100%);
+      border:1px solid var(--line);
+      box-shadow:var(--shadow);
+    }
+    .social-card h3{
+      margin:8px 0 12px;
+      color:var(--ink);
+      font-family:Georgia,"Times New Roman",serif;
+      font-size:clamp(1.7rem,3vw,2.5rem);
+      line-height:1.2;
+    }
+    .social-card p{margin:0;color:#52665f}
+    .instagram-box{
+      min-height:230px;
+      padding:28px;
+      border-radius:22px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      background:linear-gradient(145deg,#7b3ff2,#e4405f 58%,#f6a623);
+      color:#fff;
+    }
+    .instagram-box .ig-icon{
+      width:64px;height:64px;border:3px solid #fff;border-radius:18px;
+      display:grid;place-items:center;font-weight:900;font-size:1.35rem;margin-bottom:15px;
+    }
+    .instagram-box strong{font-size:1.2rem}
+    .instagram-box span{display:block;margin-top:6px;color:rgba(255,255,255,.86);font-size:.92rem}
+    @media(max-width:760px){.social-card{grid-template-columns:1fr;padding:24px}}
+
+  
+    .video-layout{
+      display:grid;
+      grid-template-columns:.9fr 1.1fr;
+      gap:34px;
+      align-items:center;
+    }
+    .instagram-embed-shell{
+      width:min(100%, 500px);
+      margin-inline:auto;
+      padding:12px;
+      border-radius:28px;
+      background:#fff;
+      border:1px solid var(--line);
+      box-shadow:var(--shadow);
+    }
+    .instagram-frame{
+      display:block;
+      width:100%;
+      height:720px;
+      border:0;
+      border-radius:20px;
+      background:#f2f4f3;
+      overflow:hidden;
+    }
+    .embed-note{
+      margin-top:12px;
+      color:#6b7c77;
+      font-size:.86rem;
+      text-align:center;
+    }
+    @media(max-width:900px){
+      .video-layout{grid-template-columns:1fr}
+      .instagram-frame{height:680px}
+    }
+    @media(max-width:520px){
+      .instagram-embed-shell{padding:8px;border-radius:20px}
+      .instagram-frame{height:620px;border-radius:15px}
+    }
+
   </style>
 </head>
 <body>
@@ -167,6 +262,7 @@
         <a href="#why">五大優勢</a>
         <a href="#location">地段交通</a>
         <a href="#facts">基本資料</a>
+        <a href="#video">影片介紹</a>
         <a href="#contact">聯絡 Melody</a>
       </nav>
     </div>
@@ -289,6 +385,43 @@
       </div>
     </section>
 
+
+
+    <section id="video">
+      <div class="wrap">
+        <div class="video-layout">
+          <div>
+            <div class="kicker">MELODY'S PROPERTY VIDEO</div>
+            <h2>即時預看 Thomson Reserve 影片</h2>
+            <p>
+              直接在本頁觀看 Melody 台灣小伶的 Instagram Reels，
+              快速了解專案特色、地段與生活環境。
+            </p>
+            <div class="actions">
+              <a class="btn primary" href="https://www.instagram.com/reel/DbioQGMTE_q/" target="_blank" rel="noopener noreferrer">
+                在 Instagram 開啟
+              </a>
+            </div>
+          </div>
+
+          <div class="instagram-embed-shell">
+            <iframe
+              class="instagram-frame"
+              src="https://www.instagram.com/reel/DbioQGMTE_q/embed/"
+              title="Melody 台灣小伶的 Thomson Reserve Instagram Reels"
+              loading="lazy"
+              scrolling="no"
+              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+              allowfullscreen>
+            </iframe>
+            <div class="embed-note">
+              若影片未顯示，可能是 Instagram 的隱私設定、登入要求或瀏覽器阻擋第三方內容所致。
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="contact">
       <div class="wrap">
         <div class="cta">
@@ -308,10 +441,30 @@
     </section>
   </main>
 
-  <footer>
+
+  <footer class="site-footer">
     <div class="wrap">
-      本頁內容僅供一般資訊參考，專案資料與時間如有更新，應以發展商及正式銷售文件為準。
+      <div class="footer-brand">
+        <div><strong class="propnex-wordmark">PropNex</strong><span>新加坡房地產仲介公司</span></div>
+      </div>
+      <div class="agent-line">
+        <div><b>PROPNEX REALTY PTE. LTD.</b>｜公司牌照號碼：L3008022J</div>
+        <div><b>Melody Lin／Melody 台灣小伶</b>｜CEA 註冊號碼：R072901A</div>
+        <div>WhatsApp：<a href="https://wa.me/6580789177" target="_blank" rel="noopener">+65 8078 9177</a>｜Email：<a href="mailto:melody_lin@propnex.com">melody_lin@propnex.com</a>｜Instagram：<a href="https://www.instagram.com/reel/DbioQGMTE_q/?igsh=MTVldXZha2Rxa3kwMg==" target="_blank" rel="noopener noreferrer">觀看影片</a></div>
+      </div>
+      <nav class="footer-links" aria-label="頁尾連結">
+        <a href="#privacy">隱私權政策</a><a href="#about">關於我</a><a href="#contact">聯絡我</a>
+      </nav>
+      <div class="disclaimer" id="privacy">
+        <h3>免責聲明</h3>
+        <p>本網站由 PROPNEX REALTY PTE. LTD. 旗下持牌房地產業務員 Melody Lin 建立，僅提供 Thomson Reserve 的一般資訊與購屋諮詢服務。</p>
+        <p>本網站並非發展商、URA、HDB 或其他政府機構的官方網站。網站內容、地圖、示意圖、效果圖、預計時程及專案資料僅供參考，並可能因主管機關審批、發展商安排或正式銷售文件而調整。</p>
+        <p>Thomson Reserve 預計於 2026 年 10 月公開預覽；實際日期、價格、戶型、配套及其他銷售條件，均應以發展商最新發布的資料、正式銷售文件及簽署文件為準。</p>
+        <p>本網站內容不構成任何要約、契約、法律、稅務、財務或投資建議。買家在作出任何購屋決定前，應審閱正式文件，並在有需要時諮詢相關專業人士。</p>
+      </div>
+      <div class="footer-note">© 2026 Melody Lin｜PROPNEX REALTY PTE. LTD. All rights reserved.</div>
     </div>
   </footer>
+
 </body>
 </html>
