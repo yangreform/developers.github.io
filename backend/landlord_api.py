@@ -541,7 +541,7 @@ def record_user_query(phone):
 
 # ==========================================
 # 🔥 热力图通用 API — 前端 heatmap.html 使用
-# 支援 type: ura / hdb / all
+# 支援 type: ura / commercial / all
 # 支援 metric: price / psf / count
 # 支援 year: 2020 / 2021 / ... / all
 # ==========================================
@@ -553,7 +553,7 @@ def get_heatmap_data():
         response.headers['Access-Control-Allow-Headers'] = '*'
         return response, 200
 
-    data_type = request.args.get('type', 'ura').lower()   # ura | hdb | all
+    data_type = request.args.get('type', 'ura').lower()   # ura | commercial | all
     metric    = request.args.get('metric', 'price').lower()  # price | psf | count
     year      = request.args.get('year', 'all')              # all | 2017~2026
 

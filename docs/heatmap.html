@@ -14,11 +14,12 @@
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- SEO & Open Graph (Social Preview) -->
-  <meta name="description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。提供 HDB 与 URA 最新成交资料。">
-  <meta property="og:title" content="LandlordSG - 新加坡房产即时资料库">
-  <meta property="og:description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。">
-  <meta property="og:image" content="https://yangreform.github.io/developers.github.io/assets/seo_chart.jpg">
+  <meta name="description" content="全岛私宅与商办热力图行情分析，掌握新加坡房市与宏观指标趋势。提供 URA 私宅与商办/店面最新成交资料。">
+  <meta property="og:title" content="LandlordSG 新加坡房产热力图 | 私宅与商办/店面成交地图">
+  <meta property="og:description" content="LandlordSG 新加坡房产热力图 — 即时视觉化 URA 私宅与商办/店面的成交价格、呎价与交易量分布">
+  <meta property="og:image" content="https://profjacky.github.io/assets/img/heat.png">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://profjacky.github.io/heatmap.html">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="LandlordSG - 新加坡房产即时资料库">
   <meta name="twitter:description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。">
@@ -253,7 +254,7 @@
   <div class="stats-title">&#128202; 资料统计</div>
   <div class="stat-row"><span class="stat-key">资料笔数</span><span class="stat-val" id="stat-count">—</span></div>
   <div class="stat-row"><span class="stat-key">URA 私宅</span><span class="stat-val ura" id="stat-ura">—</span></div>
-  <div class="stat-row"><span class="stat-key">HDB 组屋</span><span class="stat-val hdb" id="stat-hdb">—</span></div>
+  <div class="stat-row"><span class="stat-key">商办 / 店面</span><span class="stat-val commercial" id="stat-commercial">—</span></div>
   <div class="stat-row"><span class="stat-key">最高值</span><span class="stat-val" id="stat-max">—</span></div>
 </div>
 
@@ -395,8 +396,8 @@
       else if (metric === 'psf')    valText = '平均呎价：S$ ' + Math.round(d.weight).toLocaleString();
       else                          valText = '平均成交价：S$ ' + Math.round(d.weight).toLocaleString();
 
-      var badgeClass = d.source === 'ura' ? 'badge-ura' : 'badge-hdb';
-      var badgeText  = d.source === 'ura' ? 'URA 私宅' : 'HDB 组屋';
+      var badgeClass = d.source === 'ura' ? 'badge-ura' : 'badge-commercial';
+      var badgeText  = d.source === 'ura' ? 'URA 私宅' : '商办 / 店面';
       var html = '<div class="tip-name">' + (d.label || '') + '</div>'
                + '<span class="tip-badge ' + badgeClass + '">' + badgeText + '</span><br>'
                + '<div class="tip-val">' + valText + '</div>';
@@ -422,15 +423,15 @@
 
   // ── 统计资讯 ────────────────────────────────────────────────
   function updateStats(data, metric) {
-    var uraCount = 0, hdbCount = 0, maxW = 0;
+    var uraCount = 0, commercialCount = 0, maxW = 0;
     data.forEach(function(d) {
       if (d.source === 'ura') uraCount++;
-      else hdbCount++;
+      else commercialCount++;
       if ((d.weight || 0) > maxW) maxW = d.weight;
     });
     document.getElementById('stat-count').textContent = data.length.toLocaleString();
     document.getElementById('stat-ura').textContent   = uraCount;
-    document.getElementById('stat-hdb').textContent   = hdbCount;
+    document.getElementById('stat-commercial').textContent = commercialCount;
     var maxLabel = (metric === 'count')
       ? Math.round(maxW).toLocaleString() + ' 笔'
       : 'S$ ' + Math.round(maxW).toLocaleString();
