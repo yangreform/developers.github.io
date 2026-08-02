@@ -612,39 +612,56 @@ def get_heatmap_data():
         if data_type in ('commercial', 'all'):
             year_filter = ""
             if year != 'all':
-                year_filter = f"AND contract_date LIKE '%{year}%'"
+                year_filter = f"AND t.contract_date LIKE '%{year}%'"
 
             if metric == 'count':
                 weight_expr = "COUNT(*)"
             elif metric == 'psf':
-                weight_expr = "AVG(psf_sgd)"
+                weight_expr = "AVG(t.psf_sgd)"
             else:
-                weight_expr = "AVG(price_sgd)"
+                weight_expr = "AVG(t.price_sgd)"
+
+            # Ensure table exists
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS ura_commercial_coordinates (
+                    project_name TEXT,
+                    street_name TEXT,
+                    lat REAL,
+                    lng REAL,
+                    postal TEXT,
+                    formatted_address TEXT,
+                    PRIMARY KEY (project_name, street_name)
+                )
+            ''')
 
             com_query = f"""
                 SELECT 
                     c.lat,
                     c.lng,
-                    t.project_name AS label,
+                    t.project_name,
+                    t.street_name,
                     {weight_expr} AS weight
                 FROM ura_commercial_transactions t
-                JOIN ura_coordinates c ON (t.project_name = c.project OR t.street_name = c.street)
+                JOIN ura_commercial_coordinates c ON t.project_name = c.project_name AND t.street_name = c.street_name
                 WHERE c.lat IS NOT NULL {year_filter}
-                GROUP BY t.project_name
+                GROUP BY t.project_name, t.street_name
                 HAVING weight > 0
             """
             try:
                 cursor.execute(com_query)
                 for row in cursor.fetchall():
+                    proj_label = row['project_name']
+                    if row['street_name'] and row['street_name'].upper() not in proj_label.upper():
+                        proj_label = f"{proj_label} ({row['street_name']})"
                     results.append({
                         'lat':    row['lat'],
                         'lng':    row['lng'],
-                        'label':  row['label'] + " (商办/店面)",
+                        'label':  proj_label + " (商办/店面)",
                         'weight': float(row['weight']) if row['weight'] else 0,
                         'source': 'commercial'
                     })
-            except Exception:
-                pass
+            except Exception as ex:
+                print(f"⚠️ [Commercial Heatmap Query Error] {ex}")
 
 
 
