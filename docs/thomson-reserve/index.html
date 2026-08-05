@@ -472,39 +472,44 @@
 </script>
 
 
-  <!--
-    TRACKING SETUP
-    1. Replace G-XXXXXXXXXX with your GA4 Measurement ID.
-    2. Replace AW-XXXXXXXXXX/CONVERSION_LABEL with your Google Ads conversion ID and label.
-    3. Keep Google Ads auto-tagging enabled.
-    4. Do not count contact-section views as conversions; only strong lead actions such as WhatsApp or email clicks.
-  -->
+  
+  <!-- Google tag：同時載入 GA4 與 Google Ads 基礎標籤 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ME9C947K1T"></script>
   <script>
-    window.MELODY_TRACKING = {
-      ga4MeasurementId: "G-XXXXXXXXXX",
-      googleAdsConversionSendTo: "AW-XXXXXXXXXX/CONVERSION_LABEL"
-    };
-
     window.dataLayer = window.dataLayer || [];
     function gtag(){ dataLayer.push(arguments); }
 
-    (function () {
-      const id = window.MELODY_TRACKING.ga4MeasurementId;
-      if (!id || id.includes("XXXXXXXXXX")) return;
+    gtag('js', new Date());
+    gtag('config', 'G-ME9C947K1T');
+    gtag('config', 'AW-18370524394');
 
-      const script = document.createElement("script");
-      script.async = true;
-      script.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(id);
-      document.head.appendChild(script);
+    window.MELODY_TRACKING = {
+      ga4MeasurementId: 'G-ME9C947K1T',
+      googleAdsId: 'AW-18370524394',
+      /* 建立 Google Ads 轉換動作後，填入 AW-18370524394/ConversionLabel */
+      googleAdsConversionSendTo: 'AW-18370524394/Ug0RCJzO7NscEOrp37dE'
+    };
+  </script>
+<link rel="canonical" href="https://developers.marketing/thomson-reserve/" />
 
-      gtag("js", new Date());
-      gtag("config", id, {
-        send_page_view: true
+  <!-- Google Ads 聯絡人轉換事件 -->
+  <script>
+    function gtag_report_conversion(url) {
+      var callback = function () {
+        if (typeof(url) != 'undefined') {
+          window.location = url;
+        }
+      };
+      gtag('event', 'conversion', {
+        'send_to': 'AW-18370524394/Ug0RCJzO7NscEOrp37dE',
+        'value': 1.0,
+        'currency': 'SGD',
+        'event_callback': callback
       });
-    })();
+      return false;
+    }
   </script>
 
-<link rel="canonical" href="https://developers.marketing/thomson-reserve/" />
 </head>
 <body>
 
@@ -878,8 +883,8 @@
             </p>
           </div>
           <div class="actions">
-            <a class="btn ghost" href="https://wa.me/6580789177" target="_blank" rel="noopener" data-conversion="lead_whatsapp" data-method="whatsapp">WhatsApp Melody</a>
-            <a class="btn ghost" href="mailto:melody_lin@propnex.com" data-conversion="lead_email" data-method="email">Email 詢問</a>
+            <a class="btn ghost" href="https://wa.me/6580789177" target="_blank" rel="noopener" data-conversion="lead_whatsapp" data-method="whatsapp" onclick="return gtag_report_conversion(this.href);">WhatsApp Melody</a>
+            <a class="btn ghost" href="mailto:melody_lin@propnex.com" data-conversion="lead_email" data-method="email" onclick="return gtag_report_conversion(this.href);">Email 詢問</a>
           </div>
         </div>
       </div>
@@ -902,7 +907,7 @@
       <div class="agent-line">
         <div><b>PROPNEX REALTY PTE. LTD.</b>｜公司牌照號碼：L3008022J</div>
         <div><b>Melody Lin／Melody 台灣小伶</b>｜CEA 註冊號碼：R072901A</div>
-        <div>WhatsApp：<a href="https://wa.me/6580789177" target="_blank" rel="noopener" data-conversion="lead_whatsapp" data-method="whatsapp">+65 8078 9177</a>｜Email：<a href="mailto:melody_lin@propnex.com" data-conversion="lead_email" data-method="email">melody_lin@propnex.com</a>｜Instagram：<a href="https://www.instagram.com/reel/DbioQGMTE_q/?igsh=MTVldXZha2Rxa3kwMg==" target="_blank" rel="noopener noreferrer">觀看影片</a></div>
+        <div>WhatsApp：<a href="https://wa.me/6580789177" target="_blank" rel="noopener" data-conversion="lead_whatsapp" data-method="whatsapp" onclick="return gtag_report_conversion(this.href);">+65 8078 9177</a>｜Email：<a href="mailto:melody_lin@propnex.com" data-conversion="lead_email" data-method="email" onclick="return gtag_report_conversion(this.href);">melody_lin@propnex.com</a>｜Instagram：<a href="https://www.instagram.com/reel/DbioQGMTE_q/?igsh=MTVldXZha2Rxa3kwMg==" target="_blank" rel="noopener noreferrer">觀看影片</a></div>
       </div>
       <nav class="footer-links" aria-label="頁尾連結">
         <a href="#privacy">隱私權政策</a><a href="#about">關於我</a><a href="#contact">聯絡我</a>
@@ -941,7 +946,7 @@
 
   function sendGoogleAdsConversion(method) {
     const sendTo = cfg.googleAdsConversionSendTo;
-    if (!sendTo || sendTo.includes("XXXXXXXXXX") || sendTo.includes("CONVERSION_LABEL")) return;
+    if (!sendTo || !sendTo.includes("/")) return;
 
     if (typeof window.gtag === "function") {
       gtag("event", "conversion", {
@@ -989,7 +994,7 @@
     });
 
     // Google Ads Primary conversion: strong lead click.
-    sendGoogleAdsConversion(method);
+    // Google Ads conversion is fired by gtag_report_conversion on the clicked contact link.
   });
 
   // Helpful engagement signal only; do NOT mark this as a Google Ads conversion.
