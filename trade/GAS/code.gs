@@ -1,3 +1,4 @@
+
 // ================= 動態讀取設定區 =================
 const props = PropertiesService.getScriptProperties();
 const NGROK_URL = props.getProperty('NGROK_URL');
@@ -46,8 +47,8 @@ function forwardToNgrok(payloadString) {
       if (responseData.message) {
         if (responseData.message === "庫存為+1，這次不下單" || 
             responseData.message === "庫存為-1，這次不下單" || 
-            responseData.message === "這次有下單，但下單失敗" ||
-            responseData.message.startsWith("這次有下單，狀態:")) { // <=== ✨ 新增這一行
+            responseData.message.startsWith("這次有下單") ||
+            responseData.status === "error") {
             
             // 觸發條件，推播給 LINE (加入 \n 換行讓排版更好看)
             sendPushMessage(`${responseData.message}\n\n原始訊號：\n${payloadString}`);
@@ -138,4 +139,8 @@ function sendPushMessage(messageText) {
     }
   }
   return false;
+}
+
+function test() {
+  sendPushMessage("jacky")
 }

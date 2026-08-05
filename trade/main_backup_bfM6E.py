@@ -273,8 +273,10 @@ def webhook():
 
             # 2. 建立合約別名轉換表 (Symbol Alias Mapping)
             # 確保 Webhook 傳來的代號 (Key) 能對應到 IBKR 正確的 Symbol (Value)
+            # ⚠️ 必須在庫存檢查前先做轉換，否則 XC→YC 後查不到部位
             alias_map = {
-                "MNG": "MHNG"   # 天然氣代碼為 NG
+                "MNG": "MHNG",   # 天然氣代碼為 NG
+                "XC": "YC"       # 玉米 mini 在 IBKR 的 symbol 為 YC
             }
             # 轉換代碼（後續查庫存、建合約都使用 actual_symbol）
             actual_symbol = alias_map.get(symbol.upper(), symbol.upper())
@@ -284,10 +286,10 @@ def webhook():
             # 2. 建立合約
             # 定義各期貨商品的交易所對應表
             exchange_map = {
-                "MBT": "CME", "MES": "CME", "MNQ": "CME", "MJY": "CME",
+                "MBT": "CME", "MES": "CME", "MNQ": "CME", "M6E": "CME", "MJY": "CME",
                 "MHG": "COMEX", "MGC": "COMEX",
                 "MHNG": "NYMEX", "MCL": "NYMEX",
-                "VXM": "CFE"
+                "YC": "CBOT", "VXM": "CFE"
             }
 
             # 3. 修正：將 expiry_map 改為支援條件邏輯 (支援 BUY/SELL 分別指定不同月份)
@@ -297,7 +299,7 @@ def webhook():
                 mapping = {
                     "MBT": "202608", "VXM": "202608",
                     "MGC": "202610", "MHNG": "202609", "MNG": "202609", "MCL": "202609",
-                    "MNQ": "202609", "MES": "202609", "MJY": "202609", "MHG": "202609"
+                    "MNQ": "202609", "MES": "202609", "M6E": "202609", "MJY": "202609", "MHG": "202609", "YC": "202609"
                 }
                 
                 # 特殊邏輯：MNQ 轉倉規則
@@ -307,6 +309,8 @@ def webhook():
                 #    return "202609" if act == "BUY" else "202610"
                 #if sym == "MNQ":
                 #    return "202606" if act == "BUY" else "202609"
+                #if sym == "M6E":
+                #    return "202609" if act == "BUY" else "202606"
                 #if sym == "MJY":
                 #    return "202609" if act == "BUY" else "202606"
 
@@ -339,6 +343,7 @@ def webhook():
 
             # 針對部分 CBOT/COMEX 商品，IB 回報的 minTick (可能因為單位問題) 與實際報價小數點位數不同，這裡進行覆寫
             TICK_OVERRIDES = {
+                'YC': 0.125,     # 玉米 Mini (跳動點 1/8 = 0.125)
                 'ZC': 0.25,      # 玉米 (跳動點 1/4 = 0.25)
                 'MGC': 0.1,      # 微型黃金
                 'MES': 0.25,     # 微型 SP500
@@ -377,7 +382,9 @@ def webhook():
                 order.algoStrategy = 'Adaptive'
                 order.algoParams = [TagValue('adaptivePriority', 'Normal')]
 
-            CBOT_FUTURES = {'YC', 'MYM', 'ZC'}
+            # CBOT 農產品期貨（YC=玉米）在美股正規時段外
+            CBOT_FUTURES = {'YC'}  # CBOT 交易所的期貨品種
+            
             if is_future:
                 if not is_rth and actual_symbol in CBOT_FUTURES:
                     order.tif = 'GTC'

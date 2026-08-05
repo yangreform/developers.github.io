@@ -959,50 +959,7 @@ def get_positions_with_pnl(ib_client: IB, ticker_decimals_map: dict[str, int]):
             'contract': p.contract,
         })
 
-    # Include WATCH_LIST items with position 0 if they aren't in my_positions
-    '''
-    for item in WATCH_LIST:
-        sym = item['symbol']
-        if not any(r['symbol'] == sym for r in results):
-            c = Contract(
-                symbol=sym,
-                secType=item['secType'],
-                exchange=item['exchange'],
-                currency=item['currency'],
-                lastTradeDateOrContractMonth=item.get('expiry', '')
-            )
-            ib_client.qualifyContracts(c)
-            tickers = ib_client.reqTickers(c)
-            market_price = 0.0
-            if tickers:
-                t = tickers[0]
-                for pr in [t.marketPrice(), t.last, t.close]:
-                    if pr == pr and pr > 0:
-                        market_price = float(pr)
-                        break
-            
-            # For VXM, multiplier is 100
-            multiplier = 100.0 if sym == "VXM" else 1.0
-
-            results.append({
-                'symbol': sym,
-                'localSymbol': c.localSymbol if c.localSymbol else sym,
-                'position': 0.0,
-                'avgCost': 0.0,
-                'marketPrice': market_price,
-                'pnl': 0.0,
-                'totalCost': 0.0,
-                'decimals': item.get('decimals', 2),
-                'multiplier': multiplier,
-                'secType': c.secType,
-                'strike': c.strike,
-                'right': c.right,
-                'expiry': c.lastTradeDateOrContractMonth,
-                'contract': c,
-            })
-
     return results
-    '''
 
 
 # ==============================================================================
@@ -1170,19 +1127,28 @@ def main():
                             micro_ratio = contract_multiplier / target_micro_mult if target_micro_mult else 1.0
 
                             if sec_type in ['FUT', 'CONTFUT']:
+                                mkt_p = float(item.get('marketPrice') or 0.0)
+                                if mkt_p <= 0 and qty != 0:
+                                    group_mute_flag[my_group_name] = True
+                                    print(f"🎯 [{my_group_name}] 🔕 {sym_disp} 缺乏期貨現價，安全鎖啟動！")
                                 if sym_disp.upper().startswith(group_info['hedge_sym'].upper()):
                                     pos_delta = 1.0 * qty
                                 else:
                                     pos_delta = 1.0 * qty * micro_ratio
 
-                            elif sec_type == 'STK':
-                                if is_value_hedge:
+                            elif sec_type in ['STK', 'CRYPTO']:
+                                mkt_p = float(item.get('marketPrice') or 0.0)
+                                if mkt_p <= 0 and qty != 0:
+                                    group_mute_flag[my_group_name] = True
+                                    print(f"🎯 [{my_group_name}] 🔕 {sym_disp} 缺乏現價報價，安全鎖啟動！")
+                                elif is_value_hedge:
                                     future_price = group_underlying.get(my_group_name, 0.0)
                                     if future_price > 0:
                                         future_notional = future_price * target_micro_mult
-                                        pos_delta = (qty * item['marketPrice']) / future_notional
+                                        pos_delta = (qty * mkt_p) / future_notional
                                     else:
                                         group_mute_flag[my_group_name] = True
+                                        print(f"🎯 [{my_group_name}] 🔕 缺乏對沖標的 ({group_info['hedge_sym']}) 報價，安全鎖啟動！")
                                 else:
                                     pos_delta = 1.0 * qty * micro_ratio
 
