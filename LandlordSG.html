@@ -3,7 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LandlordSG · 新加坡房产资料平台</title>
+  <title>LandlordSG 新加坡房產即時行情資料庫｜私宅Condo、商辦店面、開發商排行與房價走勢</title>
+
+  <!-- Canonical & Robots -->
+  <link rel="canonical" href="https://developers.marketing/LandlordSG.html">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="author" content="LandlordSG">
+  <meta name="description" content="LandlordSG 整合新加坡市區重建局 (URA) 官方最新私宅、商辦與店面交易資料，提供全島房產熱力圖、開發商排行榜、歷史成交呎價 (PSF) 與未來漲幅預估分析。">
+  <meta name="keywords" content="新加坡房產, 新加坡房地產, 新加坡私宅, 新加坡公寓, 新加坡商辦, 新加坡店面, 新加坡寫字樓, 新加坡買房, 新加坡租屋, 新加坡物業投資, 新加坡房價走勢, 新加坡房產熱力圖, URA 交易紀錄, Singapore Real Estate, Singapore Condo, Singapore Commercial Property, Singapore Shophouse, Singapore Property Heatmap, URA Property Transactions, Singapore Property Developers, CCR, RCR, OCR, Orchard, Marina Bay, CBD, Bugis, Tampines, Jurong, Woodlands, City Developments Limited, Far East Organization, CapitaLand Residential, Keppel Land Limited, GuocoLand, Frasers Property, MCL Land, SingHaiyi Group, UOL Group, Bukit Sembawang Estates, Wing Tai Holdings, Hoi Hup Realty, Sim Lian Group, Qingjian Realty, Allgreen Properties, Oxley Holdings, Kingsford Development, CEL Development, Tuan Sing Holdings, Hong Leong Holdings, International Plaza, Suntec City, Shenton House, Peninsula Plaza, The Adelphi, Tong Eng Building, Samsung Hub, Prudential Tower, The Central, SBF Center, GB Building, High Street Centre, Textile Centre, Crown at Robinson, Oxley Tower, Robinson Square, Plus Building, PS100, Eon Shenton, Vision Exchange, # 1 LOFT, # 1 SUITES, 1 CANBERRA, 1 KING ALBERT PARK, 1 MOULMEIN RISE, 10 EVELYN, 10 SHELFORD, 11 AMBER ROAD, 111 EMERALD HILL, 120 GRANGE, 15 HOLLAND HILL, 16 @ AMBER, 18 SHELFORD, 18 WOODSVILLE, 183 LONGHAUS, 19 NASSIM, 1919, 1953, 2 RVG, 21 ANDERSON, 21 RICHARDS, 21 SHELFORD, 24 ONE RESIDENCES, 26 NEWTON, 28 IMPERIAL RESIDENCES, 28 RC SUITES, 28 SHELFORD, 283 STUDIO, 3 CUSCADEN, 3 ORCHARD BY-THE-PARK, 32 GILSTEAD, 33 RESIDENCES, 35 GILSTEAD, 368 THOMSON, 38 I SUITES, 38 JERVOIS, 3@PHILLIPS, 3@SANDILANDS, 3BHC, 448@EAST COAST">
 
   <!-- PWA & Mobile Meta -->
   <link rel="manifest" href="manifest.json">
@@ -13,28 +20,42 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="LandlordSG">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-    <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="shortcut icon" href="favicon.ico">
-  <!-- SEO & Open Graph (Social Preview) -->
-  <meta name="description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。提供 HDB 与 URA 最新成交资料。">
-  <meta property="og:title" content="LandlordSG - 新加坡房产即时资料库">
-  <meta property="og:description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。">
-  <meta property="og:image" content="https://developers.marketing/assets/seo_chart.jpg">
+
+  <!-- Open Graph / Social Preview -->
+  <meta property="og:locale" content="zh_TW">
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="LandlordSG 新加坡房產資料平台">
+  <meta property="og:title" content="LandlordSG 新加坡房產即時行情資料庫｜私宅Condo、商辦店面、開發商排行">
+  <meta property="og:description" content="整合新加坡市區重建局 (URA) 官方最新私宅、商辦與店面交易資料，提供全島房產熱力圖、開發商排行榜與歷史行情走勢分析。">
+  <meta property="og:url" content="https://developers.marketing/LandlordSG.html">
+  <meta property="og:image" content="https://developers.marketing/assets/seo_chart.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="LandlordSG 新加坡房產行情資料庫與熱力圖">
+
+  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="LandlordSG - 新加坡房产即时资料库">
-  <meta name="twitter:description" content="全岛私宅热力图与行情分析，掌握新加坡房市与宏观指标趋势。">
+  <meta name="twitter:site" content="@LandlordSG">
+  <meta name="twitter:title" content="LandlordSG 新加坡房產即時行情資料庫">
+  <meta name="twitter:description" content="整合 URA 最新私宅、商辦與店面交易資料，全島房產熱力圖與開發商行情分析。">
   <meta name="twitter:image" content="https://developers.marketing/assets/seo_chart.jpg">
 
-  <meta name="keywords" content="新加坡房產, 新加坡房地產, 新加坡私宅, 新加坡公寓, 新加坡商辦, 新加坡店面, 新加坡寫字樓, 新加坡買房, 新加坡租屋, 新加坡物業投資, 新加坡房價走勢, 新加坡房產熱力圖, URA 交易紀錄, Singapore Real Estate, Singapore Condo, Singapore Commercial Property, Singapore Shophouse, Singapore Property Heatmap, URA Property Transactions, Singapore Property Developers, CCR, RCR, OCR, Orchard, Marina Bay, CBD, Bugis, Tampines, Jurong, Woodlands, City Developments Limited, Far East Organization, CapitaLand Residential, Keppel Land Limited, GuocoLand, Frasers Property, MCL Land, SingHaiyi Group, UOL Group, Bukit Sembawang Estates, Wing Tai Holdings, Hoi Hup Realty, Sim Lian Group, Qingjian Realty, Allgreen Properties, Oxley Holdings, Kingsford Development, CEL Development, Tuan Sing Holdings, Hong Leong Holdings, International Plaza, Suntec City, Shenton House, Peninsula Plaza, The Adelphi, Tong Eng Building, Samsung Hub, Prudential Tower, The Central, SBF Center, GB Building, High Street Centre, Textile Centre, Crown at Robinson, Oxley Tower, Robinson Square, Plus Building, PS100, Eon Shenton, Vision Exchange, # 1 LOFT, # 1 SUITES, 1 CANBERRA, 1 KING ALBERT PARK, 1 MOULMEIN RISE, 10 EVELYN, 10 SHELFORD, 11 AMBER ROAD, 111 EMERALD HILL, 120 GRANGE, 15 HOLLAND HILL, 16 @ AMBER, 18 SHELFORD, 18 WOODSVILLE, 183 LONGHAUS, 19 NASSIM, 1919, 1953, 2 RVG, 21 ANDERSON, 21 RICHARDS, 21 SHELFORD, 24 ONE RESIDENCES, 26 NEWTON, 28 IMPERIAL RESIDENCES, 28 RC SUITES, 28 SHELFORD, 283 STUDIO, 3 CUSCADEN, 3 ORCHARD BY-THE-PARK, 32 GILSTEAD, 33 RESIDENCES, 35 GILSTEAD, 368 THOMSON, 38 I SUITES, 38 JERVOIS, 3@PHILLIPS, 3@SANDILANDS, 3BHC, 448@EAST COAST">
+  <!-- Geo Meta -->
+  <meta name="geo.region" content="SG">
+  <meta name="geo.placename" content="Singapore">
+  <meta name="geo.position" content="1.3521;103.8198">
+  <meta name="ICBM" content="1.3521, 103.8198">
+
+  <!-- Chart.js & Fonts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <meta name="description" content="LandlordSG — 新加坡最完整的房产成交资料平台，涵盖 HDB 组屋与 URA 私宅即时行情，附热力图视觉化分析">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <style>
+
+<style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
       --navy:#0a0e1a;
@@ -216,13 +237,6 @@
 
     @media(max-width:600px){.nav-links{gap:4px}.nav-link{padding:6px 10px;font-size:12px}}
   </style>
-  <link rel="canonical" href="https://developers.marketing/LandlordSG.html">
-  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
-  <meta name="author" content="LandlordSG">
-  <meta name="geo.region" content="SG">
-  <meta name="geo.placename" content="Singapore">
-  <meta name="geo.position" content="1.3521;103.8198">
-  <meta name="ICBM" content="1.3521, 103.8198">
 
   <!-- Structured Data / JSON-LD for Google Rich Results -->
   <script type="application/ld+json">
@@ -250,7 +264,8 @@
         "description": "Singapore private residential (URA) and commercial property transaction records, price per square foot (PSF), CAGR growth rate, and developer analytics.",
         "creator": {
           "@type": "Organization",
-          "name": "LandlordSG"
+          "name": "LandlordSG",
+          "url": "https://developers.marketing/"
         },
         "spatialCoverage": {
           "@type": "Place",
@@ -261,6 +276,49 @@
             "longitude": 103.8198
           }
         }
+      },
+      {
+        "@type": "ItemList",
+        "@id": "https://developers.marketing/LandlordSG.html#navigation",
+        "name": "LandlordSG 快速功能導覽",
+        "itemListElement": [
+          {
+            "@type": "SiteNavigationElement",
+            "position": 1,
+            "name": "全島房產熱力圖",
+            "url": "https://developers.marketing/heatmap.html"
+          },
+          {
+            "@type": "SiteNavigationElement",
+            "position": 2,
+            "name": "私宅樓盤行情資料庫",
+            "url": "https://developers.marketing/LandlordSG.html#tab-ura"
+          },
+          {
+            "@type": "SiteNavigationElement",
+            "position": 3,
+            "name": "商辦 / 店面行情資料庫",
+            "url": "https://developers.marketing/LandlordSG.html#tab-commercial"
+          },
+          {
+            "@type": "SiteNavigationElement",
+            "position": 4,
+            "name": "各大開發商推案排行榜",
+            "url": "https://developers.marketing/LandlordSG.html#tab-dev"
+          },
+          {
+            "@type": "SiteNavigationElement",
+            "position": 5,
+            "name": "Thomson Reserve 專案分析",
+            "url": "https://developers.marketing/thomson-reserve/"
+          },
+          {
+            "@type": "SiteNavigationElement",
+            "position": 6,
+            "name": "聯絡諮詢與建議",
+            "url": "https://developers.marketing/LandlordSG.html#contact"
+          }
+        ]
       },
       {
         "@type": "FAQPage",
@@ -289,6 +347,14 @@
               "@type": "Answer",
               "text": "點擊 LandlordSG 的全島熱力圖功能，可依據平均成交價、每平方呎價格 (PSF) 或交易量即時切換私宅與商辦/店面的全島地理熱度圖層。"
             }
+          },
+          {
+            "@type": "Question",
+            "name": "如何獲取新加坡新推建案（如 Thomson Reserve）的一對一置業諮詢？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "您可前往 Thomson Reserve 專案專頁查看戶型資料與土地成本分析，並填寫表單或透過 WhatsApp 與 Melody 專業團隊預約一對一賞屋與諮詢。"
+            }
           }
         ]
       }
@@ -296,6 +362,39 @@
   }
   </script>
 
+  <!-- Google tag：GA4 + Google Ads -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ME9C947K1T"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ME9C947K1T');
+    gtag('config', 'AW-18370524394');
+
+    window.MELODY_TRACKING = {
+      ga4MeasurementId: 'G-ME9C947K1T',
+      googleAdsId: 'AW-18370524394',
+      googleAdsConversionSendTo: 'AW-18370524394/Ug0RCJzO7NscEOrp37dE'
+    };
+  </script>
+
+  <!-- Google Ads 聯絡人轉換事件 -->
+  <script>
+    function gtag_report_conversion(url) {
+      var callback = function () {
+        if (typeof(url) != 'undefined') {
+          window.location = url;
+        }
+      };
+      gtag('event', 'conversion', {
+        'send_to': 'AW-18370524394/Ug0RCJzO7NscEOrp37dE',
+        'value': 1.0,
+        'currency': 'SGD',
+        'event_callback': callback
+      });
+      return false;
+    }
+  </script>
 </head>
 <body>
 
@@ -461,7 +560,7 @@
   <p>
     &copy; 2026 LandlordSG &nbsp;|&nbsp;
     新加坡房产即时资料平台 &nbsp;|&nbsp;
-    <a href="mailto:Law@weishun.cc">Law@weishun.cc</a> &nbsp;|&nbsp;
+    <a href="mailto:Law@weishun.cc" onclick="return gtag_report_conversion(this.href);">Law@weishun.cc</a> &nbsp;|&nbsp;
     资料来源：HDB / URA 官方公开资料
   </p>
 </footer>
@@ -792,6 +891,7 @@ window.addEventListener('load', function() {
   <script>
     document.getElementById('contact-form')?.addEventListener('submit', function(e) {
       e.preventDefault();
+      if (typeof gtag_report_conversion === 'function') { gtag_report_conversion(); }
       var name  = document.getElementById('form-name').value.trim();
       var email = document.getElementById('form-email').value.trim();
       var phone = document.getElementById('form-phone').value.trim();
