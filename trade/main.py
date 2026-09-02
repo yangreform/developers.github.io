@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 # 引入 IB
 from ib_insync import *
+from notifier import send_push_message, send_trade_notification
 
 load_dotenv()
 
@@ -172,8 +173,13 @@ def webhook():
 
     symbol = data.get('symbol')
     action = data.get('action', '').upper()
-    quantity = int(data.get('quantity', 1))
+    quantity = int(float(data.get('quantity', 1)))
     tv_price = data.get('price')
+    strategy_name = data.get('strategy_name', '')
+
+    if strategy_name == 'iron_condor':
+        logger.info(f"[{symbol}] Iron Condor 訊號已由 option.py 獨立執行，此處僅作記錄不重複下單。")
+        return jsonify({'status': 'success', 'message': f'{symbol} 已下單完畢，單純通知。 (Iron Condor {action})'}), 200
 
     if symbol == 'TMF': # 假設 I 代表國內期貨
         if not api:
@@ -246,7 +252,12 @@ def webhook():
 
             logger.info(f"Shioaji 國內下單結果: {msg}")
 
-            # ======== 加入 message 欄位供 GAS 擷取 ========
+            res_msg = f'這次有下單，{msg}'
+            try:
+                send_trade_notification(symbol, res_msg, data)
+            except Exception as notify_err:
+                logger.error(f"LINE 推播發送失敗: {notify_err}")
+
             return jsonify({
                 'status': result_status,
                 'shioaji': {
@@ -255,12 +266,17 @@ def webhook():
                     'remaining': remain_qty,
                     'avg_price': avg_price,
                 },
-                'message': f'這次有下單，{msg}'
+                'message': res_msg
             }), 200
             
         except Exception as e:
             logger.error(f"國內下單發生異常: {e}")
-            return jsonify({'status': 'error', 'message': '這次有下單，但下單失敗', 'error': str(e)}), 200
+            err_msg = '這次有下單，但下單失敗'
+            try:
+                send_trade_notification(symbol, f"{err_msg}: {e}", data)
+            except Exception:
+                pass
+            return jsonify({'status': 'error', 'message': err_msg, 'error': str(e)}), 200
 
     else:
         loop = asyncio.new_event_loop()
@@ -274,7 +290,8 @@ def webhook():
             # 2. 建立合約別名轉換表 (Symbol Alias Mapping)
             # 確保 Webhook 傳來的代號 (Key) 能對應到 IBKR 正確的 Symbol (Value)
             alias_map = {
-                "MNG": "MHNG"   # 天然氣代碼為 NG
+                "MNG": "MHNG",   # 天然氣代碼為 NG
+                "XC": "YC"       # 玉米 mini 在 IBKR 的 symbol 為 YC
             }
             # 轉換代碼（後續查庫存、建合約都使用 actual_symbol）
             actual_symbol = alias_map.get(symbol.upper(), symbol.upper())
@@ -284,10 +301,10 @@ def webhook():
             # 2. 建立合約
             # 定義各期貨商品的交易所對應表
             exchange_map = {
-                "MBT": "CME", "MES": "CME", "MNQ": "CME", "MJY": "CME",
+                "MBT": "CME", "MES": "CME", "MNQ": "CME", "M6E": "CME", "MJY": "CME",
                 "MHG": "COMEX", "MGC": "COMEX",
                 "MHNG": "NYMEX", "MCL": "NYMEX",
-                "VXM": "CFE"
+                "YC": "CBOT", "VXM": "CFE"
             }
 
             # 3. 修正：將 expiry_map 改為支援條件邏輯 (支援 BUY/SELL 分別指定不同月份)
@@ -295,9 +312,9 @@ def webhook():
             def get_target_expiry(sym, act):
                 # 預設對照表
                 mapping = {
-                    "MBT": "202608", "VXM": "202608",
-                    "MGC": "202610", "MHNG": "202609", "MNG": "202609", "MCL": "202609",
-                    "MNQ": "202609", "MES": "202609", "MJY": "202609", "MHG": "202609"
+                    "MGC": "202610", "MHNG": "202609", "MNG": "202609",
+                    "MNQ": "202609", "MES": "202609", "M6E": "202609", "MJY": "202609", "MHG": "202609", "YC": "202609",
+                    "MCL": "202610", "VXM": "202609"
                 }
                 
                 # 特殊邏輯：MNQ 轉倉規則
@@ -339,11 +356,13 @@ def webhook():
 
             # 針對部分 CBOT/COMEX 商品，IB 回報的 minTick (可能因為單位問題) 與實際報價小數點位數不同，這裡進行覆寫
             TICK_OVERRIDES = {
+                'YC': 0.125,     # 玉米 Mini (跳動點 1/8 = 0.125)
                 'ZC': 0.25,      # 玉米 (跳動點 1/4 = 0.25)
                 'MGC': 0.1,      # 微型黃金
                 'MES': 0.25,     # 微型 SP500
                 'MNQ': 0.25,     # 微型 Nasdaq
                 'MCL': 0.01,     # 微型原油
+                'ZC': 0.25,      # 玉米 (跳動點 1/4 = 0.25)
             }
             if actual_symbol in TICK_OVERRIDES:
                 min_tick = TICK_OVERRIDES[actual_symbol]
@@ -358,30 +377,48 @@ def webhook():
             is_rth = is_regular_trading_hours()
 
             if not mkt_price or mkt_price <= 0:
-                raise Exception("無法獲取市價，無法計算 Adaptive Algo 的限價天花板")
+                logger.info(f"[{symbol}] Webhook 傳入市價為 0，嘗試透過 IB 即時取得報價...")
+                ticker = ib.reqMktData(contract, "", False, False)
+                ib.sleep(1.5)
+                
+                if ticker.last and ticker.last > 0:
+                    mkt_price = ticker.last
+                elif ticker.ask and ticker.ask > 0 and action == 'BUY':
+                    mkt_price = ticker.ask
+                elif ticker.bid and ticker.bid > 0 and action == 'SELL':
+                    mkt_price = ticker.bid
+                elif ticker.close and ticker.close > 0:
+                    mkt_price = ticker.close
+                
+                ib.cancelMktData(contract)
+                
+                if not mkt_price or mkt_price <= 0:
+                    raise Exception("無法獲取市價，無法計算 Adaptive Algo 的限價天花板")
+                logger.info(f"[{symbol}] 成功取得 IB 即時市價: {mkt_price}")
 
             # 統一計算限價天花板 (買單 +1%，賣單 -1%)，並根據 minTick 四捨五入
             raw_limit_price = mkt_price * (1.01 if action == 'BUY' else 0.99)
             limit_price = round(round(raw_limit_price / min_tick) * min_tick, 5)
 
-            # 建立限價單
-            order = LimitOrder(action, quantity, limit_price)
+            # 建立市價單
+            order = MarketOrder(action, quantity)
             order.outsideRth = True
 
-            # 🌟 2. 掛上 IBKR Adaptive Algo 外掛 (魔法在這裡)
             # ==========================================
-            # 股票在盤前/盤後不支援 Adaptive Algo，必須改用一般限價單
+            # 核心 2. 套用 IBKR Adaptive Algo 演算法
+            # ==========================================
+            # 盤前盤後不支援 Adaptive Algo 時退回一般市價單
             if not is_future and not is_rth:
-                logger.info(f"[{symbol}] 股票盤外時段不支援 Adaptive Algo，改用一般限價單")
+                logger.info(f"[{symbol}] 美股盤外時段不支援 Adaptive Algo，使用一般市價單")
             else:
                 order.algoStrategy = 'Adaptive'
-                order.algoParams = [TagValue('adaptivePriority', 'Normal')]
+                order.algoParams = [TagValue('adaptivePriority', 'Patient')]
 
-            CBOT_FUTURES = {'YC', 'MYM', 'ZC'}
+            CBOT_FUTURES = {'YC', 'ZC'}
             if is_future:
                 if not is_rth and actual_symbol in CBOT_FUTURES:
                     order.tif = 'GTC'
-                    logger.info(f"[CBOT盤外] 使用 GTC LimitOrder @ {limit_price}")
+                    logger.info(f"[CBOT盤外] 使用 GTC MarketOrder")
                 else:
                     # Adaptive Algo 不適合 IOC，改用 GTC
                     order.tif = 'GTC'
@@ -429,7 +466,12 @@ def webhook():
 
             logger.info(f"IB 下單結果: {msg}")
 
-            # ======== 加入 message 欄位供 GAS 擷取 ========
+            res_msg = f'這次有下單，{msg}'
+            try:
+                send_trade_notification(symbol, res_msg, data)
+            except Exception as notify_err:
+                logger.error(f"LINE 推播發送失敗: {notify_err}")
+
             return jsonify({
                 'status': result_status,
                 'ib': {
@@ -438,13 +480,17 @@ def webhook():
                     'remaining': remain_qty,
                     'avg_price': avg_price,
                 },
-                'message': f'這次有下單，{msg}',
+                'message': res_msg,
             }), 200
 
         except Exception as e:
             logger.error(f"IB 下單發生異常: {e}")
-            # ======== 下單失敗回傳指定訊息 ========
-            return jsonify({'status': 'error', 'message': '這次有下單，但下單失敗', 'error': str(e)}), 200
+            err_msg = '這次有下單，但下單失敗'
+            try:
+                send_trade_notification(symbol, f"{err_msg}: {e}", data)
+            except Exception:
+                pass
+            return jsonify({'status': 'error', 'message': err_msg, 'error': str(e)}), 200
         finally:
             if ib.isConnected():
                 ib.sleep(0.1)

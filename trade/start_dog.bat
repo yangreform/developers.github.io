@@ -33,6 +33,14 @@ if %errorlevel% equ 0 (
     start "q.py" /max py .\q.py
 )
 
+wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "option.py" >nul
+if %errorlevel% equ 0 (
+    echo [OK] option.py is running.
+) else (
+    echo [WARNING] option.py is NOT running! Restarting MAXIMIZED...
+    start "option.py" /max py .\option.py
+)
+
 wmic process where "name='ngrok.exe'" get commandline 2>nul | find "http 5000" >nul
 if %errorlevel% equ 0 (
     echo [OK] ngrok http 5000 is running.

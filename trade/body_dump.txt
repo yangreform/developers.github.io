@@ -1,0 +1,49 @@
+
+
+<div class="tabs">
+    <button class="tablinks active" onclick="openTab(event, 'overview')">Overview (Delta Hedge)</button>
+    <button class="tablinks" onclick="openTab(event, \'barchart\')">Barchart (Bull Put)</button>
+    <button class="tablinks" onclick="openTab(event, 'portfolio')">Portfolio (平倉)</button>
+</div>
+
+<div id="overview" class="tabcontent" style="display:block;">
+
+  <h1>📊 對沖監控面板</h1>
+  <div class="updated" id="updated">載入中...</div>
+  <div class="card">
+    <div class="switch-row">
+      <div>
+        <h2 style="margin:0;">🚨 自動對沖送單</h2>
+        <div class="webhook-desc">關閉後，偵測到 Delta 偏移只會印出訊號，不會實際下單</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="webhookToggle" onchange="toggleWebhook(this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+  <div id="groups"></div>
+  <div id="account" class="card"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+    
+    
+    <div class="tabs">
+
+    <div id="barchart" class="tabcontent" style="display:block;">
+        <h3>Barchart Bull Put Spread</h3>
+        <button class="action-btn" onclick="loadBarchartData()">Refresh Data</button>
+        <div id="barchart_content" class="loading">Loading...</div>
+    </div>
+    </div>
+
+    <div id="portfolio" class="tabcontent">
+        <h3>目前 Options 部位</h3>
+        <button class="action-btn" onclick="loadPortfolio()">Refresh Portfolio</button>
+        <div id="portfolio_content" class="loading">Loading...</div>
+    </div>
+
+    
+
+

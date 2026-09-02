@@ -66,6 +66,8 @@ def proxy_dashboard():
 def proxy_dashboard_api(subpath):
     try:
         upstream_url = f"{DASHBOARD_UPSTREAM}/api/{subpath}"
+        if request.query_string:
+            upstream_url += "?" + request.query_string.decode("utf-8")
         if request.method == 'POST':
             resp = requests.post(upstream_url, json=request.get_json(silent=True), timeout=10)
         else:

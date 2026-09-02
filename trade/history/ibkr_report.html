@@ -1,0 +1,73 @@
+
+<html>
+<head>
+<meta charset="utf-8">
+<title>IBKR 對沖群組現金流統計 (Cash Flow Summary)</title>
+<style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f8f9fa; }
+    h1 { color: #343a40; }
+    table { border-collapse: collapse; width: 80%; background-color: #fff; margin-bottom: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+    th { background-color: #343a40; color: #fff; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+    .pos { color: green; font-weight: bold; }
+    .neg { color: red; font-weight: bold; }
+    .note { padding: 15px; background-color: #e9ecef; border-left: 5px solid #007bff; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+    <h1>IBKR 對沖群組 現金流(Cash Flow) 統計報告</h1>
+    <div class="note">
+        <strong>⚠️ 注意事項：</strong> 本報告基於 IBKR「現金結單/轉帳歷史」生成，此處的金額代表<strong>現金流量 (Cash Flow)</strong>。<br>
+        1. 期貨 (Futures)：每日 MTM 損益會直接反映為現金流，因此期貨現金流 = 期貨損益。<br>
+        2. 期權 (Options)：期權只有在<strong>買入或賣出時</strong>才會產生現金流，期權的未實現損益 (Unrealized PnL) 不會顯示在此表中。如果使用 Gamma 剝頭皮策略買入期權，買入當下的權利金支出若發生在歷史紀錄範圍外，不會計算在內，但期權的時間價值流失 (Theta Decay) 會導致您的帳戶淨值 (NAV) 下降，這也是帳戶賠錢但現金流表可能看不出來的主因。
+    </div>
+    <h2>=== 總損益/現金流結算 (SGD) ===</h2>
+    <table>
+        <tr>
+            <th>對沖群組 (Group)</th>
+            <th>總現金流 (SGD)</th>
+            <th>期貨每日 MTM 次數</th>
+            <th>實質交易次數</th>
+        </tr>
+<tr><td>加密幣(Crypto)</td><td class='pos'>846.86</td><td>23</td><td>16</td></tr>
+<tr><td>玉米(Corn)</td><td class='pos'>2,622.49</td><td>30</td><td>17</td></tr>
+<tr><td>日圓(JPY)</td><td class='neg'>-1,056.90</td><td>32</td><td>40</td></tr>
+<tr><td>歐元(EUR)</td><td class='neg'>-24.86</td><td>30</td><td>38</td></tr>
+<tr><td>天然氣(NG)</td><td class='neg'>-588.47</td><td>36</td><td>27</td></tr>
+<tr><td>銅(HG)</td><td class='neg'>-1,214.18</td><td>35</td><td>17</td></tr>
+<tr><td>原油(CL)</td><td class='neg'>-1,846.65</td><td>27</td><td>20</td></tr>
+<tr><td>小羅素(RTY)</td><td class='pos'>1,195.89</td><td>27</td><td>30</td></tr>
+<tr><td>小標(ES)</td><td class='neg'>-13,394.50</td><td>33</td><td>43</td></tr>
+<tr><td>小納(NQ)</td><td class='neg'>-34,164.18</td><td>33</td><td>56</td></tr>
+<tr><td>黃金(Gold)</td><td class='neg'>-14,765.22</td><td>16</td><td>20</td></tr>
+<tr><td>未分類(Other)</td><td class='pos'>6,123.36</td><td>45</td><td>267</td></tr>
+
+    </table>
+    <h2>=== 玉米(Corn) 交易明細 ===</h2>
+    <table>
+        <tr>
+            <th>日期 (Date)</th>
+            <th>說明 (Description)</th>
+            <th>動作/數量 (Qty)</th>
+            <th>價格 (Price)</th>
+            <th>現金流 (SGD)</th>
+        </tr>
+<tr><td>2026-08-04</td><td>YC 14SEP26</td><td>-2.0</td><td>4.49625</td><td class='pos'>183.76</td></tr>
+<tr><td>2026-08-04</td><td>ZC SEP26 5 P</td><td>-1.0</td><td>0.28625</td><td class='pos'>1,830.93</td></tr>
+<tr><td>2026-08-04</td><td>YC 14SEP26</td><td>-2.0</td><td>4.51125</td><td class='pos'>222.22</td></tr>
+<tr><td>2026-07-27</td><td>YC 14SEP26</td><td>1.0</td><td>4.54375</td><td class='neg'>-36.60</td></tr>
+<tr><td>2026-07-22</td><td>YC 14SEP26</td><td>-1.0</td><td>4.58375</td><td class='neg'>-49.50</td></tr>
+<tr><td>2026-07-21</td><td>YC 14SEP26</td><td>1.0</td><td>4.46625</td><td class='pos'>76.43</td></tr>
+<tr><td>2026-07-15</td><td>YC 14SEP26</td><td>1.0</td><td>4.44375</td><td class='pos'>37.59</td></tr>
+<tr><td>2026-07-15</td><td>YC 14SEP26</td><td>1.0</td><td>4.4275</td><td class='pos'>58.53</td></tr>
+<tr><td>2026-07-15</td><td>YC 14SEP26</td><td>-1.0</td><td>4.43625</td><td class='neg'>-52.65</td></tr>
+<tr><td>2026-07-14</td><td>YC 14SEP26</td><td>1.0</td><td>4.37625</td><td class='pos'>8.60</td></tr>
+<tr><td>2026-07-13</td><td>YC 14SEP26</td><td>-1.0</td><td>4.44875</td><td class='pos'>47.45</td></tr>
+<tr><td>2026-07-10</td><td>YC 14SEP26</td><td>-1.0</td><td>4.31625</td><td class='neg'>-104.44</td></tr>
+<tr><td>2026-07-09</td><td>YC 14SEP26</td><td>1.0</td><td>4.31375</td><td class='neg'>-1.10</td></tr>
+<tr><td>2026-06-29</td><td>YC 14JUL26</td><td>-2.0</td><td>4.02625</td><td class='pos'>10.72</td></tr>
+<tr><td>2026-06-29</td><td>YC 14JUL26</td><td>-2.0</td><td>4.02625</td><td class='pos'>10.72</td></tr>
+<tr><td>2026-06-29</td><td>YC 14SEP26</td><td>1.0</td><td>4.10875</td><td class='neg'>-10.80</td></tr>
+<tr><td>2026-06-29</td><td>YC 14SEP26</td><td>1.0</td><td>4.11125</td><td class='neg'>-14.03</td></tr>
+</table></body></html>

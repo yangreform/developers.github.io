@@ -50,8 +50,19 @@ function forwardToNgrok(payloadString) {
             responseData.message.startsWith("這次有下單") ||
             responseData.status === "error") {
             
+            // 解析 payload 取得 symbol
+            let symbolPrefix = "";
+            try {
+              let payloadObj = JSON.parse(payloadString);
+              if (payloadObj.symbol) {
+                symbolPrefix = "[" + payloadObj.symbol + "] ";
+              }
+            } catch(e) {
+              // 忽略解析錯誤
+            }
+            
             // 觸發條件，推播給 LINE (加入 \n 換行讓排版更好看)
-            sendPushMessage(`${responseData.message}\n\n原始訊號：\n${payloadString}`);
+            sendPushMessage(`${symbolPrefix}${responseData.message}\n\n原始訊號：\n${payloadString}`);
         }
       }
       return true;
@@ -144,3 +155,4 @@ function sendPushMessage(messageText) {
 function test() {
   sendPushMessage("jacky")
 }
+

@@ -1,0 +1,240 @@
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>對沖監控面板</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 12px 12px 80px;
+    background: #0d1117; color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+  }
+  h1 { font-size: 16px; margin: 4px 0 12px; }
+  .updated { color: #8b949e; font-size: 11px; margin-bottom: 12px; }
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+    padding: 12px; margin-bottom: 12px;
+  }
+  .card h2 { font-size: 14px; margin: 0 0 8px; color: #58a6ff; }
+  .row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+  .row span:first-child { color: #8b949e; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th, td { text-align: right; padding: 4px 3px; border-bottom: 1px solid #21262d; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: #8b949e; font-weight: 500; }
+  .pos { color: #f85149; }
+  .neg { color: #3fb950; }
+  .muted { color: #d29922; font-size: 11px; margin-top: 6px; }
+  .group-title { display:flex; justify-content:space-between; align-items:center; }
+  .badge { font-size: 10px; padding: 2px 6px; border-radius: 6px; background:#21262d; color:#8b949e; }
+  .form-row { display:flex; gap:6px; margin-top:8px; }
+  input[type=number], input[type=password] {
+    flex: 1; background:#0d1117; border:1px solid #30363d; color:#e6edf3;
+    border-radius:6px; padding:8px; font-size:12px; width:100%;
+  }
+  button {
+    background:#238636; color:#fff; border:none; border-radius:6px;
+    padding:8px 12px; font-size:12px;
+  }
+  button:active { background:#2ea043; }
+  .toast {
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+    background:#238636; color:#fff; padding:8px 16px; border-radius:8px;
+    font-size:12px; opacity:0; transition:opacity .3s; pointer-events:none;
+  }
+  .toast.show { opacity:1; }
+  .refresh-note { position:fixed; top:8px; right:12px; font-size:10px; color:#8b949e; }
+  .switch-row { display:flex; justify-content:space-between; align-items:center; }
+  .switch { position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
+  .switch input { opacity:0; width:0; height:0; }
+  .slider {
+    position:absolute; cursor:pointer; inset:0;
+    background:#30363d; transition:.2s; border-radius:26px;
+  }
+  .slider:before {
+    position:absolute; content:""; height:20px; width:20px; left:3px; bottom:3px;
+    background:#e6edf3; transition:.2s; border-radius:50%;
+  }
+  .switch input:checked + .slider { background:#238636; }
+  .switch input:checked + .slider:before { transform:translateX(20px); }
+  .webhook-desc { font-size:11px; color:#8b949e; margin-top:4px; }
+</style>
+</head>
+<body>
+  <h1>📊 對沖監控面板</h1>
+  <div class="updated" id="updated">載入中...</div>
+  <div class="card">
+    <div class="switch-row">
+      <div>
+        <h2 style="margin:0;">🚨 自動對沖送單</h2>
+        <div class="webhook-desc">關閉後，偵測到 Delta 偏移只會印出訊號，不會實際下單</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="webhookToggle" onchange="toggleWebhook(this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+  <div id="groups"></div>
+  <div id="account" class="card"></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+const PASSWORD_KEY = "dashboard_pw";
+
+function fmt(n, d=2) {
+  if (n === null || n === undefined || isNaN(n)) return "-";
+  return Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function cls(n) { return Number(n) > 0 ? "pos" : (Number(n) < 0 ? "neg" : ""); }
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2000);
+}
+
+async function submitThreshold(groupName) {
+  const upperEl = document.getElementById("u_" + groupName);
+  const lowerEl = document.getElementById("l_" + groupName);
+  let pw = localStorage.getItem(PASSWORD_KEY) || "";
+  const body = { group: groupName, upper: upperEl.value, lower: lowerEl.value, password: pw };
+  try {
+    const resp = await fetch("/api/threshold", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (resp.status === 401) {
+      pw = prompt("請輸入監控密碼：") || "";
+      localStorage.setItem(PASSWORD_KEY, pw);
+      return submitThreshold(groupName);
+    }
+    if (data.status === "ok") {
+      showToast("✅ 已更新 " + groupName);
+    } else {
+      showToast("❌ " + (data.message || "更新失敗"));
+    }
+  } catch (e) {
+    showToast("❌ 連線失敗");
+  }
+}
+
+let webhookToggleBusy = false;
+async function toggleWebhook(enabled) {
+  if (webhookToggleBusy) return;
+  webhookToggleBusy = true;
+  const toggleEl = document.getElementById("webhookToggle");
+  let pw = localStorage.getItem(PASSWORD_KEY) || "";
+  try {
+    const resp = await fetch("/api/send_webhook", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ enabled: enabled, password: pw })
+    });
+    if (resp.status === 401) {
+      pw = prompt("請輸入監控密碼：") || "";
+      localStorage.setItem(PASSWORD_KEY, pw);
+      webhookToggleBusy = false;
+      return toggleWebhook(enabled);
+    }
+    const data = await resp.json();
+    if (data.status === "ok") {
+      showToast(data.send_webhook ? "✅ 自動送單已開啟" : "🧪 自動送單已關閉（僅印出訊號）");
+    } else {
+      toggleEl.checked = !enabled;
+      showToast("❌ " + (data.message || "更新失敗"));
+    }
+  } catch (e) {
+    toggleEl.checked = !enabled;
+    showToast("❌ 連線失敗");
+  } finally {
+    webhookToggleBusy = false;
+  }
+}
+
+function renderPositions(rows) {
+  if (!rows || !rows.length) return "";
+  let html = '<table><tr><th>商品</th><th>部位</th><th>現價</th><th>損益</th><th>Δ</th><th>θ</th><th>γ</th></tr>';
+  for (const r of rows) {
+    html += `<tr>
+      <td>${r.symbol}</td>
+      <td class="${cls(r.position)}">${fmt(r.position,1)}</td>
+      <td>${fmt(r.market_price, r.decimals ?? 2)}</td>
+      <td class="${cls(r.pnl)}">${fmt(r.pnl,2)}</td>
+      <td>${fmt(r.delta,4)}</td>
+      <td>${fmt(r.theta,0)}</td>
+      <td>${fmt(r.gamma,4)}</td>
+    </tr>`;
+  }
+  html += "</table>";
+  return html;
+}
+
+function renderGroup(g) {
+  return `
+  <div class="card">
+    <div class="group-title">
+      <h2>${g.name}</h2>
+      <span class="badge">${g.hedge_sym}</span>
+    </div>
+    ${g.closed ? '<div class="muted">⏳ 未開盤，暫停對沖</div>' : ''}
+    ${g.mute
+      ? `<div class="row"><span class="muted">🔕 缺乏報價，安全鎖啟動</span></span></div>`
+      : `<div class="row"><span>目前 Δ ${fmt(g.total_delta,3)}</span><span>目前 θ ${fmt(g.total_theta,0)}</span><span>單邊估計點數 ${fmt(g.ref_points,0)}</span></div>`
+    }
+    ${renderPositions(g.positions)}
+    <div class="form-row">
+      <input type="number" step="0.1" id="u_${g.name}" placeholder="上限 (目前 ${fmt(g.upper_threshold,2)})">
+      <input type="number" step="0.1" id="l_${g.name}" placeholder="下限 (目前 ${fmt(g.lower_threshold,2)})">
+      <button onclick="submitThreshold('${g.name}')">送出</button>
+    </div>
+  </div>`;
+}
+
+async function refresh() {
+  try {
+    const resp = await fetch("/api/snapshot");
+    const data = await resp.json();
+    document.getElementById("updated").textContent = "最後更新: " + (data.updated_at || "-");
+
+    const toggleEl = document.getElementById("webhookToggle");
+    if (!webhookToggleBusy && data.send_webhook !== undefined) {
+      toggleEl.checked = !!data.send_webhook;
+    }
+
+    const acc = data.account || {};
+    const shioaji = data.shioaji || {};
+    let accHtml = "<h2>帳戶</h2>";
+    accHtml += `<div class="row"><span>IB 淨值</span><span>${acc.net_liq ?? "-"}</span></div>`;
+    accHtml += `<div class="row"><span>IB 可用金</span><span>${acc.avail ?? "-"}</span></div>`;
+    accHtml += `<div class="row"><span>全帳戶 θ 加總</span><span>${fmt(acc.total_theta, 0)}</span></div>`;
+    if (shioaji && shioaji.equity !== undefined) {
+      accHtml += `<div class="row"><span>永豐權益</span><span>${fmt(shioaji.equity,0)}</span></div>`;
+      accHtml += `<div class="row"><span>永豐可出金</span><span>${fmt(shioaji.available,0)}</span></div>`;
+    }
+    document.getElementById("account").innerHTML = accHtml;
+
+    let groupsHtml = "";
+    for (const g of (data.groups || [])) {
+      groupsHtml += renderGroup(g);
+    }
+    document.getElementById("groups").innerHTML = groupsHtml || '<div class="card">目前無持倉資料</div>';
+  } catch (e) {
+    document.getElementById("updated").textContent = "⚠️ 讀取失敗，重試中...";
+  }
+}
+
+refresh();
+setInterval(refresh, 15000);
+</script>
+</body>
+</html>
+"""

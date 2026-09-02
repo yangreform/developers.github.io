@@ -9,6 +9,13 @@ import math
 import sys
 import json
 
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 import pandas as pd
 import requests
 from scipy.stats import norm
@@ -17,6 +24,8 @@ from dotenv import load_dotenv, find_dotenv, set_key
 
 from ib_insync import *
 import shioaji as sj
+from notifier import send_push_message, send_trade_notification
+from vxm_config import load_vxm_config, save_vxm_config
 
 # ==============================================================================
 # 🔐 Load .env
@@ -175,79 +184,166 @@ def check_dashboard_auth(payload: dict) -> bool:
 
 DASHBOARD_HTML = """
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>對沖監控面板</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>選擇權與 Delta 對沖監控面板</title>
 <style>
-  :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 12px 12px 80px;
-    background: #0d1117; color: #e6edf3;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 16px;
     font-size: 13px;
   }
-  h1 { font-size: 16px; margin: 4px 0 12px; }
-  .updated { color: #8b949e; font-size: 11px; margin-bottom: 12px; }
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid #30363d;
+    margin-bottom: 16px;
+  }
+  .tablinks {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #8b949e;
+    border-bottom: 2px solid transparent;
+    transition: 0.2s;
+  }
+  .tablinks:hover {
+    color: #c9d1d9;
+  }
+  .tablinks.active {
+    color: #58a6ff;
+    border-bottom: 2px solid #58a6ff;
+  }
+  .tabcontent {
+    display: none;
+  }
   .card {
-    background: #161b22; border: 1px solid #30363d; border-radius: 10px;
-    padding: 12px; margin-bottom: 12px;
+    background-color: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
   }
-  .card h2 { font-size: 14px; margin: 0 0 8px; color: #58a6ff; }
-  .row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
-  .row span:first-child { color: #8b949e; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th, td { text-align: right; padding: 4px 3px; border-bottom: 1px solid #21262d; white-space: nowrap; }
-  th:first-child, td:first-child { text-align: left; }
-  th { color: #8b949e; font-weight: 500; }
-  .pos { color: #f85149; }
-  .neg { color: #3fb950; }
-  .muted { color: #d29922; font-size: 11px; margin-top: 6px; }
-  .group-title { display:flex; justify-content:space-between; align-items:center; }
-  .badge { font-size: 10px; padding: 2px 6px; border-radius: 6px; background:#21262d; color:#8b949e; }
-  .form-row { display:flex; gap:6px; margin-top:8px; }
-  input[type=number], input[type=password] {
-    flex: 1; background:#0d1117; border:1px solid #30363d; color:#e6edf3;
-    border-radius:6px; padding:8px; font-size:12px; width:100%;
+  .card h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #58a6ff;
+    font-size: 15px;
   }
-  button {
-    background:#238636; color:#fff; border:none; border-radius:6px;
-    padding:8px 12px; font-size:12px;
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 12px;
   }
-  button:active { background:#2ea043; }
-  .toast {
-    position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
-    background:#238636; color:#fff; padding:8px 16px; border-radius:8px;
-    font-size:12px; opacity:0; transition:opacity .3s; pointer-events:none;
+  th, td {
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid #21262d;
+    white-space: nowrap;
   }
-  .toast.show { opacity:1; }
-  .refresh-note { position:fixed; top:8px; right:12px; font-size:10px; color:#8b949e; }
-  .switch-row { display:flex; justify-content:space-between; align-items:center; }
-  .switch { position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
-  .switch input { opacity:0; width:0; height:0; }
+  th {
+    background-color: #21262d;
+    color: #8b949e;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+  }
+  tr:hover {
+    background-color: #1c2128;
+  }
+  button.action-btn {
+    background-color: #238636;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+  }
+  button.action-btn:hover { background-color: #2ea043; }
+  button.action-btn:disabled { background-color: #484f58; cursor: not-allowed; }
+  button.danger-btn {
+    background-color: #da3633;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+  }
+  button.danger-btn:hover { background-color: #f85149; }
+  .badge {
+    background-color: #1f6feb;
+    color: #ffffff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+  }
+  .muted { color: #8b949e; }
+  .loading { color: #8b949e; font-style: italic; }
+  .row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  
+  /* 多單 OR 賺錢 (正數)：紅色；空單 OR 賠錢 (負數)：綠色 */
+  .pos { color: #f85149 !important; }
+  .neg { color: #2ea043 !important; }
+  
+  .group-title { display: flex; justify-content: space-between; align-items: center; }
+  .form-row { display: flex; gap: 8px; margin-top: 12px; }
+  .form-row input {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    padding: 6px 10px;
+    border-radius: 6px;
+    flex: 1;
+  }
+  .switch-row { display: flex; justify-content: space-between; align-items: center; }
+  .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
   .slider {
-    position:absolute; cursor:pointer; inset:0;
-    background:#30363d; transition:.2s; border-radius:26px;
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #30363d; transition: .3s; border-radius: 24px;
   }
   .slider:before {
-    position:absolute; content:""; height:20px; width:20px; left:3px; bottom:3px;
-    background:#e6edf3; transition:.2s; border-radius:50%;
+    position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+    background-color: white; transition: .3s; border-radius: 50%;
   }
-  .switch input:checked + .slider { background:#238636; }
-  .switch input:checked + .slider:before { transform:translateX(20px); }
-  .webhook-desc { font-size:11px; color:#8b949e; margin-top:4px; }
+  input:checked + .slider { background-color: #238636; }
+  input:checked + .slider:before { transform: translateX(20px); }
+  .toast {
+    position: fixed; bottom: 20px; right: 20px; background: #238636; color: white;
+    padding: 10px 16px; border-radius: 6px; display: none; z-index: 1000;
+  }
+  .toast.show { display: block; }
 </style>
 </head>
 <body>
-  <h1>📊 對沖監控面板</h1>
+
+<div class="tabs">
+    <button class="tablinks active" onclick="openTab(event, 'overview')">Overview (Delta Hedge)</button>
+    <button class="tablinks" onclick="openTab(event, 'barchart')">Barchart (選擇權策略)</button>
+</div>
+
+<div id="overview" class="tabcontent" style="display:block;">
+  <h1>對沖監控看板</h1>
   <div class="updated" id="updated">載入中...</div>
   <div class="card">
     <div class="switch-row">
       <div>
-        <h2 style="margin:0;">🚨 自動對沖送單</h2>
-        <div class="webhook-desc">關閉後，偵測到 Delta 偏移只會印出訊號，不會實際下單</div>
+        <h2 style="margin:0;">自動對沖下單</h2>
+        <div class="muted">開啟後，當監控標的 Delta 偏離時將發送通知，並依設定下單。</div>
       </div>
       <label class="switch">
         <input type="checkbox" id="webhookToggle" onchange="toggleWebhook(this.checked)">
@@ -255,9 +351,77 @@ DASHBOARD_HTML = """
       </label>
     </div>
   </div>
+
+  <!-- VXM 波動率期貨對沖監控分區 -->
+  <div class="card" id="vxm-section" style="border-left: 4px solid #f0883e;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h3 style="margin:0; color:#f0883e; display:flex; align-items:center; gap:8px;">
+        <span>⚡ VXM 微型波動率期貨對沖監控</span>
+        <span id="vxm-badge" class="badge" style="background-color:#238636; font-size:11px;">監控中</span>
+      </h3>
+      <button class="action-btn" onclick="loadVXMStatus(this)" style="font-size:11px; padding:4px 10px;">🔄 重新整理 VXM</button>
+    </div>
+
+    <!-- 結構化指標卡片 -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-bottom:16px;">
+      <div style="background:#0d1117; padding:10px; border-radius:6px; border:1px solid #21262d;">
+        <div class="muted" style="font-size:11px;">標的合約</div>
+        <div style="font-size:14px; font-weight:bold; color:#58a6ff;" id="vxm-contract-display">-</div>
+        <div class="muted" style="font-size:11px;" id="vxm-expiry-display">-</div>
+      </div>
+      <div style="background:#0d1117; padding:10px; border-radius:6px; border:1px solid #21262d;">
+        <div class="muted" style="font-size:11px;">目前部位</div>
+        <div style="font-size:16px; font-weight:bold;" id="vxm-pos-display">-</div>
+        <div class="muted" style="font-size:11px;" id="vxm-target-display">-</div>
+      </div>
+      <div style="background:#0d1117; padding:10px; border-radius:6px; border:1px solid #21262d;">
+        <div class="muted" style="font-size:11px;">未平倉損益 (USD)</div>
+        <div style="font-size:16px; font-weight:bold;" id="vxm-pnl-display">-</div>
+        <div class="muted" style="font-size:11px;">Unrealized PnL</div>
+      </div>
+      <div style="background:#0d1117; padding:10px; border-radius:6px; border:1px solid #21262d;">
+        <div class="muted" style="font-size:11px;">當前策略判斷</div>
+        <div style="font-size:12px; font-weight:bold; color:#7ee787;" id="vxm-status-text">載入中...</div>
+      </div>
+    </div>
+
+    <!-- 條件設定表單 -->
+    <div style="border-top:1px solid #21262d; padding-top:12px;">
+      <div style="font-weight:600; color:#c9d1d9; margin-bottom:8px; font-size:13px;">⚙️ 未平倉損益下單條件設定 (修改後存入 .env)</div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-bottom:12px;">
+        <div>
+          <label class="muted" style="font-size:11px; display:block; margin-bottom:4px;">1. 初始目標空單部位 (口)</label>
+          <input type="number" id="vxm_cfg_init_pos" step="1" oninput="markVXMDirty()" style="width:100%; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:6px 8px; border-radius:5px;" value="-2">
+          <span class="muted" style="font-size:10px;">部位 > 此值時賣出至此口數</span>
+        </div>
+        <div>
+          <label class="muted" style="font-size:11px; display:block; margin-bottom:4px;">停利回補損益門檻 (USD)</label>
+          <input type="number" id="vxm_cfg_tp_pnl" step="10" oninput="markVXMDirty()" style="width:100%; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:6px 8px; border-radius:5px;" value="200">
+          <span class="muted" style="font-size:10px;">損益 > 此金額時加買 1 口</span>
+        </div>
+        <div>
+          <label class="muted" style="font-size:11px; display:block; margin-bottom:4px;">停損門檻 (USD)</label>
+          <input type="number" id="vxm_cfg_loss_pnl" step="10" oninput="markVXMDirty()" style="width:100%; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:6px 8px; border-radius:5px;" value="-100">
+          <span class="muted" style="font-size:10px;">損益 < 此金額時加賣 1 口</span>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="action-btn" onclick="saveVXMConfig(this)" style="padding:6px 16px;">💾 儲存 VXM 條件設定至 .env</button>
+      </div>
+    </div>
+  </div>
   <div id="groups"></div>
   <div id="account" class="card"></div>
   <div class="toast" id="toast"></div>
+</div>
+
+<div id="barchart" class="tabcontent">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="margin:0;">Barchart 選擇權策略掃描 (所有 CSV 表格)</h2>
+        <button class="action-btn" onclick="loadBarchartData()">重新整理全部檔案</button>
+    </div>
+    <div id="barchart_content" class="loading">載入中...</div>
+</div>
 
 <script>
 const PASSWORD_KEY = "dashboard_pw";
@@ -267,6 +431,38 @@ function fmt(n, d=2) {
   return Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
 }
 function cls(n) { return Number(n) > 0 ? "pos" : (Number(n) < 0 ? "neg" : ""); }
+
+function calcDTE(exp, dte) {
+  if (dte !== undefined && dte !== null && dte !== "") {
+    if (typeof dte === 'number') return Math.round(dte);
+    const parsed = parseInt(dte, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  if (!exp) return "-";
+  if (typeof exp === 'number') return Math.round(exp);
+  const s = String(exp).replace(/[-\/]/g, '').trim();
+  if (/^\d{8}$/.test(s)) {
+    const y = parseInt(s.substring(0, 4), 10);
+    const m = parseInt(s.substring(4, 6), 10) - 1;
+    const d = parseInt(s.substring(6, 8), 10);
+    const expDate = new Date(y, m, d);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.round((expDate - today) / (1000 * 60 * 60 * 24));
+    return diffDays;
+  }
+  if (/^\d{6}$/.test(s)) {
+    const y = parseInt(s.substring(0, 4), 10);
+    const m = parseInt(s.substring(4, 6), 10) - 1;
+    const expDate = new Date(y, m, 1);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.round((expDate - today) / (1000 * 60 * 60 * 24));
+    return diffDays;
+  }
+  const parsed = parseInt(s, 10);
+  return isNaN(parsed) ? "-" : parsed;
+}
 
 function showToast(msg) {
   const t = document.getElementById("toast");
@@ -288,17 +484,17 @@ async function submitThreshold(groupName) {
     });
     const data = await resp.json();
     if (resp.status === 401) {
-      pw = prompt("請輸入監控密碼：") || "";
+      pw = prompt("請輸入管理密碼:") || "";
       localStorage.setItem(PASSWORD_KEY, pw);
       return submitThreshold(groupName);
     }
     if (data.status === "ok") {
-      showToast("✅ 已更新 " + groupName);
+      showToast("已更新 " + groupName);
     } else {
-      showToast("❌ " + (data.message || "更新失敗"));
+      showToast("錯誤: " + (data.message || "更新失敗"));
     }
   } catch (e) {
-    showToast("❌ 連線失敗");
+    showToast("連線失敗");
   }
 }
 
@@ -315,21 +511,21 @@ async function toggleWebhook(enabled) {
       body: JSON.stringify({ enabled: enabled, password: pw })
     });
     if (resp.status === 401) {
-      pw = prompt("請輸入監控密碼：") || "";
+      pw = prompt("請輸入管理密碼:") || "";
       localStorage.setItem(PASSWORD_KEY, pw);
       webhookToggleBusy = false;
       return toggleWebhook(enabled);
     }
     const data = await resp.json();
     if (data.status === "ok") {
-      showToast(data.send_webhook ? "✅ 自動送單已開啟" : "🧪 自動送單已關閉（僅印出訊號）");
+      showToast(data.send_webhook ? "自動對沖下單已啟用" : "自動對沖下單已停用");
     } else {
       toggleEl.checked = !enabled;
-      showToast("❌ " + (data.message || "更新失敗"));
+      showToast("錯誤: " + (data.message || "更新失敗"));
     }
   } catch (e) {
     toggleEl.checked = !enabled;
-    showToast("❌ 連線失敗");
+    showToast("連線失敗");
   } finally {
     webhookToggleBusy = false;
   }
@@ -337,16 +533,17 @@ async function toggleWebhook(enabled) {
 
 function renderPositions(rows) {
   if (!rows || !rows.length) return "";
-  let html = '<table><tr><th>商品</th><th>部位</th><th>現價</th><th>損益</th><th>Δ</th><th>θ</th><th>γ</th></tr>';
+  let html = '<table><tr><th>代號</th><th>部位</th><th>現價</th><th>損益</th><th>Delta</th><th>Theta</th><th>DTE</th></tr>';
   for (const r of rows) {
+    const dteVal = calcDTE(r.expiry, r.dte);
     html += `<tr>
       <td>${r.symbol}</td>
-      <td class="${cls(r.position)}">${fmt(r.position,1)}</td>
+      <td class="${cls(r.position)}" style="font-weight:bold;">${fmt(r.position,1)}</td>
       <td>${fmt(r.market_price, r.decimals ?? 2)}</td>
-      <td class="${cls(r.pnl)}">${fmt(r.pnl,2)}</td>
+      <td class="${cls(r.pnl)}" style="font-weight:bold;">${fmt(r.pnl,2)}</td>
       <td>${fmt(r.delta,4)}</td>
       <td>${fmt(r.theta,0)}</td>
-      <td>${fmt(r.gamma,4)}</td>
+      <td>${dteVal}</td>
     </tr>`;
   }
   html += "</table>";
@@ -354,22 +551,23 @@ function renderPositions(rows) {
 }
 
 function renderGroup(g) {
+  const totalPnl = (g.total_pnl !== undefined && g.total_pnl !== null) ? g.total_pnl : (g.positions ? g.positions.reduce((acc, p) => acc + (Number(p.pnl) || 0), 0) : 0);
   return `
   <div class="card">
     <div class="group-title">
       <h2>${g.name}</h2>
       <span class="badge">${g.hedge_sym}</span>
     </div>
-    ${g.closed ? '<div class="muted">⏳ 未開盤，暫停對沖</div>' : ''}
+    ${g.closed ? '<div class="muted">部位已平倉</div>' : ''}
     ${g.mute
-      ? `<div class="row"><span class="muted">🔕 缺乏報價，安全鎖啟動</span></span></div>`
-      : `<div class="row"><span>目前 Δ ${fmt(g.total_delta,3)}</span><span>目前 θ ${fmt(g.total_theta,0)}</span><span>單邊估計點數 ${fmt(g.ref_points,0)}</span></div>`
+      ? `<div class="row"><span class="muted">資料不足，暫停計算</span></div>`
+      : `<div class="row"><span>Delta: ${fmt(g.total_delta,3)}</span><span>Theta: ${fmt(g.total_theta,0)}</span><span>未平倉損益: <span class="${cls(totalPnl)}">${fmt(totalPnl,2)}</span></span></div>`
     }
     ${renderPositions(g.positions)}
     <div class="form-row">
       <input type="number" step="0.1" id="u_${g.name}" placeholder="上限 (目前 ${fmt(g.upper_threshold,2)})">
       <input type="number" step="0.1" id="l_${g.name}" placeholder="下限 (目前 ${fmt(g.lower_threshold,2)})">
-      <button onclick="submitThreshold('${g.name}')">送出</button>
+      <button class="action-btn" onclick="submitThreshold('${g.name}')">送出</button>
     </div>
   </div>`;
 }
@@ -387,13 +585,13 @@ async function refresh() {
 
     const acc = data.account || {};
     const shioaji = data.shioaji || {};
-    let accHtml = "<h2>帳戶</h2>";
-    accHtml += `<div class="row"><span>IB 淨值</span><span>${acc.net_liq ?? "-"}</span></div>`;
-    accHtml += `<div class="row"><span>IB 可用金</span><span>${acc.avail ?? "-"}</span></div>`;
-    accHtml += `<div class="row"><span>全帳戶 θ 加總</span><span>${fmt(acc.total_theta, 0)}</span></div>`;
+    let accHtml = "<h2>帳戶概況</h2>";
+    accHtml += `<div class="row"><span>IB 淨值:</span><span>${acc.net_liq ?? "-"}</span></div>`;
+    accHtml += `<div class="row"><span>IB 可用資金:</span><span>${acc.avail ?? "-"}</span></div>`;
+    accHtml += `<div class="row"><span>所有部位 Theta 總計:</span><span>${fmt(acc.total_theta, 0)}</span></div>`;
     if (shioaji && shioaji.equity !== undefined) {
-      accHtml += `<div class="row"><span>永豐權益</span><span>${fmt(shioaji.equity,0)}</span></div>`;
-      accHtml += `<div class="row"><span>永豐可出金</span><span>${fmt(shioaji.available,0)}</span></div>`;
+      accHtml += `<div class="row"><span>永豐保證金淨值:</span><span>${fmt(shioaji.equity,0)}</span></div>`;
+      accHtml += `<div class="row"><span>永豐可用保證金:</span><span>${fmt(shioaji.available,0)}</span></div>`;
     }
     document.getElementById("account").innerHTML = accHtml;
 
@@ -401,18 +599,655 @@ async function refresh() {
     for (const g of (data.groups || [])) {
       groupsHtml += renderGroup(g);
     }
-    document.getElementById("groups").innerHTML = groupsHtml || '<div class="card">目前無持倉資料</div>';
+    document.getElementById("groups").innerHTML = groupsHtml || '<div class="card">目前無群組資料</div>';
+    if (data.vxm) {
+      updateVXMUI(data.vxm);
+    } else {
+      loadVXMStatus();
+    }
   } catch (e) {
-    document.getElementById("updated").textContent = "⚠️ 讀取失敗，重試中...";
+    document.getElementById("updated").textContent = "讀取失敗，重試中...";
   }
 }
 
 refresh();
 setInterval(refresh, 15000);
+
+function openTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablinks");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    if(evt) evt.currentTarget.className += " active";
+    
+    if(tabName === 'barchart') {
+        loadBarchartData();
+    }
+}
+
+// ==========================================
+// Barchart Multi-table dynamic loader & quote
+// ==========================================
+async function loadBarchartData() {
+    const container = document.getElementById('barchart_content');
+    container.innerHTML = '<div class="loading">正在讀取所有 Barchart CSV 檔案...</div>';
+    try {
+        const response = await fetch('/api/option/barchart_tables?t=' + Date.now());
+        const res = await response.json();
+        if (res.status === 'error') {
+            container.innerHTML = `<span style="color:#f85149;">錯誤: ${res.message}</span>`;
+            return;
+        }
+        const tables = res.tables || [];
+        if (!tables.length) {
+            container.innerHTML = '<p class="muted">在 Barchart 目錄下未找到任何 CSV 檔案。</p>';
+            return;
+        }
+
+        let fullHtml = '';
+        tables.forEach((t, tIdx) => {
+            fullHtml += `<div class="card" style="margin-bottom:24px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <h3 style="margin:0;">${t.title} <span class="badge" style="background-color:#30363d; font-size:11px; font-weight:normal;">${t.filename} (${t.rows.length} 筆)</span></h3>
+                </div>
+                <div style="overflow-x:auto; max-height:480px;">
+                    <table>
+                        <thead>
+                            <tr>`;
+            
+            // Replicate exact columns from the CSV
+            t.columns.forEach(col => {
+                fullHtml += `<th>${col}</th>`;
+            });
+            fullHtml += `<th>操作 (Action)</th></tr></thead><tbody>`;
+
+            t.rows.forEach((row, rIdx) => {
+                fullHtml += `<tr>`;
+                t.columns.forEach(col => {
+                    let val = row[col];
+                    if (val === null || val === undefined) val = "";
+                    let clsName = "";
+                    if (col.includes('Profit') || col.includes('Gain') || col.includes('%TP')) {
+                        clsName = "pos";
+                    } else if (col.includes('Loss')) {
+                        clsName = "neg";
+                    } else if (col === 'DTE' || col === 'Exp Date') {
+                        val = calcDTE(row['Exp Date'], row['DTE']);
+                    }
+                    fullHtml += `<td class="${clsName}">${val}</td>`;
+                });
+
+                // Render Action Button
+                if (t.strategy === 'bull_put') {
+                    fullHtml += `<td><button class="action-btn" id="btn_${tIdx}_${rIdx}" onclick='onBullPutAction(this, ${JSON.stringify(row)})'>下單 (Bull Put)</button></td>`;
+                } else if (t.strategy === 'long_call') {
+                    fullHtml += `<td><button class="action-btn" style="background-color:#1f6feb;" id="btn_${tIdx}_${rIdx}" onclick='onLongCallAction(this, ${JSON.stringify(row)})'>下單 (Buy Call)</button></td>`;
+                } else if (t.strategy === 'short_strangle' || t.strategy === 'iron_condor') {
+                    fullHtml += `<td><button class="action-btn" style="background-color:#9e6a03;" id="btn_${tIdx}_${rIdx}" onclick='onShortStrangleAction(this, ${JSON.stringify(row)})'>下單 (雙賣)</button></td>`;
+                } else {
+                    fullHtml += `<td><button class="action-btn" id="btn_${tIdx}_${rIdx}" onclick='onGenericAction(this, ${JSON.stringify(row)})'>下單</button></td>`;
+                }
+
+                fullHtml += `</tr>`;
+            });
+
+            fullHtml += `</tbody></table></div></div>`;
+        });
+
+        container.innerHTML = fullHtml;
+    } catch (err) {
+        container.innerHTML = `<span style="color:#f85149;">讀取失敗: ${err}</span>`;
+    }
+}
+
+async function onBullPutAction(btn, row) {
+    const origText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = "查詢報價中...";
+    try {
+        const resp = await fetch('/api/option/barchart_quote', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                strategy: 'bull_put',
+                symbol: row.Symbol,
+                exp_date: row['Exp Date'],
+                leg1_strike: row['Leg1 Strike'],
+                leg2_strike: row['Leg2 Strike'],
+                max_profit: row['Max Profit'] || 0
+            })
+        });
+        const q = await resp.json();
+        btn.disabled = false;
+        btn.innerText = origText;
+
+        if (q.status !== 'ok') {
+            alert("取得報價失敗: " + (q.message || "未知錯誤"));
+            return;
+        }
+
+        const msg = `【下單詢問視窗 - Bull Put Spread】\n\n` +
+                    `標的: ${q.symbol}\n` +
+                    `到期日: ${q.exp_date}\n` +
+                    `Sell Put: ${q.leg1_strike}\n` +
+                    `Buy Put: ${q.leg2_strike}\n\n` +
+                    `IBKR 即時報價:\n` +
+                    `- Bid: ${q.bid !== null ? q.bid : 'N/A'}\n` +
+                    `- Ask: ${q.ask !== null ? q.ask : 'N/A'}\n\n` +
+                    `預計下單內容:\n` +
+                    `- 動作: SELL 1口 (限價單)\n` +
+                    `- 限價價格: $${q.limit_price}\n\n` +
+                    `確定要送出此筆 Bull Put Spread 下單嗎？`;
+
+        if (!confirm(msg)) return;
+
+        // Execute trade
+        btn.disabled = true;
+        btn.innerText = "送出委託中...";
+        const trResp = await fetch('/api/option/execute_barchart_trade', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                strategy: 'bull_put',
+                symbol: q.symbol,
+                action: 'SELL',
+                limit_price: q.limit_price,
+                leg1_conId: q.leg1_conId,
+                leg2_conId: q.leg2_conId
+            })
+        });
+        const trData = await trResp.json();
+        btn.disabled = false;
+        btn.innerText = origText;
+        alert(trData.message || (trData.status === 'ok' ? '下單成功！' : '下單失敗'));
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerText = origText;
+        alert("下單連線失敗: " + e);
+    }
+}
+
+async function onShortStrangleAction(btn, row) {
+    const origText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = "查詢報價中...";
+
+    // 取得同位置的 Short Put 與 Short Call 履約價
+    let shortPut = row['Short Put Strike'] || row['Short Put'] || row['Sell Put Strike'] || row['Sell Put'] || row['Leg2 Strike'] || row['Leg1 Strike'] || row['Put Strike'] || row['SP'] || 0;
+    let shortCall = row['Short Call Strike'] || row['Short Call'] || row['Sell Call Strike'] || row['Sell Call'] || row['Leg3 Strike'] || row['Leg2 Strike'] || row['Call Strike'] || row['SC'] || 0;
+
+    try {
+        const resp = await fetch('/api/option/barchart_quote', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                strategy: 'short_strangle',
+                symbol: row.Symbol,
+                exp_date: row['Exp Date'] || row['Expiration Date'] || row['Expiry'],
+                short_put_strike: shortPut,
+                short_call_strike: shortCall,
+                max_profit: row['Max Profit'] || row['Credit'] || row['Midpoint'] || 0
+            })
+        });
+        const q = await resp.json();
+        btn.disabled = false;
+        btn.innerText = origText;
+
+        if (q.status !== 'ok') {
+            alert("取得報價失敗: " + (q.message || "未知錯誤"));
+            return;
+        }
+
+        const msg = `【下單詢問視窗 - 雙賣 (Short Strangle)】\n\n` +
+                    `標的: ${q.symbol}\n` +
+                    `到期日: ${q.exp_date}\n` +
+                    `Sell Put (履約價): ${q.short_put_strike}\n` +
+                    `Sell Call (履約價): ${q.short_call_strike}\n\n` +
+                    `IBKR 即時報價:\n` +
+                    `- Bid: ${q.bid !== null ? q.bid : 'N/A'}\n` +
+                    `- Ask: ${q.ask !== null ? q.ask : 'N/A'}\n\n` +
+                    `預計下單內容:\n` +
+                    `- 動作: SELL 1口 (雙賣限價單)\n` +
+                    `- 限價價格: $${q.limit_price}\n\n` +
+                    `確定要送出此筆雙賣下單嗎？`;
+
+        if (!confirm(msg)) return;
+
+        // Execute trade
+        btn.disabled = true;
+        btn.innerText = "送出委託中...";
+        const trResp = await fetch('/api/option/execute_barchart_trade', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                strategy: 'short_strangle',
+                symbol: q.symbol,
+                action: 'SELL',
+                limit_price: q.limit_price,
+                put_conId: q.put_conId,
+                call_conId: q.call_conId
+            })
+        });
+        const trData = await trResp.json();
+        btn.disabled = false;
+        btn.innerText = origText;
+        alert(trData.message || (trData.status === 'ok' ? '下單成功！' : '下單失敗'));
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerText = origText;
+        alert("下單連線失敗: " + e);
+    }
+}
+
+async function onLongCallAction(btn, row) {
+    const origText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = "查詢報價中...";
+    try {
+        const resp = await fetch('/api/option/barchart_quote', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                strategy: 'long_call',
+                symbol: row.Symbol,
+                exp_date: row['Exp Date'],
+                strike: row.Strike,
+                bid: row.Bid || 0,
+                ask: row.Ask || 0
+            })
+        });
+        const q = await resp.json();
+        btn.disabled = false;
+        btn.innerText = origText;
+
+        if (q.status !== 'ok') {
+            alert("取得報價失敗: " + (q.message || "未知錯誤"));
+            return;
+        }
+
+        const msg = `【下單詢問視窗 - Long Call】\n\n` +
+                    `標的: ${q.symbol}\n` +
+                    `到期日: ${q.exp_date}\n` +
+                    `Buy Call: ${q.strike}\n\n` +
+                    `IBKR 即時報價:\n` +
+                    `- Bid (買方出價): ${q.bid !== null ? q.bid : 'N/A'}\n` +
+                    `- Ask (賣方要價): ${q.ask !== null ? q.ask : 'N/A'}\n\n` +
+                    `預計下單內容:\n` +
+                    `- 動作: BUY 1口 (限價單)\n` +
+                    `- 限價價格: $${q.limit_price} (Bid 限價)\n\n` +
+                    `確定要送出此筆 Buy Call 下單嗎？`;
+
+        if (!confirm(msg)) return;
+
+        // Execute trade
+        btn.disabled = true;
+        btn.innerText = "送出委託中...";
+        const trResp = await fetch('/api/option/execute_barchart_trade', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                strategy: 'long_call',
+                symbol: q.symbol,
+                action: 'BUY',
+                limit_price: q.limit_price,
+                conId: q.conId
+            })
+        });
+        const trData = await trResp.json();
+        btn.disabled = false;
+        btn.innerText = origText;
+        alert(trData.message || (trData.status === 'ok' ? '下單成功！' : '下單失敗'));
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerText = origText;
+        alert("下單連線失敗: " + e);
+    }
+}
+
+let vxmFormDirty = false;
+
+function markVXMDirty() {
+  vxmFormDirty = true;
+}
+
+function updateVXMUI(d) {
+  if (!d) return;
+  const box = document.getElementById("vxm-console-box");
+  if (box && d.terminal_output) {
+    box.textContent = d.terminal_output;
+  }
+  const cDisp = document.getElementById("vxm-contract-display");
+  if (cDisp) cDisp.textContent = d.trading_contract || d.local_symbol || "-";
+  const eDisp = document.getElementById("vxm-expiry-display");
+  if (eDisp) eDisp.textContent = `到期: ${d.expiry || '-'} (conId: ${d.con_id || '-'})`;
+  const pDisp = document.getElementById("vxm-pos-display");
+  if (pDisp) {
+    pDisp.textContent = `${d.current_pos} 口`;
+    pDisp.className = d.current_pos < 0 ? "pos" : (d.current_pos > 0 ? "neg" : "");
+  }
+  const tDisp = document.getElementById("vxm-target-display");
+  if (tDisp && d.config) tDisp.textContent = `目標: ${d.config.target_init_pos} 口`;
+  const pnlDisp = document.getElementById("vxm-pnl-display");
+  if (pnlDisp && d.unrealized_pnl !== undefined) {
+    const pnlVal = Number(d.unrealized_pnl);
+    const pnlSign = pnlVal > 0 ? "+" : "";
+    pnlDisp.textContent = `${pnlSign}${pnlVal.toFixed(2)} USD`;
+    pnlDisp.className = pnlVal > 0 ? "pos" : (pnlVal < 0 ? "neg" : "");
+  }
+  const sText = document.getElementById("vxm-status-text");
+  if (sText) {
+    sText.textContent = d.status_line || "正常監控中";
+    sText.style.color = d.action ? "#f85149" : "#7ee787";
+  }
+
+  if (d.config && !vxmFormDirty) {
+    if (document.getElementById("vxm_cfg_init_pos")) document.getElementById("vxm_cfg_init_pos").value = d.config.target_init_pos ?? -2;
+    if (document.getElementById("vxm_cfg_tp_pnl")) document.getElementById("vxm_cfg_tp_pnl").value = d.config.tp_pnl ?? 200;
+    if (document.getElementById("vxm_cfg_loss_pnl")) document.getElementById("vxm_cfg_loss_pnl").value = d.config.loss_pnl ?? -100;
+  }
+}
+
+async function loadVXMStatus(btn) {
+  let origText = "";
+  if (btn) {
+    origText = btn.innerText;
+    btn.innerText = "查詢中...";
+    btn.disabled = true;
+  }
+  try {
+    const res = await fetch('/api/vxm/status');
+    const d = await res.json();
+    if (d.status === 'ok') {
+      updateVXMUI(d);
+      if (btn) showToast("VXM 狀態已重新整理");
+    }
+  } catch (e) {
+    console.error("載入 VXM 狀態失敗:", e);
+  } finally {
+    if (btn) {
+      btn.innerText = origText;
+      btn.disabled = false;
+    }
+  }
+}
+
+async function saveVXMConfig(btn) {
+  const origText = btn.innerText;
+  btn.disabled = true;
+  btn.innerText = "儲存中...";
+  const pw = localStorage.getItem(PASSWORD_KEY) || "";
+
+  const payload = {
+    password: pw,
+    target_init_pos: parseInt(document.getElementById("vxm_cfg_init_pos").value, 10),
+    tp_pnl: parseFloat(document.getElementById("vxm_cfg_tp_pnl").value),
+    loss_pnl: parseFloat(document.getElementById("vxm_cfg_loss_pnl").value)
+  };
+
+  try {
+    const res = await fetch('/api/vxm/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    btn.disabled = false;
+    btn.innerText = origText;
+
+    if (d.status === 'ok') {
+      showToast(d.message || "VXM 策略設定已成功寫入 .env！");
+      vxmFormDirty = false;
+      loadVXMStatus();
+    } else {
+      alert("儲存失敗: " + (d.message || "未知錯誤"));
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.innerText = origText;
+    alert("儲存連線失敗: " + e);
+  }
+}
 </script>
 </body>
 </html>
 """
+
+VXM_CACHE = {
+    "target_contract": None,
+    "last_contract_check": 0,
+    "last_trade_time": 0
+}
+VXM_CURRENT_DATA = {}
+
+
+def get_target_vxm_contract(ib_instance):
+    now_ts = time.time()
+    today_str = datetime.date.today().strftime('%Y%m%d')
+    cached = VXM_CACHE.get("target_contract")
+    if cached and (now_ts - VXM_CACHE.get("last_contract_check", 0) < 3600):
+        if cached.lastTradeDateOrContractMonth and cached.lastTradeDateOrContractMonth >= today_str:
+            return cached
+
+    try:
+        details = ib_instance.reqContractDetails(Future(symbol='VXM', exchange='CFE'))
+        if details:
+            valid_contracts = sorted(
+                [d.contract for d in details if d.contract.lastTradeDateOrContractMonth and d.contract.lastTradeDateOrContractMonth >= today_str],
+                key=lambda c: c.lastTradeDateOrContractMonth
+            )
+            if valid_contracts:
+                ib_instance.qualifyContracts(valid_contracts[0])
+                VXM_CACHE["target_contract"] = valid_contracts[0]
+                VXM_CACHE["last_contract_check"] = now_ts
+                return valid_contracts[0]
+    except Exception as e:
+        print(f"⚠️ 查詢 VXM 合約異常: {e}")
+    return VXM_CACHE.get("target_contract")
+
+
+def compute_vxm_evaluation(current_pos, unrealized_pnl, target_contract_symbol, expiry, con_id, cfg):
+    target_init_pos = int(cfg.get("target_init_pos", -2))
+    tp_pnl = float(cfg.get("tp_pnl", 200.0))
+    loss_pnl = float(cfg.get("loss_pnl", -100.0))
+
+    action = None
+    qty = 0
+    decision_reason = ""
+
+    if current_pos > target_init_pos:
+        action = 'SELL'
+        qty = int(current_pos - target_init_pos)
+        decision_reason = f"未平倉量 ({current_pos}) > 初始目標部位 ({target_init_pos})，賣出 {qty} 口至 {target_init_pos}"
+    elif unrealized_pnl < loss_pnl:
+        action = 'SELL'
+        qty = 1
+        decision_reason = f"未平倉損益 ({unrealized_pnl:.2f}) < 損益門檻 ({loss_pnl:.2f})，加賣 1 口"
+    elif unrealized_pnl > tp_pnl:
+        action = 'BUY'
+        qty = 1
+        decision_reason = f"未平倉損益 ({unrealized_pnl:.2f}) > 停利回補損益門檻 ({tp_pnl:.2f})，加買 1 口"
+
+    if not decision_reason:
+        status_line = f"無需調整部位 (目前部位: {current_pos}, 損益: {unrealized_pnl:.2f})"
+    else:
+        status_line = decision_reason
+
+    terminal_output = (
+        f"================ 開始處理 VXM 策略 ================\n"
+        f"-> 鎖定最近期可交易 VXM: {target_contract_symbol} (到期: {expiry}, conId: {con_id})\n"
+        f"[VXM 狀態] 目前部位: {current_pos} 口 | 未平倉損益: {unrealized_pnl:.2f} USD | 交易合約: {target_contract_symbol}\n"
+        f"-> [VXM] {status_line}"
+    )
+
+    return {
+        "status": "ok",
+        "terminal_output": terminal_output,
+        "status_line": status_line,
+        "action": action,
+        "qty": qty,
+        "trading_contract": target_contract_symbol,
+        "local_symbol": target_contract_symbol,
+        "expiry": expiry,
+        "con_id": con_id,
+        "current_pos": current_pos,
+        "unrealized_pnl": round(unrealized_pnl, 2),
+        "config": cfg
+    }
+
+
+def evaluate_and_run_vxm(ib_instance, execute_order=True):
+    global VXM_CURRENT_DATA
+    if not ib_instance or not ib_instance.isConnected():
+        return VXM_CURRENT_DATA
+
+    target_contract = get_target_vxm_contract(ib_instance)
+    local_symbol = target_contract.localSymbol if target_contract else "VXMU6"
+    expiry = target_contract.lastTradeDateOrContractMonth if target_contract else "20260916"
+    con_id = target_contract.conId if target_contract else 866999756
+
+    # 取得目前所有 VXM 部位與損益
+    vxm_positions = [p for p in ib_instance.portfolio() if p.contract.symbol == 'VXM']
+    current_pos = 0
+    total_unrealized_pnl = 0.0
+    held_contract = None
+
+    for p in vxm_positions:
+        current_pos += int(p.position)
+        if p.unrealizedPNL is not None:
+            total_unrealized_pnl += p.unrealizedPNL
+        if p.position != 0:
+            held_contract = p.contract
+
+    trade_contract = held_contract if held_contract else target_contract
+    if trade_contract and hasattr(trade_contract, 'conId') and trade_contract.conId:
+        try:
+            ib_instance.qualifyContracts(trade_contract)
+        except Exception:
+            pass
+
+    trading_contract_name = trade_contract.localSymbol if trade_contract and trade_contract.localSymbol else local_symbol
+
+    cfg = load_vxm_config()
+    target_init_pos = int(cfg.get("target_init_pos", -2))
+    tp_pnl = float(cfg.get("tp_pnl", 200.0))
+    loss_pnl = float(cfg.get("loss_pnl", -100.0))
+
+    trade_action = None
+    trade_qty = 0
+    reason = ""
+
+    # 1 如果未平倉量 > target_init_pos，就賣出到 target_init_pos
+    if current_pos > target_init_pos:
+        trade_action = 'SELL'
+        trade_qty = int(current_pos - target_init_pos)
+        reason = f"未平倉量 ({current_pos}) > 初始目標部位 ({target_init_pos})，賣出 {trade_qty} 口至 {target_init_pos}"
+
+    # 2 損益小於門檻加賣一口
+    elif total_unrealized_pnl < loss_pnl:
+        trade_action = 'SELL'
+        trade_qty = 1
+        reason = f"未平倉損益 ({total_unrealized_pnl:.2f}) < 損益門檻 ({loss_pnl:.2f})，加賣 1 口"
+
+    # 3 損益大於停利門檻加買一口
+    elif total_unrealized_pnl > tp_pnl:
+        trade_action = 'BUY'
+        trade_qty = 1
+        reason = f"未平倉損益 ({total_unrealized_pnl:.2f}) > 停利回補損益門檻 ({tp_pnl:.2f})，加買 1 口"
+
+    if not reason:
+        status_line = f"無需調整部位 (目前部位: {current_pos}, 損益: {total_unrealized_pnl:.2f})"
+    else:
+        status_line = reason
+
+    terminal_output = (
+        f"================ 開始處理 VXM 策略 ================\n"
+        f"-> 鎖定最近期可交易 VXM: {local_symbol} (到期: {expiry}, conId: {con_id})\n"
+        f"[VXM 狀態] 目前部位: {current_pos} 口 | 未平倉損益: {total_unrealized_pnl:.2f} USD | 交易合約: {trading_contract_name}\n"
+        f"-> [VXM] {status_line}"
+    )
+
+    print(terminal_output)
+
+    now_ts = time.time()
+    if execute_order and trade_action and trade_qty > 0:
+        if now_ts - VXM_CACHE.get("last_trade_time", 0) > 60:
+            if SEND_WEBHOOK:
+                order = MarketOrder(trade_action, trade_qty)
+                order.tif = 'DAY'
+                trade = ib_instance.placeOrder(trade_contract, order)
+                VXM_CACHE["last_trade_time"] = now_ts
+                print(f"🚀 [VXM 下單成功] 已送出 {trade_action} {trade_qty} 口 {trade_contract.localSymbol}，原因: {reason}")
+                
+                try:
+                    payload_dict = {
+                        "strategy": "VXM_HEDGE",
+                        "symbol": "VXM",
+                        "contract": trade_contract.localSymbol,
+                        "action": trade_action,
+                        "quantity": trade_qty,
+                        "current_pos": current_pos,
+                        "unrealized_pnl": total_unrealized_pnl,
+                        "reason": reason
+                    }
+                    send_trade_notification(
+                        symbol="VXM",
+                        message=f"已執行 VXM 策略下單: {trade_action} {trade_qty} 口 {trade_contract.localSymbol}\n原因: {reason}\n未平倉損益: {total_unrealized_pnl:.2f} USD",
+                        payload_str=json.dumps(payload_dict, ensure_ascii=False, indent=2)
+                    )
+                except Exception as ex:
+                    print(f"⚠️ VXM LINE 推播發送失敗: {ex}")
+            else:
+                print(f"-> [VXM 守門] 觸發下單條件 ({reason})，但自動對沖下單開關未開啟 (SEND_WEBHOOK=False)，跳過下單。")
+        else:
+            print(f"-> [VXM 守門] 冷卻中 (距離上次下單未滿 60 秒)，暫不重複送單。")
+
+    VXM_CURRENT_DATA = {
+        "status": "ok",
+        "terminal_output": terminal_output,
+        "status_line": status_line,
+        "action": trade_action,
+        "qty": trade_qty,
+        "trading_contract": trading_contract_name,
+        "local_symbol": local_symbol,
+        "expiry": expiry,
+        "con_id": con_id,
+        "current_pos": current_pos,
+        "unrealized_pnl": round(total_unrealized_pnl, 2),
+        "config": cfg,
+        "updated_at": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    return VXM_CURRENT_DATA
+
+
+def get_vxm_status_data():
+    global VXM_CURRENT_DATA
+    cfg = load_vxm_config()
+    if VXM_CURRENT_DATA:
+        current_pos = VXM_CURRENT_DATA.get("current_pos", -2)
+        unrealized_pnl = VXM_CURRENT_DATA.get("unrealized_pnl", 0.0)
+        target_sym = VXM_CURRENT_DATA.get("local_symbol", "VXMU6")
+        expiry = VXM_CURRENT_DATA.get("expiry", "20260916")
+        con_id = VXM_CURRENT_DATA.get("con_id", 866999756)
+        trading_sym = VXM_CURRENT_DATA.get("trading_contract", target_sym)
+        
+        eval_res = compute_vxm_evaluation(current_pos, unrealized_pnl, target_sym, expiry, con_id, cfg)
+        eval_res["trading_contract"] = trading_sym
+        eval_res["updated_at"] = VXM_CURRENT_DATA.get("updated_at", "")
+        return eval_res
+
+    if ib and ib.isConnected():
+        try:
+            return evaluate_and_run_vxm(ib, execute_order=False)
+        except Exception:
+            pass
+
+    return compute_vxm_evaluation(-2, 0.0, "VXMU6", "20260916", 866999756, cfg)
 
 
 @dash_app.route("/dashboard", methods=["GET"])
@@ -423,6 +1258,35 @@ def dashboard_page():
 @dash_app.route("/api/snapshot", methods=["GET"])
 def api_snapshot():
     return jsonify(get_snapshot())
+
+
+@dash_app.route("/api/vxm/status", methods=["GET"])
+def api_vxm_status():
+    return jsonify(get_vxm_status_data())
+
+
+@dash_app.route("/api/vxm/config", methods=["POST"])
+def api_vxm_config():
+    payload = request.get_json(silent=True) or {}
+    if not check_dashboard_auth(payload):
+        return jsonify({"status": "error", "message": "密碼錯誤"}), 401
+    
+    try:
+        new_cfg = {
+            "target_init_pos": int(payload.get("target_init_pos", 2)),
+            "tp_pnl": float(payload.get("tp_pnl", 400.0)),
+            "loss_pnl": float(payload.get("loss_pnl", payload.get("step_losses", {}).get("2", -400.0)))
+        }
+    except (ValueError, TypeError) as e:
+        return jsonify({"status": "error", "message": f"參數格式錯誤: {e}"}), 400
+
+    ok, result = save_vxm_config(new_cfg)
+    if ok:
+        print(f"[手機面板] VXM 策略參數已儲存至 .env: {new_cfg}")
+        updated_status = get_vxm_status_data()
+        return jsonify({"status": "ok", "message": "VXM 策略設定已成功寫入 .env", "data": updated_status})
+    else:
+        return jsonify({"status": "error", "message": f"寫入 .env 失敗: {result}"}), 500
 
 
 @dash_app.route("/api/threshold", methods=["POST"])
@@ -482,6 +1346,453 @@ def api_send_webhook():
     return jsonify({"status": "ok", "send_webhook": SEND_WEBHOOK})
 
 
+
+BARCHART_DIR = r"C:\Users\Administrator\Desktop\docker_mc\developers.github.io\trade\Barchart"
+LATEST_TMF_PRICE = 0.0
+TXO_OPTIONS_BY_DATE = {}
+
+def clean_num(val):
+    if pd.isna(val): return 0.0
+    s = str(val).replace(',', '').replace('$', '').replace('%', '').strip()
+    try:
+        return float(s)
+    except:
+        return 0.0
+
+@dash_app.route('/api/option/portfolio', methods=['GET'])
+def get_dash_portfolio():
+    snap = get_snapshot()
+    raw_positions = snap.get('options_positions', [])
+    positions = []
+    for p in raw_positions:
+        pos = p.get('position', 0)
+        action = 'BUY' if pos < 0 else 'SELL'
+        positions.append({
+            'conId': p.get('conId', getattr(p.get('contract'), 'conId', 0)),
+            'symbol': p.get('symbol', ''),
+            'localSymbol': p.get('localSymbol', ''),
+            'position': pos,
+            'marketPrice': p.get('marketPrice', 0.0),
+            'action': action
+        })
+    return jsonify({'status': 'ok', 'positions': positions})
+
+@dash_app.route('/api/option/close', methods=['POST'])
+def close_dash_position():
+    payload = request.get_json(silent=True) or {}
+    conId = payload.get('conId')
+    action = payload.get('action')
+    qty = payload.get('quantity')
+    
+    if not conId or not action or not qty:
+        return jsonify({'status': 'error', 'message': 'Missing parameters.'})
+
+    import random
+    from ib_insync import IB, Contract, MarketOrder, TagValue
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    local_ib = IB()
+    local_ib.reqPositionsAsync = lambda: asyncio.sleep(0)
+    local_ib.reqAccountUpdatesAsync = lambda acct: asyncio.sleep(0)
+    local_ib.reqAccountUpdatesMultiAsync = lambda acct: asyncio.sleep(0)
+    local_ib.reqOpenOrdersAsync = lambda: asyncio.sleep(0)
+    local_ib.reqCompletedOrdersAsync = lambda apiOnly: asyncio.sleep(0)
+    local_ib.reqExecutionsAsync = lambda: asyncio.sleep(0)
+    try:
+        local_ib.connect(IB_HOST, IB_PORT, clientId=random.randint(8000, 8999), timeout=10)
+        contract = Contract(conId=int(conId))
+        local_ib.qualifyContracts(contract)
+        
+        order = MarketOrder(action, float(qty))
+        order.tif = 'DAY'
+        order.algoStrategy = 'Adaptive'
+        order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+        
+        local_ib.placeOrder(contract, order)
+        local_ib.sleep(1)
+        res_msg = f'已送出平倉單: {action} {qty} (conId: {conId})'
+        try:
+            send_trade_notification('OPTION', res_msg, {'action': action, 'qty': qty, 'conId': conId})
+        except Exception:
+            pass
+        return jsonify({'status': 'ok', 'message': res_msg})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+    finally:
+        try:
+            local_ib.disconnect()
+        except Exception:
+            pass
+
+@dash_app.route('/api/option/barchart_tables', methods=['GET'])
+def get_barchart_tables():
+    import glob, re
+    try:
+        csv_files = glob.glob(os.path.join(BARCHART_DIR, "*.csv"))
+        tables = []
+        for f in sorted(csv_files):
+            fname = os.path.basename(f)
+            df = pd.read_csv(f)
+            if 'Exp Date' in df.columns:
+                df = df.dropna(subset=['Exp Date'])
+            else:
+                df = df.dropna(how='all')
+            
+            # Clean Symbol if footer
+            if 'Symbol' in df.columns:
+                df = df[~df['Symbol'].astype(str).str.contains('Barchart|Page', case=False, na=False)]
+
+            cols_lower = [str(c).lower().strip() for c in df.columns]
+            m_profile = re.search(r'screener-(.*?)-\d{2}-\d{2}-\d{4}', fname)
+            profile_name = m_profile.group(1).upper() if m_profile else fname.replace('.csv', '')
+
+            if 'condor' in fname.lower() or any('condor' in c for c in cols_lower) or any('short call' in c and 'short put' in c for c in cols_lower) or any('leg3' in c or 'leg4' in c for c in cols_lower) or 'strangle' in fname.lower():
+                strategy = 'short_strangle'
+                title = f"雙賣 (Short Strangle) ({profile_name})"
+            elif any('leg1 strike' in c for c in cols_lower):
+                strategy = 'bull_put'
+                title = f"Bull Put Spread ({profile_name})"
+            elif any('call' in c for c in cols_lower) or 'call' in fname.lower():
+                strategy = 'long_call'
+                title = f"Long Call ({profile_name})"
+            else:
+                strategy = 'generic'
+                title = f"選擇權策略 ({profile_name})"
+
+            tables.append({
+                'filename': fname,
+                'title': title,
+                'strategy': strategy,
+                'columns': list(df.columns),
+                'rows': df.fillna('').to_dict(orient='records')
+            })
+        return jsonify({'status': 'ok', 'tables': tables})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@dash_app.route('/api/option/barchart_quote', methods=['POST'])
+def quote_barchart_trade():
+    payload = request.get_json(silent=True) or {}
+    strategy = payload.get('strategy')
+    symbol = payload.get('symbol')
+    exp_date = str(payload.get('exp_date', '')).replace('-', '').strip()
+    
+    if not symbol or not exp_date:
+        return jsonify({'status': 'error', 'message': 'Missing symbol or expiry date'})
+
+    import random, asyncio, math
+    from ib_insync import IB, Option, Contract, ComboLeg
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    local_ib = IB()
+    local_ib.reqPositionsAsync = lambda: asyncio.sleep(0)
+    local_ib.reqAccountUpdatesAsync = lambda acct: asyncio.sleep(0)
+    local_ib.reqAccountUpdatesMultiAsync = lambda acct: asyncio.sleep(0)
+    local_ib.reqOpenOrdersAsync = lambda: asyncio.sleep(0)
+    local_ib.reqCompletedOrdersAsync = lambda apiOnly: asyncio.sleep(0)
+    local_ib.reqExecutionsAsync = lambda: asyncio.sleep(0)
+
+    try:
+        local_ib.connect(IB_HOST, IB_PORT, clientId=random.randint(5000, 6999), timeout=10, readonly=True)
+        if strategy == 'bull_put':
+            leg1 = clean_num(payload.get('leg1_strike'))
+            leg2 = clean_num(payload.get('leg2_strike'))
+            credit = clean_num(payload.get('max_profit'))
+            c1 = Option(symbol, exp_date, leg1, 'P', 'SMART')
+            c2 = Option(symbol, exp_date, leg2, 'P', 'SMART')
+            local_ib.qualifyContracts(c1, c2)
+
+            contract = Contract(secType='BAG', symbol=symbol, currency='USD', exchange='SMART')
+            l1 = ComboLeg(conId=c1.conId, ratio=1, action='BUY', exchange='SMART')
+            l2 = ComboLeg(conId=c2.conId, ratio=1, action='SELL', exchange='SMART')
+            contract.comboLegs = [l1, l2]
+
+            ticker = local_ib.reqMktData(contract, "", True, False)
+            limit_price = credit * 2.0
+            for _ in range(15):
+                local_ib.sleep(0.1)
+                if ticker.bid and not math.isnan(ticker.bid) and ticker.bid > 0:
+                    limit_price = ticker.bid
+                    break
+            
+            bid_val = ticker.bid if ticker.bid and not math.isnan(ticker.bid) else None
+            ask_val = ticker.ask if ticker.ask and not math.isnan(ticker.ask) else None
+            return jsonify({
+                'status': 'ok',
+                'strategy': 'bull_put',
+                'symbol': symbol,
+                'exp_date': payload.get('exp_date'),
+                'leg1_strike': leg1,
+                'leg2_strike': leg2,
+                'bid': bid_val,
+                'ask': ask_val,
+                'limit_price': round(limit_price, 2),
+                'leg1_conId': c1.conId,
+                'leg2_conId': c2.conId
+            })
+
+        elif strategy in ('short_strangle', 'iron_condor'):
+            short_put = clean_num(payload.get('short_put_strike'))
+            short_call = clean_num(payload.get('short_call_strike'))
+            credit = clean_num(payload.get('max_profit'))
+            c_put = Option(symbol, exp_date, short_put, 'P', 'SMART')
+            c_call = Option(symbol, exp_date, short_call, 'C', 'SMART')
+            local_ib.qualifyContracts(c_put, c_call)
+
+            contract = Contract(secType='BAG', symbol=symbol, currency='USD', exchange='SMART')
+            l1 = ComboLeg(conId=c_put.conId, ratio=1, action='BUY', exchange='SMART')
+            l2 = ComboLeg(conId=c_call.conId, ratio=1, action='BUY', exchange='SMART')
+            contract.comboLegs = [l1, l2]
+
+            ticker = local_ib.reqMktData(contract, "", True, False)
+            limit_price = credit if credit > 0 else 1.0
+            for _ in range(15):
+                local_ib.sleep(0.1)
+                if ticker.bid and not math.isnan(ticker.bid) and ticker.bid > 0:
+                    limit_price = ticker.bid
+                    break
+
+            bid_val = ticker.bid if ticker.bid and not math.isnan(ticker.bid) else None
+            ask_val = ticker.ask if ticker.ask and not math.isnan(ticker.ask) else None
+            return jsonify({
+                'status': 'ok',
+                'strategy': 'short_strangle',
+                'symbol': symbol,
+                'exp_date': payload.get('exp_date'),
+                'short_put_strike': short_put,
+                'short_call_strike': short_call,
+                'bid': bid_val,
+                'ask': ask_val,
+                'limit_price': round(limit_price, 2),
+                'put_conId': c_put.conId,
+                'call_conId': c_call.conId
+            })
+
+        elif strategy == 'long_call':
+            strike = clean_num(payload.get('strike'))
+            csv_ask = clean_num(payload.get('ask'))
+            csv_bid = clean_num(payload.get('bid'))
+            c = Option(symbol, exp_date, strike, 'C', 'SMART')
+            local_ib.qualifyContracts(c)
+
+            ticker = local_ib.reqMktData(c, "", True, False)
+            limit_price = csv_bid if csv_bid > 0 else csv_ask
+            for _ in range(15):
+                local_ib.sleep(0.1)
+                if ticker.bid and not math.isnan(ticker.bid) and ticker.bid > 0:
+                    limit_price = ticker.bid
+                    break
+                elif ticker.ask and not math.isnan(ticker.ask) and ticker.ask > 0 and limit_price <= 0:
+                    limit_price = ticker.ask
+
+            bid_val = ticker.bid if ticker.bid and not math.isnan(ticker.bid) else None
+            ask_val = ticker.ask if ticker.ask and not math.isnan(ticker.ask) else None
+            return jsonify({
+                'status': 'ok',
+                'strategy': 'long_call',
+                'symbol': symbol,
+                'exp_date': payload.get('exp_date'),
+                'strike': strike,
+                'bid': bid_val,
+                'ask': ask_val,
+                'limit_price': round(limit_price, 2),
+                'conId': c.conId
+            })
+
+        return jsonify({'status': 'error', 'message': f'Unknown strategy: {strategy}'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+    finally:
+        try:
+            local_ib.disconnect()
+        except Exception:
+            pass
+
+@dash_app.route('/api/option/execute_barchart_trade', methods=['POST'])
+def execute_barchart_trade():
+    payload = request.get_json(silent=True) or {}
+    strategy = payload.get('strategy')
+    symbol = payload.get('symbol')
+    action = payload.get('action', 'SELL')
+    limit_price = clean_num(payload.get('limit_price'))
+
+    import random, asyncio
+    from ib_insync import IB, Contract, ComboLeg, LimitOrder
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    local_ib = IB()
+    local_ib.reqPositionsAsync = lambda: asyncio.sleep(0)
+    local_ib.reqAccountUpdatesAsync = lambda acct: asyncio.sleep(0)
+    local_ib.reqAccountUpdatesMultiAsync = lambda acct: asyncio.sleep(0)
+    local_ib.reqOpenOrdersAsync = lambda: asyncio.sleep(0)
+    local_ib.reqCompletedOrdersAsync = lambda apiOnly: asyncio.sleep(0)
+    local_ib.reqExecutionsAsync = lambda: asyncio.sleep(0)
+
+    try:
+        local_ib.connect(IB_HOST, IB_PORT, clientId=random.randint(5000, 6999), timeout=10)
+        if strategy == 'bull_put':
+            leg1_conId = payload.get('leg1_conId')
+            leg2_conId = payload.get('leg2_conId')
+            contract = Contract(secType='BAG', symbol=symbol, currency='USD', exchange='SMART')
+            l1 = ComboLeg(conId=int(leg1_conId), ratio=1, action='BUY', exchange='SMART')
+            l2 = ComboLeg(conId=int(leg2_conId), ratio=1, action='SELL', exchange='SMART')
+            contract.comboLegs = [l1, l2]
+
+            order = LimitOrder(action, 1, limit_price)
+            order.tif = 'DAY'
+            order.transmit = True
+            local_ib.placeOrder(contract, order)
+            local_ib.sleep(1)
+            res_msg = f'已成功送出 {symbol} Bull Put Spread 下單: {action} 1口 (限價 {limit_price})'
+            try:
+                send_trade_notification(symbol, res_msg, payload)
+            except Exception:
+                pass
+            return jsonify({'status': 'ok', 'message': res_msg})
+
+        elif strategy in ('short_strangle', 'iron_condor'):
+            put_conId = payload.get('put_conId')
+            call_conId = payload.get('call_conId')
+            contract = Contract(secType='BAG', symbol=symbol, currency='USD', exchange='SMART')
+            l1 = ComboLeg(conId=int(put_conId), ratio=1, action='BUY', exchange='SMART')
+            l2 = ComboLeg(conId=int(call_conId), ratio=1, action='BUY', exchange='SMART')
+            contract.comboLegs = [l1, l2]
+
+            order = LimitOrder(action, 1, limit_price)
+            order.tif = 'DAY'
+            order.transmit = True
+            local_ib.placeOrder(contract, order)
+            local_ib.sleep(1)
+            res_msg = f'已成功送出 {symbol} 雙賣 (Short Strangle) 下單: {action} 1口 (限價 {limit_price})'
+            try:
+                send_trade_notification(symbol, res_msg, payload)
+            except Exception:
+                pass
+            return jsonify({'status': 'ok', 'message': res_msg})
+
+        elif strategy == 'long_call':
+            conId = payload.get('conId')
+            contract = Contract(conId=int(conId))
+            local_ib.qualifyContracts(contract)
+
+            order = LimitOrder(action, 1, limit_price)
+            order.tif = 'DAY'
+            order.transmit = True
+            local_ib.placeOrder(contract, order)
+            local_ib.sleep(1)
+            res_msg = f'已成功送出 {symbol} Long Call 下單: {action} 1口 (Bid限價 {limit_price})'
+            try:
+                send_trade_notification(symbol, res_msg, payload)
+            except Exception:
+                pass
+            return jsonify({'status': 'ok', 'message': res_msg})
+
+        return jsonify({'status': 'error', 'message': f'Unknown strategy: {strategy}'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'下單失敗: {e}'})
+    finally:
+        try:
+            local_ib.disconnect()
+        except Exception:
+            pass
+
+@dash_app.route('/api/option/data_bull_put', methods=['GET'])
+def get_dash_data_bull_put():
+    return get_barchart_tables()
+
+@dash_app.route('/api/option/trade_bull_put', methods=['POST'])
+def place_dash_trade_bull_put():
+    return execute_barchart_trade()
+
+@dash_app.route('/api/option/txo_strangles', methods=['GET'])
+def get_txo_strangles():
+    global api, LATEST_TMF_PRICE, TXO_OPTIONS_BY_DATE
+    if api is None:
+        return jsonify({'status': 'error', 'message': 'Shioaji not connected'})
+    try:
+        import shioaji as sj
+        underlying = LATEST_TMF_PRICE
+        if not underlying or underlying <= 0:
+            target_code = list(api.Contracts.Futures.TMF.keys())[0]
+            c = api.Contracts.Futures.TMF[target_code]
+            snap = api.snapshots([c])
+            if snap and len(snap) > 0:
+                underlying = snap[0].close
+        if not underlying or underlying <= 0:
+            return jsonify({'status': 'error', 'message': '無法取得 TMF 即時行情'})
+
+        atm_strike = round(underlying / 50.0) * 50
+        
+        if not TXO_OPTIONS_BY_DATE:
+            by_date = {}
+            for cat in ['TX1', 'TX2', 'TX4', 'TX5', 'TXO']:
+                if hasattr(api.Contracts.Options, cat):
+                    for opt in getattr(api.Contracts.Options, cat):
+                        if opt.delivery_date not in by_date:
+                            by_date[opt.delivery_date] = []
+                        by_date[opt.delivery_date].append(opt)
+            TXO_OPTIONS_BY_DATE = by_date
+
+        sorted_dates = sorted(list(TXO_OPTIONS_BY_DATE.keys()))
+        results = []
+        for d in sorted_dates[:2]:
+            opts = TXO_OPTIONS_BY_DATE.get(d, [])
+            calls = [o for o in opts if o.option_right == sj.constant.OptionRight.Call and o.strike_price == atm_strike]
+            puts = [o for o in opts if o.option_right == sj.constant.OptionRight.Put and o.strike_price == atm_strike]
+            if calls and puts:
+                c_opt = calls[0]
+                p_opt = puts[0]
+                results.append({
+                    'delivery_date': d,
+                    'atm_strike': atm_strike,
+                    'call_code': c_opt.code,
+                    'call_name': getattr(c_opt, 'name', ''),
+                    'call_symbol': getattr(c_opt, 'symbol', ''),
+                    'put_code': p_opt.code,
+                    'put_name': getattr(p_opt, 'name', ''),
+                    'put_symbol': getattr(p_opt, 'symbol', ''),
+                    'symbol': f"TXO {d} ATM {atm_strike} (Call+Put 雙賣)"
+                })
+        return jsonify({'status': 'ok', 'underlying_price': underlying, 'atm_strike': atm_strike, 'data': results})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@dash_app.route('/api/option/trade_txo_strangle', methods=['POST'])
+def trade_txo_strangle():
+    global api
+    payload = request.get_json(silent=True) or {}
+    call_code = payload.get('call')
+    put_code = payload.get('put')
+    if api is None or not getattr(api, 'futopt_account', None):
+        return jsonify({'status': 'error', 'message': 'Shioaji not connected or futopt account not available'})
+    try:
+        import shioaji as sj
+        call_contract = None
+        put_contract = None
+        for cat in ['TX1', 'TX2', 'TX4', 'TX5', 'TXO']:
+            if hasattr(api.Contracts.Options, cat):
+                for c in getattr(api.Contracts.Options, cat):
+                    if c.code == call_code: call_contract = c
+                    if c.code == put_code: put_contract = c
+                    
+        if not call_contract or not put_contract:
+            return jsonify({'status': 'error', 'message': f'Cannot find contract for Call {call_code} or Put {put_code}'})
+
+        oc = api.Order(price=0, quantity=1, action=sj.constant.Action.Sell, price_type=sj.constant.FuturesPriceType.MKT, order_type=sj.constant.OrderType.IOC, octype=sj.constant.FuturesOCType.Auto, account=api.futopt_account)
+        op = api.Order(price=0, quantity=1, action=sj.constant.Action.Sell, price_type=sj.constant.FuturesPriceType.MKT, order_type=sj.constant.OrderType.IOC, octype=sj.constant.FuturesOCType.Auto, account=api.futopt_account)
+        
+        trade_c = api.place_order(call_contract, oc)
+        trade_p = api.place_order(put_contract, op)
+        res_msg = f'TXO 雙賣市價下單成功！Call: {call_code}, Put: {put_code}'
+        try:
+            send_trade_notification('TXO', res_msg, payload)
+        except Exception:
+            pass
+        return jsonify({'status': 'ok', 'message': f'TXO 雙賣市價下單成功！\nCall: {call_code}\nPut: {put_code}'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'下單失敗: {e}'})
+
 def start_dashboard_server():
     """在背景執行緒啟動 Flask 監控面板，不影響主邏輯。"""
     from waitress import serve as _serve
@@ -493,8 +1804,9 @@ def start_dashboard_server():
 # 🌟 Auto Delta Hedge Sender
 # ==============================================================================
 def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int | float) -> bool:
-    if not WEBHOOK_URL or not WEBHOOK_PASSPHRASE:
-        print(f"[{symbol} 自動對沖系統] ⚠️ WEBHOOK_URL 或 WEBHOOK_PASSPHRASE 未設定，只印出訊號不送單。")
+    local_exec_url = "http://127.0.0.1:5000/webhook"
+    if not WEBHOOK_PASSPHRASE:
+        print(f"[{symbol} 自動對沖系統] ⚠️ WEBHOOK_PASSPHRASE 未設定，只印出訊號不送單。")
         print(f" -> 動作: {action} {qty} 單位 {symbol} @ {current_price}\n")
         return False
 
@@ -508,22 +1820,22 @@ def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int
     }
 
     try:
-        print(f"[{symbol} 自動對沖系統] 🚨 偵測到 Delta 偏移！準備發送 Webhook 訊號...")
+        print(f"[{symbol} 自動對沖系統] 🚨 偵測到 Delta 偏移！準備發送下單訊號至本地交易核心...")
         print(f" -> 動作: {action} {qty} 單位 {symbol} @ {current_price}\n")
 
         if SEND_WEBHOOK:
-            response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+            response = requests.post(local_exec_url, json=payload, timeout=10)
             if response.status_code == 200:
-                print(f"[{symbol} 自動對沖系統] ✅ Webhook 傳送成功: {response.text}")
+                print(f"[{symbol} 自動對沖系統] ✅ 下單委託成功: {response.text}")
                 return True
-            print(f"[{symbol} 自動對沖系統] ❌ Webhook 傳送失敗, 狀態碼: {response.status_code}, body={response.text}")
+            print(f"[{symbol} 自動對沖系統] ❌ 下單委託失敗, 狀態碼: {response.status_code}, body={response.text}")
             return False
 
         print(f"[{symbol} 自動對沖系統] 🧪 SEND_WEBHOOK=False，目前為測試模式，未實際送出。")
         return True
 
     except Exception as e:
-        print(f"[{symbol} 自動對沖系統] ❌ Webhook 請求發生異常: {e}")
+        print(f"[{symbol} 自動對沖系統] ❌ 下單請求發生異常: {e}")
         return False
 
 
@@ -719,15 +2031,17 @@ def get_ib_option_greeks(ib_client: IB, contract: Contract, wait_seconds: float 
             delta = float(comp["delta"])
             gamma = float(comp["gamma"])
             theta = float(comp["theta"])
+            und_price = float(comp.get("undPrice") or 0.0)
         else:
             delta = float(comp.delta)
             gamma = float(comp.gamma)
             theta = float(comp.theta)
+            und_price = float(getattr(comp, "undPrice", 0.0) or 0.0)
 
         if not (_finite_number(delta) and _finite_number(gamma) and _finite_number(theta)):
             return None
 
-        return delta, theta, gamma, source
+        return delta, theta, gamma, und_price, source
 
     except Exception as e:
         print(f"⚠️ IB Greeks 讀取失敗: {getattr(contract, 'localSymbol', contract.symbol)}, error={e}")
@@ -755,8 +2069,9 @@ def evaluate_and_trigger_hedge(
     last_hedge_times_dict: dict[str, float],
     cooldown_seconds: int,
 ) -> None:
-    if underlying_price <= 0:
-        return
+    if underlying_price is None or underlying_price <= 0:
+        underlying_price = 0.0
+        print(f"ℹ️ [{group_name}] 庫存無期貨部位 (市價為 0)，下單時將由交易核心向 IB 即時取得市價...")
 
     current_ts = time.time()
 
@@ -942,6 +2257,17 @@ def get_positions_with_pnl(ib_client: IB, ticker_decimals_map: dict[str, int]):
             if any(s in local_symbol for s in ["MJY", "M6E", "MHG", "MNG"]) or re.search(r"\s+[CP]\d+", local_symbol):
                 decimals = 6
 
+        expiry_str = p.contract.lastTradeDateOrContractMonth or ''
+        dte_num = None
+        if expiry_str:
+            try:
+                s_exp = str(expiry_str).replace('-', '').replace('/', '').strip()
+                if len(s_exp) == 8:
+                    exp_d = datetime.date(int(s_exp[:4]), int(s_exp[4:6]), int(s_exp[6:8]))
+                    dte_num = (exp_d - datetime.date.today()).days
+            except Exception:
+                pass
+
         results.append({
             'symbol': base_symbol,
             'localSymbol': local_symbol,
@@ -957,6 +2283,8 @@ def get_positions_with_pnl(ib_client: IB, ticker_decimals_map: dict[str, int]):
             'right': p.contract.right,
             'expiry': p.contract.lastTradeDateOrContractMonth,
             'contract': p.contract,
+            'conId': p.contract.conId,
+            'dte': dte_num,
         })
 
     return results
@@ -966,9 +2294,9 @@ def get_positions_with_pnl(ib_client: IB, ticker_decimals_map: dict[str, int]):
 # Shioaji login
 # ==============================================================================
 def init_shioaji():
-    global api
+    global api, TXO_OPTIONS_BY_DATE
     if not SHIOAJI_API_KEY or not SHIOAJI_SECRET_KEY:
-        print("⚠️ Shioaji API key/secret 未設定，略過永豐登入。")
+        print("⚠️ Shioaji API key/secret 未設定，跳過登入")
         return None
 
     api = sj.Shioaji()
@@ -976,8 +2304,19 @@ def init_shioaji():
 
     if SHIOAJI_CA_PATH and SHIOAJI_CA_PASSWD:
         api.activate_ca(ca_path=SHIOAJI_CA_PATH, ca_passwd=SHIOAJI_CA_PASSWD)
-    else:
-        print("⚠️ Shioaji CA path/password 未設定，若需下單請補上。")
+
+    try:
+        by_date = {}
+        for cat in ['TX1', 'TX2', 'TX4', 'TX5', 'TXO']:
+            if hasattr(api.Contracts.Options, cat):
+                for c in getattr(api.Contracts.Options, cat):
+                    d = c.delivery_date
+                    if d not in by_date:
+                        by_date[d] = []
+                    by_date[d].append(c)
+        TXO_OPTIONS_BY_DATE = by_date
+    except Exception as e:
+        print(f"快取選擇權合約失敗: {e}")
 
     return api
 
@@ -1171,8 +2510,13 @@ def main():
                                         group_mute_flag[my_group_name] = True
                                         print(f"🎯 [{my_group_name}] 🔕 {sym_disp} 缺乏 IB Greeks，安全鎖啟動，強制靜音暫停對沖！")
                                     else:
-                                        d, t, g, greek_source = ib_greeks
+                                        d, t, g, und_p, greek_source = ib_greeks
                                         item['greek_source'] = greek_source
+
+                                        if und_p > 0:
+                                            if group_underlying.get(my_group_name, 0.0) <= 0:
+                                                group_underlying[my_group_name] = und_p
+                                            group_greeks[my_group_name]['underlying_price'] = group_underlying[my_group_name]
 
                                         if is_value_hedge and sec_type == 'OPT':
                                             # Convert stock/ETF option delta into micro-futures equivalent by notional value.
@@ -1204,7 +2548,7 @@ def main():
                                         wait_seconds=IB_GREEKS_WAIT_SECONDS,
                                     )
                                     if ib_greeks:
-                                        d, t, g, greek_source = ib_greeks
+                                        d, t, g, und_p, greek_source = ib_greeks
                                         item['greek_source'] = greek_source
                                         pos_delta = d * qty * contract_multiplier
                                         pos_theta = t * qty * contract_multiplier
@@ -1263,6 +2607,7 @@ def main():
                             "theta": float(item['disp_theta']),
                             "gamma": float(item['disp_gamma']),
                             "expiry": item.get('expiry', ''),
+                            "dte": item.get('dte'),
                         })
 
                     ref_points = None
@@ -1279,12 +2624,14 @@ def main():
                                 f"當前 {HEDGE_CONFIG[g_name]['hedge_sym']} Δ={group_greeks[g_name]['delta']:.2f} θ={group_greeks[g_name]['theta']:.0f}"
                             )
 
+                        total_pnl = sum(p['pnl'] for p in group_positions_snapshot if p.get('pnl') is not None)
                         dashboard_groups.append({
                             "name": g_name,
                             "hedge_sym": HEDGE_CONFIG[g_name]['hedge_sym'],
                             "total_delta": group_greeks[g_name]['delta'],
                             "total_gamma": group_greeks[g_name]['gamma'],
                             "total_theta": group_greeks[g_name]['theta'],
+                            "total_pnl": total_pnl,
                             "upper_threshold": HEDGE_CONFIG[g_name]['upper_threshold'],
                             "lower_threshold": HEDGE_CONFIG[g_name]['lower_threshold'],
                             "ref_points": ref_points,
@@ -1293,12 +2640,14 @@ def main():
                             "positions": group_positions_snapshot,
                         })
                     else:
+                        total_pnl = sum(p['pnl'] for p in group_positions_snapshot if p.get('pnl') is not None)
                         dashboard_groups.append({
                             "name": g_name,
                             "hedge_sym": "-",
                             "total_delta": sum(p['delta'] for p in group_positions_snapshot),
                             "total_gamma": sum(p['gamma'] for p in group_positions_snapshot),
                             "total_theta": sum(p['theta'] for p in group_positions_snapshot),
+                            "total_pnl": total_pnl,
                             "upper_threshold": None,
                             "lower_threshold": None,
                             "ref_points": None,
@@ -1329,6 +2678,16 @@ def main():
 
                 print("-" * 115)
 
+                # -------------------------------------------------------------
+                # ⚡ VXM 波動率期貨守門程序
+                # -------------------------------------------------------------
+                try:
+                    evaluate_and_run_vxm(ib, execute_order=True)
+                except Exception as vxm_ex:
+                    print(f"⚠️ VXM 守門程序異常: {vxm_ex}")
+
+                print("-" * 115)
+
             # Account status
             dashboard_account = {"net_liq": acc_info.get('net_liq', ''), "avail": acc_info.get('avail', '')}
             try:
@@ -1354,6 +2713,7 @@ def main():
                     contract = api.Contracts.Futures.TMF[target_code]
                     snapshots_stk = api.snapshots([contract])
                     underlying_price = snapshots_stk[0].close
+                    global LATEST_TMF_PRICE; LATEST_TMF_PRICE = float(underlying_price)
                     positions = api.list_positions(api.futopt_account)
 
                     total_portfolio_delta_tmf = 0.0
@@ -1414,6 +2774,12 @@ def main():
                                     else:
                                         tmf_mute_flag = True
 
+                            sj_dte = None
+                            if not is_future:
+                                opt_info = parse_tx_opt_code(p.code)
+                                if opt_info:
+                                    sj_dte = int(round(opt_info[2]))
+
                             df_list.append({
                                 "code": p.code,
                                 "direction": p.direction.name,
@@ -1423,6 +2789,7 @@ def main():
                                 "Δ": f"{position_delta_tmf:.5f}",
                                 "γ": f"{position_gamma_tmf:.5f}",
                                 "θ": f"{position_theta_tmf:.0f}",
+                                "dte": sj_dte,
                             })
 
                         print(pd.DataFrame(df_list).to_string(index=False))
@@ -1457,12 +2824,14 @@ def main():
                                 cooldown_seconds=HEDGE_COOLDOWN_SECONDS,
                             )
 
+                        tmf_total_pnl = sum(float(str(d.get("pnl", 0)).replace(",", "")) for d in df_list if d.get("pnl"))
                         dashboard_groups.append({
                             "name": "台指(TMF)",
                             "hedge_sym": tmf_config['hedge_sym'],
                             "total_delta": total_portfolio_delta_tmf,
                             "total_gamma": total_portfolio_gamma_tmf,
                             "total_theta": total_portfolio_theta_tmf,
+                            "total_pnl": tmf_total_pnl,
                             "upper_threshold": u_th,
                             "lower_threshold": l_th,
                             "ref_points": tmf_ref_points,
@@ -1481,10 +2850,28 @@ def main():
                                     "theta": float(d["θ"]),
                                     "gamma": float(d["γ"]),
                                     "expiry": "",
+                                    "dte": d.get("dte"),
                                 }
                                 for d in df_list
                             ],
                         })
+                    else:
+                        tmf_config = HEDGE_CONFIG.get('台指(TMF)', {})
+                        if tmf_config:
+                            dashboard_groups.append({
+                                "name": "台指(TMF)",
+                                "hedge_sym": tmf_config.get('hedge_sym', 'TMF'),
+                                "total_delta": 0.0,
+                                "total_gamma": 0.0,
+                                "total_theta": 0.0,
+                                "total_pnl": 0.0,
+                                "upper_threshold": tmf_config.get('upper_threshold', 1.0),
+                                "lower_threshold": tmf_config.get('lower_threshold', -0.5),
+                                "ref_points": None,
+                                "mute": False,
+                                "closed": True,
+                                "positions": [],
+                            })
                 except Exception as e:
                     print(f"⚠️ 永豐/台指區段略過: {e}")
 
@@ -1495,6 +2882,19 @@ def main():
                     total_all_theta += g.get('total_theta', 0.0)
             dashboard_account["total_theta"] = total_all_theta
             
+            opt_pos = []
+            for p in (portfolio_data or []):
+                if p.get('secType') in ['OPT', 'FOP']:
+                    action = 'BUY' if p.get('position', 0) < 0 else 'SELL'
+                    opt_pos.append({
+                        'conId': p.get('conId', getattr(p.get('contract'), 'conId', 0)),
+                        'symbol': p.get('symbol', ''),
+                        'localSymbol': p.get('localSymbol', ''),
+                        'position': p.get('position', 0),
+                        'marketPrice': p.get('marketPrice', 0.0),
+                        'action': action
+                    })
+
             update_snapshot({
                 "updated_at": now_dt.strftime('%Y-%m-%d %H:%M:%S'),
                 "account": dashboard_account,
@@ -1502,7 +2902,9 @@ def main():
                 "orders": dashboard_orders,
                 "fills": dashboard_fills,
                 "groups": dashboard_groups,
+                "options_positions": opt_pos,
                 "send_webhook": SEND_WEBHOOK,
+                "vxm": VXM_CURRENT_DATA,
             })
 
             print(f"最後更新: {now_dt.strftime('%H:%M:%S')} | 下次更新: {REFRESH_SECONDS}秒後")
