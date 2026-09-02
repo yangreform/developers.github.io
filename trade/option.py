@@ -12,11 +12,11 @@ import threading
 from waitress import serve
 
 # ==============================================================================
-# 0. 讀取 .env / op.env 設定
+# 0. 讀取 op.env / .env 設定
 # ==============================================================================
-ENV_PATH = os.path.join(os.path.dirname(__file__), '.env')
+ENV_PATH = os.path.join(os.path.dirname(__file__), 'op.env')
 if not os.path.exists(ENV_PATH):
-    ENV_PATH = os.path.join(os.path.dirname(__file__), 'op.env')
+    ENV_PATH = os.path.join(os.path.dirname(__file__), '.env')
 env_config = {}
 if os.path.exists(ENV_PATH):
     with open(ENV_PATH, 'r', encoding='utf-8') as f:
@@ -35,7 +35,8 @@ IB_HOST = env_config.get('IB_HOST', '127.0.0.1')
 IB_PORT = int(env_config.get('IB_PORT', 4001))
 CLIENT_ID = int(env_config.get('IB_CLIENT_ID', 100)) + 6 
 
-SEND_WEBHOOK = str(env_config.get('SEND_WEBHOOK', 'false')).lower() == 'true'
+raw_send_webhook = str(env_config.get('SEND_WEBHOOK', 'false')).strip().strip("'").strip('"').lower()
+SEND_WEBHOOK = raw_send_webhook in ('true', '1')
 WEBHOOK_URL = env_config.get('WEBHOOK_URL', '')
 WEBHOOK_PASSPHRASE = env_config.get('WEBHOOK_PASSPHRASE', '')
 
@@ -127,7 +128,6 @@ def send_webhook_notification(action: str, symbol: str, qty: float, price: float
 # 2. 動態解析群組商品 (鎖定大合約 NQ, ES, GC, CL... 與標準選擇權類別)
 # ==============================================================================
 def resolve_group_symbols(group_name, symbols):
-    # 優先從 symbols 中找到標準大期貨代碼 (如 NQ, ES, CL, NG, GC, HG, ZC, JPY, EUR, RTY)
     underlying_sym = None
     for sym in symbols:
         if sym in FUTURE_SYMBOL_MAP:
@@ -143,13 +143,11 @@ def resolve_group_symbols(group_name, symbols):
     valid_details = [d for d in details if d.contract.exchange not in ['QBALGO', 'SMART']]
     
     if valid_details:
-        # 依到期月份排序，確保優先檢查近月合約
         valid_details = sorted(valid_details, key=lambda d: d.contract.lastTradeDateOrContractMonth)
         underlying_fut = valid_details[0].contract
         
         trading_classes = set()
         chains = []
-        # 查詢近月期貨合約之期權鏈（涵蓋約 0~180 天）
         for d in valid_details[:6]:
             res = ib.reqSecDefOptParams(d.contract.symbol, d.contract.exchange, d.contract.secType, d.contract.conId)
             if res:
@@ -157,17 +155,14 @@ def resolve_group_symbols(group_name, symbols):
                 for c in res:
                     trading_classes.add(c.tradingClass)
         
-        # 1. 優先查表獲取標準月度選擇權交易類別 (如 QN, EW, LO, LN, OG, HXE, OZC 等)
         preferred = PREFERRED_TRADING_CLASS_MAP.get(underlying_fut.symbol)
         opt_class = None
         if preferred and preferred in trading_classes:
             opt_class = preferred
 
-        # 2. 匹配群組設定中指定的交易類別 (排除微型代碼如 MNQ, MES, MGC 等)
         if not opt_class:
             opt_class = next((s for s in symbols if s in trading_classes and not s.startswith(('M', 'W', 'X'))), None)
 
-        # 3. 若仍無匹配，挑選標準月選擇權 (排除 W/X/M 開頭)
         if not opt_class and chains:
             std_candidates = [c.tradingClass for c in chains if not c.tradingClass.startswith(('W', 'X', 'M'))]
             opt_class = std_candidates[0] if std_candidates else chains[0].tradingClass
@@ -179,39 +174,45 @@ def resolve_group_symbols(group_name, symbols):
 # 3. 獲取 16 Delta 雙賣合約與當前市價
 # ==============================================================================
 def get_iron_condor_legs(underlying_fut, opt_class, chains):
-    expirations = set()
-    strikes = set()
-    for c in chains:
-        if c.tradingClass == opt_class:
-            expirations.update(c.expirations)
-            strikes.update(c.strikes)
+    today = datetime.date.today()
     
-    if not expirations:
-        print(f"[錯誤] 找不到 {underlying_fut.symbol} (Class: {opt_class}) 的期權鏈資料")
+    class_candidates = []
+    # 優先從指定的標準 opt_class 尋找 30~60 天合約
+    if opt_class:
+        for c in chains:
+            if c.tradingClass == opt_class:
+                for exp in c.expirations:
+                    dte = (datetime.datetime.strptime(exp, '%Y%m%d').date() - today).days
+                    if MIN_ENTRY_DTE <= dte <= MAX_ENTRY_DTE:
+                        class_candidates.append((c.tradingClass, exp, c.strikes, dte))
+    
+    # 若該 opt_class 在 30~60 天無到期日，從所有標準交易類別 (排除微型與非月/週五) 尋找 30~60 天合約
+    if not class_candidates:
+        for c in chains:
+            if not c.tradingClass.startswith(('M', 'W', 'X')) and c.tradingClass not in ['XC', 'YC', 'MJY', 'M6E', 'MHG', 'M2K']:
+                for exp in c.expirations:
+                    dte = (datetime.datetime.strptime(exp, '%Y%m%d').date() - today).days
+                    if MIN_ENTRY_DTE <= dte <= MAX_ENTRY_DTE:
+                        class_candidates.append((c.tradingClass, exp, c.strikes, dte))
+                        
+    # 若 30~60 天仍無合約，則備用 > EXIT_DTE (21天) 的合約
+    if not class_candidates:
+        for c in chains:
+            if not c.tradingClass.startswith(('M', 'W', 'X')) and c.tradingClass not in ['XC', 'YC', 'MJY', 'M6E', 'MHG', 'M2K']:
+                for exp in c.expirations:
+                    dte = (datetime.datetime.strptime(exp, '%Y%m%d').date() - today).days
+                    if dte > EXIT_DTE:
+                        class_candidates.append((c.tradingClass, exp, c.strikes, dte))
+
+    if not class_candidates:
+        print(f"[錯誤] 找不到 {underlying_fut.symbol} (Class: {opt_class}) 符合條件的期權合約到期日")
         return None
 
-    today = datetime.date.today()
-    # 優先從 30 ~ 60 天 (MIN_ENTRY_DTE ~ MAX_ENTRY_DTE) 的到期日中選取
-    in_range_expirations = [
-        e for e in expirations 
-        if MIN_ENTRY_DTE <= (datetime.datetime.strptime(e, '%Y%m%d').date() - today).days <= MAX_ENTRY_DTE
-    ]
-    if in_range_expirations:
-        valid_expirations = in_range_expirations
-    else:
-        # 若 30~60 天無合約，以 > EXIT_DTE (21天) 的到期日作為備選
-        valid_expirations = [e for e in expirations if (datetime.datetime.strptime(e, '%Y%m%d').date() - today).days > EXIT_DTE]
-        if not valid_expirations:
-            print(f"=== [防禦] {underlying_fut.symbol} 所有到期日皆小於等於 {EXIT_DTE} 天，拒絕開倉 ===")
-            return None
+    # 選取 DTE 最接近 ENTRY_DTE (45天) 的合約
+    best_candidate = min(class_candidates, key=lambda item: abs(item[3] - ENTRY_DTE))
+    chosen_opt_class, closest_expiry, strikes, current_dte = best_candidate
 
-    target_date = today + datetime.timedelta(days=ENTRY_DTE)
-    closest_expiry = min(valid_expirations, key=lambda x: abs(datetime.datetime.strptime(x, '%Y%m%d').date() - target_date))
-    
-    chosen_date = datetime.datetime.strptime(closest_expiry, '%Y%m%d').date()
-    current_dte = (chosen_date - today).days
-
-    print(f"-> 鎖定 {underlying_fut.symbol} (Class: {opt_class}) 到期日: {closest_expiry} (DTE: {current_dte} 天，範圍 30~60 天)")
+    print(f"-> 鎖定 {underlying_fut.symbol} (Class: {chosen_opt_class}) 到期日: {closest_expiry} (DTE: {current_dte} 天，範圍 30~60 天)")
 
     # 取得底層期貨最新市價以過濾履約價範圍（±35%），大幅提升合約驗證與 Greeks 獲取速度
     underlying_ticker = ib.reqTickers(underlying_fut)
