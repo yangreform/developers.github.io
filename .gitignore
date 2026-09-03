@@ -18,7 +18,14 @@ env/
 ENV/
 
 # ── 敏感資訊（絕不提交！）──────────────────────────
+trade/Barchart/chrome_profile/
+trade/Barchart/chrome_profile/**
+trade/Barchart/chrome_profile*
+trade/notifier.py
 trade/.env
+trade/*.env
+trade/.env*
+trade/*.env*
 backend/*.db
 trade/*.db
 trade/Sinopac.pfx
