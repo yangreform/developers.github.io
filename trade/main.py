@@ -91,6 +91,102 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ==============================================================================
+# 🌟 全期貨商品動態尋找最近可用合約 (自動滾倉/到期檢測)
+# ==============================================================================
+FUTURE_EXCHANGE_MAP = {
+    "MNQ": "CME", "NQ": "CME",
+    "MES": "CME", "ES": "CME",
+    "M2K": "CME", "RTY": "CME",
+    "M6E": "CME", "EUR": "CME",
+    "MJY": "CME", "JPY": "CME",
+    "MBT": "CME", "BTC": "CME",
+    "MCL": "NYMEX", "CL": "NYMEX",
+    "MHNG": "NYMEX", "MNG": "NYMEX", "NG": "NYMEX", "LN": "NYMEX",
+    "MHG": "COMEX", "HG": "COMEX",
+    "MGC": "COMEX", "GC": "COMEX",
+    "YC": "CBOT", "XC": "CBOT", "ZC": "CBOT",
+    "VXM": "CFE",
+}
+
+FUTURE_SYMBOL_ALIAS = {
+    "XC": "YC",
+    "MNG": "MHNG",
+}
+
+FUTURE_CONTRACT_CACHE = {}
+
+
+def is_unexpired(exp_str: str, today_str: str) -> bool:
+    if not exp_str:
+        return False
+    clean_exp = str(exp_str).strip()
+    if len(clean_exp) >= 8:
+        return clean_exp[:8] >= today_str
+    if len(clean_exp) == 6:
+        return clean_exp >= today_str[:6]
+    return clean_exp >= today_str
+
+
+def get_target_future_contract(ib_instance, symbol: str):
+    """
+    自動搜尋並回傳該商品最近可以下單的正確合法期貨合約。
+    支援自動過濾已到期合約、按到期日排序取最近月，並自動進行合約資格化 (qualifyContracts)。
+    """
+    if not ib_instance or not ib_instance.isConnected():
+        return None
+
+    actual_symbol = FUTURE_SYMBOL_ALIAS.get(symbol.upper(), symbol.upper())
+    exchange = FUTURE_EXCHANGE_MAP.get(actual_symbol, "CME")
+    today_str = datetime.date.today().strftime('%Y%m%d')
+    now_ts = time.time()
+
+    cache_key = f"{actual_symbol}_{exchange}"
+    cached = FUTURE_CONTRACT_CACHE.get(cache_key)
+    if cached:
+        contract, cached_time = cached
+        if (now_ts - cached_time < 1800) and is_unexpired(contract.lastTradeDateOrContractMonth, today_str):
+            return contract
+
+    details = []
+    try:
+        details = ib_instance.reqContractDetails(Future(symbol=actual_symbol, exchange=exchange, currency='USD'))
+    except Exception:
+        pass
+
+    if not details:
+        try:
+            details = ib_instance.reqContractDetails(Future(symbol=actual_symbol, exchange=exchange))
+        except Exception:
+            pass
+
+    if not details:
+        try:
+            details = ib_instance.reqContractDetails(Future(symbol=actual_symbol))
+        except Exception:
+            pass
+
+    valid_details = [
+        d for d in details
+        if d.contract.exchange not in ['QBALGO', 'SMART']
+        and is_unexpired(d.contract.lastTradeDateOrContractMonth, today_str)
+    ]
+
+    if not valid_details:
+        logger.warning(f"⚠️ [期貨合約搜尋] 找不到 {symbol} ({actual_symbol} @ {exchange}) 的可用近月合約！")
+        return None
+
+    # 按到期月份升冪排序，取得最接近可下單的有效合約
+    valid_details = sorted(valid_details, key=lambda d: d.contract.lastTradeDateOrContractMonth)
+    target_contract = valid_details[0].contract
+    try:
+        ib_instance.qualifyContracts(target_contract)
+    except Exception as q_err:
+        logger.warning(f"⚠️ [期貨合約資格化異常] {target_contract.symbol}: {q_err}")
+
+    FUTURE_CONTRACT_CACHE[cache_key] = (target_contract, now_ts)
+    return target_contract
+
 app = Flask(__name__)
 
 # --- 新增的部位檢查函式 ---
@@ -298,8 +394,7 @@ def webhook():
 
             # ======== 1. 檢查特定商品與庫存狀況 ========
             # ============================================
-            # 2. 建立合約
-            # 定義各期貨商品的交易所對應表
+            # 2. 建立合約 (優先支援傳入 conId 或 expiry，若無則自動動態查詢最近可用期貨合約)
             exchange_map = {
                 "MBT": "CME", "MES": "CME", "MNQ": "CME", "M6E": "CME", "MJY": "CME",
                 "MHG": "COMEX", "MGC": "COMEX",
@@ -307,48 +402,25 @@ def webhook():
                 "YC": "CBOT", "VXM": "CFE"
             }
 
-            # 3. 修正：將 expiry_map 改為支援條件邏輯 (支援 BUY/SELL 分別指定不同月份)
-            # 將邏輯封裝在一個函數中，或者直接在這裡判斷
-            def get_target_expiry(sym, act):
-                # 預設對照表
-                mapping = {
-                    "MGC": "202610", "MHNG": "202609", "MNG": "202609",
-                    "MNQ": "202609", "MES": "202609", "M6E": "202609", "MJY": "202609", "MHG": "202609", "YC": "202609",
-                    "MCL": "202610", "VXM": "202609"
-                }
-                
-                # 特殊邏輯：MNQ 轉倉規則
-                #if sym == "MGC":
-                #    return "202608" if act == "BUY" else "202610"
-                #if sym == "MCL":
-                #    return "202609" if act == "BUY" else "202610"
-                #if sym == "MNQ":
-                #    return "202606" if act == "BUY" else "202609"
-                #if sym == "MJY":
-                #    return "202609" if act == "BUY" else "202606"
-
-                #if sym == "MHG":
-                #    return "202607" if act == "BUY" else "202609"
-
-                #if sym == "MBT":
-                #    return "202607" if act == "BUY" else "202608"
-                #if sym == "VXM":
-                #    return "202608" if act == "BUY" else "202607"
-                #if sym == "MHNG":
-                #    return "202609" if act == "BUY" else "202608"
-                
-                return mapping.get(sym, "202609") # 若無對應則預設 202609
-
-            if actual_symbol in exchange_map:
-                target_exchange = exchange_map.get(actual_symbol, "CME")
-                target_expiry = get_target_expiry(actual_symbol, action.upper())
-                
-                # 使用轉換後的 actual_symbol 與動態邏輯計算出的 target_expiry
-                contract = Future(actual_symbol, target_expiry, target_exchange, currency='USD')
+            contract = None
+            if 'conId' in data and int(data['conId']) > 0:
+                contract = Contract(conId=int(data['conId']))
+                ib.qualifyContracts(contract)
+                logger.info(f"使用傳入 conId 建立合約: conId={data['conId']}, localSymbol={getattr(contract, 'localSymbol', '')}")
+            elif 'expiry' in data and data['expiry']:
+                target_exchange = FUTURE_EXCHANGE_MAP.get(actual_symbol, exchange_map.get(actual_symbol, "CME"))
+                contract = Future(actual_symbol, str(data['expiry']), target_exchange, currency='USD')
+                ib.qualifyContracts(contract)
+                logger.info(f"使用傳入 expiry 建立合約: {actual_symbol} @ {target_exchange} (expiry={data['expiry']})")
+            elif actual_symbol in exchange_map or actual_symbol in FUTURE_EXCHANGE_MAP:
+                # 動態搜尋最近可以下單的正確期貨合約
+                contract = get_target_future_contract(ib, actual_symbol)
+                if not contract:
+                    raise Exception(f"無法自動取得 {actual_symbol} 的有效近月期貨合約")
+                logger.info(f"動態鎖定最近期貨合約: {contract.symbol} {contract.localSymbol} (expiry={contract.lastTradeDateOrContractMonth}, conId={contract.conId})")
             else:
                 contract = Stock(symbol, 'SMART', 'USD')
-            
-            ib.qualifyContracts(contract)
+                ib.qualifyContracts(contract)
 
             # 獲取合約的最小跳動點 (minTick) 以避免報價不符規範 (Warning 110)
             details = ib.reqContractDetails(contract)

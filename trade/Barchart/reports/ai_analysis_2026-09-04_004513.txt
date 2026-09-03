@@ -1,0 +1,8 @@
+============================================================
+Barchart 選擇權異動 AI 投資建議 (Smart Money 深度分析)
+分析時間：2026-09-04 00:45:13
+============================================================
+
+:* Price 12.32, Strike 12.50 (Moneyness -1.21%). DTE 15. Vol/OI = 46.41 (7,889 Vol / 170 OI). Delta = 0.527. IV = 103.93%.
+        *   *Analysis:* Delta is 0.53, meaning it's the perfect "at-the-money" pivot. The Vol/OI of 46.41x indicates a massive, sudden institutional sweep. DTE of 15 days is perfect for a momentum breakout play (not too much theta decay yet, but high gamma).
+    *   *IWM:* Price 29

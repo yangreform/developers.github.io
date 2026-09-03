@@ -334,6 +334,7 @@ DASHBOARD_HTML = """
 <div class="tabs">
     <button class="tablinks active" onclick="openTab(event, 'overview')">Overview (Delta Hedge)</button>
     <button class="tablinks" onclick="openTab(event, 'barchart')">Barchart (選擇權策略)</button>
+    <button class="tablinks" onclick="openTab(event, 'ai_report')">AI 投資建議 (Gemini 分析)</button>
 </div>
 
 <div id="overview" class="tabcontent" style="display:block;">
@@ -421,6 +422,23 @@ DASHBOARD_HTML = """
         <button class="action-btn" onclick="loadBarchartData()">重新整理全部檔案</button>
     </div>
     <div id="barchart_content" class="loading">載入中...</div>
+</div>
+
+<div id="ai_report" class="tabcontent">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+        <h2 style="margin:0; display:flex; align-items:center; gap:8px;">
+            <span>🤖 AI 選擇權異常異動投資建議</span>
+            <span class="badge" style="background-color:#238636; font-size:12px;">Gemini 深度分析</span>
+        </h2>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <select id="ai_report_select" onchange="switchAIReport(this.value)" style="background:#0d1117; color:#c9d1d9; border:1px solid #30363d; padding:6px 12px; border-radius:6px; font-size:13px;"></select>
+            <button class="action-btn" onclick="loadAIReportList()">🔄 重新整理報告</button>
+        </div>
+    </div>
+    <div class="card" style="padding:16px;">
+        <div id="ai_report_meta" style="margin-bottom:12px; font-size:12px; color:#8b949e; display:flex; justify-content:space-between;"></div>
+        <div id="ai_report_content" style="white-space:pre-wrap; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; line-height:1.7; font-size:14px; color:#e6edf3; background:#0d1117; padding:18px; border-radius:8px; border:1px solid #30363d; overflow-x:auto;">載入中...</div>
+    </div>
 </div>
 
 <script>
@@ -628,7 +646,59 @@ function openTab(evt, tabName) {
     
     if(tabName === 'barchart') {
         loadBarchartData();
+    } else if(tabName === 'ai_report') {
+        loadAIReportList();
     }
+}
+
+// ==========================================
+// AI Report dynamic loader
+// ==========================================
+async function loadAIReportList() {
+    const sel = document.getElementById('ai_report_select');
+    const content = document.getElementById('ai_report_content');
+    const meta = document.getElementById('ai_report_meta');
+    content.innerHTML = '<div class="loading">正在載入 AI 投資建議報告...</div>';
+    try {
+        const response = await fetch('/api/ai_reports?t=' + Date.now());
+        const data = await response.json();
+        if (data.status !== 'ok' || !data.reports || data.reports.length === 0) {
+            content.innerHTML = '<p class="muted">尚未找到任何 AI 投資建議文字報告。<br>請先執行 <code>python barchart_analysis.py</code> 產出最新分析。</p>';
+            sel.innerHTML = '<option value="">(無報告)</option>';
+            meta.innerHTML = '';
+            return;
+        }
+        sel.innerHTML = data.reports.map(r => `<option value="${r.filename}">${r.label}</option>`).join('');
+        if (data.latest) {
+            renderAIReportContent(data.latest);
+        }
+    } catch(err) {
+        content.innerHTML = `<span style="color:#f85149;">載入失敗: ${err}</span>`;
+    }
+}
+
+async function switchAIReport(filename) {
+    if (!filename) return;
+    const content = document.getElementById('ai_report_content');
+    content.innerHTML = '<div class="loading">正在載入所選報告...</div>';
+    try {
+        const response = await fetch('/api/ai_reports/content?filename=' + encodeURIComponent(filename) + '&t=' + Date.now());
+        const data = await response.json();
+        if (data.status === 'ok') {
+            renderAIReportContent(data);
+        } else {
+            content.innerHTML = `<span style="color:#f85149;">讀取錯誤: ${data.message}</span>`;
+        }
+    } catch(err) {
+        content.innerHTML = `<span style="color:#f85149;">讀取失敗: ${err}</span>`;
+    }
+}
+
+function renderAIReportContent(data) {
+    const content = document.getElementById('ai_report_content');
+    const meta = document.getElementById('ai_report_meta');
+    meta.innerHTML = `<span>📄 檔案名稱：<strong>${data.filename}</strong></span><span>🕒 產出時間：${data.mtime || '-'}</span>`;
+    content.textContent = data.content || '(空白報告)';
 }
 
 // ==========================================
@@ -650,6 +720,7 @@ async function loadBarchartData() {
             return;
         }
 
+        window.BARCHART_TABLES = tables;
         let fullHtml = '';
         tables.forEach((t, tIdx) => {
             fullHtml += `<div class="card" style="margin-bottom:24px;">
@@ -683,15 +754,23 @@ async function loadBarchartData() {
                     fullHtml += `<td class="${clsName}">${val}</td>`;
                 });
 
+                // Check option type (Call or Put)
+                let optType = (row.Type || row.type || '').toString().trim();
+                let isCall = optType.toLowerCase().includes('call');
+                let isPut = optType.toLowerCase().includes('put');
+
                 // Render Action Button
                 if (t.strategy === 'bull_put') {
-                    fullHtml += `<td><button class="action-btn" id="btn_${tIdx}_${rIdx}" onclick='onBullPutAction(this, ${JSON.stringify(row)})'>下單 (Bull Put)</button></td>`;
+                    fullHtml += `<td><button class="action-btn" id="btn_${tIdx}_${rIdx}" onclick="onBullPutAction(this, ${tIdx}, ${rIdx})">下單 (Bull Put)</button></td>`;
                 } else if (t.strategy === 'long_call') {
-                    fullHtml += `<td><button class="action-btn" style="background-color:#1f6feb;" id="btn_${tIdx}_${rIdx}" onclick='onLongCallAction(this, ${JSON.stringify(row)})'>下單 (Buy Call)</button></td>`;
+                    fullHtml += `<td><button class="action-btn" style="background-color:#1f6feb;" id="btn_${tIdx}_${rIdx}" onclick="onLongCallAction(this, ${tIdx}, ${rIdx})">下單 (Buy Call)</button></td>`;
                 } else if (t.strategy === 'short_strangle' || t.strategy === 'iron_condor') {
-                    fullHtml += `<td><button class="action-btn" style="background-color:#9e6a03;" id="btn_${tIdx}_${rIdx}" onclick='onShortStrangleAction(this, ${JSON.stringify(row)})'>下單 (雙賣)</button></td>`;
+                    fullHtml += `<td><button class="action-btn" style="background-color:#9e6a03;" id="btn_${tIdx}_${rIdx}" onclick="onShortStrangleAction(this, ${tIdx}, ${rIdx})">下單 (雙賣)</button></td>`;
                 } else {
-                    fullHtml += `<td><button class="action-btn" id="btn_${tIdx}_${rIdx}" onclick='onGenericAction(this, ${JSON.stringify(row)})'>下單</button></td>`;
+                    // Single Option / UOA table: default to Limit Bid Call / Put
+                    let btnColor = isPut ? '#da3633' : '#1f6feb';
+                    let btnText = isCall ? '下單 (Limit Bid Call)' : (isPut ? '下單 (Limit Bid Put)' : '下單 (Limit Bid)');
+                    fullHtml += `<td><button class="action-btn" style="background-color:${btnColor}; font-weight:600;" id="btn_${tIdx}_${rIdx}" onclick="onSingleOptionAction(this, ${tIdx}, ${rIdx})">${btnText}</button></td>`;
                 }
 
                 fullHtml += `</tr>`;
@@ -910,6 +989,100 @@ async function onLongCallAction(btn, row) {
     }
 }
 
+async function onSingleOptionAction(btn, tIdx, rIdx) {
+    const row = (typeof tIdx === 'number' && window.BARCHART_TABLES && window.BARCHART_TABLES[tIdx]) ? window.BARCHART_TABLES[tIdx].rows[rIdx] : tIdx;
+    if (!row) {
+        alert("無法讀取此筆期權合約資料！");
+        return;
+    }
+    const origText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = "查詢報價中...";
+
+    const optType = (row.Type || row.type || 'Call').toString().trim();
+    const symbol = row.Symbol || row.symbol || '';
+    const expDate = row['Exp Date'] || row['Expiration Date'] || row.exp_date || '';
+    const strike = row.Strike || row.strike || 0;
+    const csvBid = row.Bid || row.bid || 0;
+    const csvAsk = row.Ask || row.ask || 0;
+    const latest = row.Latest || row.lastPrice || row.price || 0;
+
+    try {
+        const resp = await fetch('/api/option/barchart_quote', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                strategy: 'single_option',
+                symbol: symbol,
+                exp_date: expDate,
+                strike: strike,
+                type: optType,
+                bid: csvBid,
+                ask: csvAsk,
+                latest: latest
+            })
+        });
+        const q = await resp.json();
+        btn.disabled = false;
+        btn.innerText = origText;
+
+        if (q.status !== 'ok') {
+            alert("取得報價失敗: " + (q.message || "未知錯誤"));
+            return;
+        }
+
+        const confirmMsg = `【下單詢問視窗 - 選擇權限價買單 (Limit Bid)】\n\n` +
+                          `標的代號: ${q.symbol} (${q.type})\n` +
+                          `到期日期: ${q.exp_date}\n` +
+                          `履約價格: $${q.strike}\n\n` +
+                          `IBKR 即時報價:\n` +
+                          `- Bid (買方出價): $${q.bid !== null ? q.bid : 'N/A'}\n` +
+                          `- Ask (賣方要價): $${q.ask !== null ? q.ask : 'N/A'}\n\n` +
+                          `預計委託內容:\n` +
+                          `- 委託動作: BUY 1口\n` +
+                          `- 委託種類: 限價單 (Limit Order)\n` +
+                          `- 限價價格: $${q.limit_price} (Limit Bid)\n\n` +
+                          `請確認限價價格 (直接按確定送出，或手動調整金額)：`;
+
+        const userPrice = prompt(confirmMsg, q.limit_price);
+        if (userPrice === null) return; // 使用者按取消
+
+        const finalPrice = parseFloat(userPrice);
+        if (isNaN(finalPrice) || finalPrice <= 0) {
+            alert("請輸入有效的限價金額！");
+            return;
+        }
+
+        // 送出委託
+        btn.disabled = true;
+        btn.innerText = "送出委託中...";
+        const trResp = await fetch('/api/option/execute_barchart_trade', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                strategy: 'single_option',
+                symbol: q.symbol,
+                action: 'BUY',
+                limit_price: finalPrice,
+                conId: q.conId,
+                opt_type: q.type
+            })
+        });
+        const trData = await trResp.json();
+        btn.disabled = false;
+        btn.innerText = origText;
+        alert(trData.message || (trData.status === 'ok' ? '下單成功！已送出委託。' : '下單失敗'));
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerText = origText;
+        alert("下單連線失敗: " + e);
+    }
+}
+
+function onGenericAction(btn, row) {
+    onSingleOptionAction(btn, row);
+}
+
 let vxmFormDirty = false;
 
 function markVXMDirty() {
@@ -1018,6 +1191,103 @@ async function saveVXMConfig(btn) {
 </html>
 """
 
+# ==============================================================================
+# 🌟 全期貨商品動態尋找最近可用合約 (自動滾倉/到期檢測)
+# ==============================================================================
+FUTURE_EXCHANGE_MAP = {
+    "MNQ": "CME", "NQ": "CME",
+    "MES": "CME", "ES": "CME",
+    "M2K": "CME", "RTY": "CME",
+    "M6E": "CME", "EUR": "CME",
+    "MJY": "CME", "JPY": "CME",
+    "MBT": "CME", "BTC": "CME",
+    "MCL": "NYMEX", "CL": "NYMEX",
+    "MHNG": "NYMEX", "MNG": "NYMEX", "NG": "NYMEX", "LN": "NYMEX",
+    "MHG": "COMEX", "HG": "COMEX",
+    "MGC": "COMEX", "GC": "COMEX",
+    "YC": "CBOT", "XC": "CBOT", "ZC": "CBOT",
+    "VXM": "CFE",
+}
+
+FUTURE_SYMBOL_ALIAS = {
+    "XC": "YC",
+    "MNG": "MHNG",
+}
+
+FUTURE_CONTRACT_CACHE = {}
+
+
+def is_unexpired(exp_str: str, today_str: str) -> bool:
+    if not exp_str:
+        return False
+    clean_exp = str(exp_str).strip()
+    if len(clean_exp) >= 8:
+        return clean_exp[:8] >= today_str
+    if len(clean_exp) == 6:
+        return clean_exp >= today_str[:6]
+    return clean_exp >= today_str
+
+
+def get_target_future_contract(ib_instance: IB, symbol: str):
+    """
+    自動搜尋並回傳該商品最近可以下單的正確合法期貨合約。
+    支援自動過濾已到期合約、按到期日排序取最近月，並自動進行合約資格化 (qualifyContracts)。
+    """
+    if not ib_instance or not ib_instance.isConnected():
+        return None
+
+    actual_symbol = FUTURE_SYMBOL_ALIAS.get(symbol.upper(), symbol.upper())
+    exchange = FUTURE_EXCHANGE_MAP.get(actual_symbol, "CME")
+    today_str = datetime.date.today().strftime('%Y%m%d')
+    now_ts = time.time()
+
+    cache_key = f"{actual_symbol}_{exchange}"
+    cached = FUTURE_CONTRACT_CACHE.get(cache_key)
+    if cached:
+        contract, cached_time = cached
+        if (now_ts - cached_time < 1800) and is_unexpired(contract.lastTradeDateOrContractMonth, today_str):
+            return contract
+
+    details = []
+    try:
+        details = ib_instance.reqContractDetails(Future(symbol=actual_symbol, exchange=exchange, currency='USD'))
+    except Exception:
+        pass
+
+    if not details:
+        try:
+            details = ib_instance.reqContractDetails(Future(symbol=actual_symbol, exchange=exchange))
+        except Exception:
+            pass
+
+    if not details:
+        try:
+            details = ib_instance.reqContractDetails(Future(symbol=actual_symbol))
+        except Exception:
+            pass
+
+    valid_details = [
+        d for d in details
+        if d.contract.exchange not in ['QBALGO', 'SMART']
+        and is_unexpired(d.contract.lastTradeDateOrContractMonth, today_str)
+    ]
+
+    if not valid_details:
+        print(f"⚠️ [期貨合約搜尋] 找不到 {symbol} ({actual_symbol} @ {exchange}) 的可用近月合約！")
+        return None
+
+    # 按到期月份升冪排序，取得最接近可下單的有效合約
+    valid_details = sorted(valid_details, key=lambda d: d.contract.lastTradeDateOrContractMonth)
+    target_contract = valid_details[0].contract
+    try:
+        ib_instance.qualifyContracts(target_contract)
+    except Exception as q_err:
+        print(f"⚠️ [期貨合約資格化異常] {target_contract.symbol}: {q_err}")
+
+    FUTURE_CONTRACT_CACHE[cache_key] = (target_contract, now_ts)
+    return target_contract
+
+
 VXM_CACHE = {
     "target_contract": None,
     "last_contract_check": 0,
@@ -1027,28 +1297,7 @@ VXM_CURRENT_DATA = {}
 
 
 def get_target_vxm_contract(ib_instance):
-    now_ts = time.time()
-    today_str = datetime.date.today().strftime('%Y%m%d')
-    cached = VXM_CACHE.get("target_contract")
-    if cached and (now_ts - VXM_CACHE.get("last_contract_check", 0) < 3600):
-        if cached.lastTradeDateOrContractMonth and cached.lastTradeDateOrContractMonth >= today_str:
-            return cached
-
-    try:
-        details = ib_instance.reqContractDetails(Future(symbol='VXM', exchange='CFE'))
-        if details:
-            valid_contracts = sorted(
-                [d.contract for d in details if d.contract.lastTradeDateOrContractMonth and d.contract.lastTradeDateOrContractMonth >= today_str],
-                key=lambda c: c.lastTradeDateOrContractMonth
-            )
-            if valid_contracts:
-                ib_instance.qualifyContracts(valid_contracts[0])
-                VXM_CACHE["target_contract"] = valid_contracts[0]
-                VXM_CACHE["last_contract_check"] = now_ts
-                return valid_contracts[0]
-    except Exception as e:
-        print(f"⚠️ 查詢 VXM 合約異常: {e}")
-    return VXM_CACHE.get("target_contract")
+    return get_target_future_contract(ib_instance, 'VXM')
 
 
 def compute_vxm_evaluation(current_pos, unrealized_pnl, target_contract_symbol, expiry, con_id, cfg):
@@ -1447,7 +1696,11 @@ def get_barchart_tables():
             m_profile = re.search(r'screener-(.*?)-\d{2}-\d{2}-\d{4}', fname)
             profile_name = m_profile.group(1).upper() if m_profile else fname.replace('.csv', '')
 
-            if 'condor' in fname.lower() or any('condor' in c for c in cols_lower) or any('short call' in c and 'short put' in c for c in cols_lower) or any('leg3' in c or 'leg4' in c for c in cols_lower) or 'strangle' in fname.lower():
+            if 'unusual' in fname.lower() or ('type' in cols_lower and 'strike' in cols_lower):
+                strategy = 'single_option'
+                cat_name = "個股" if "stock" in fname.lower() else ("ETF" if "etf" in fname.lower() else "")
+                title = f"異常選擇權異動 ({cat_name} UOA - {profile_name})"
+            elif 'condor' in fname.lower() or any('condor' in c for c in cols_lower) or any('short call' in c and 'short put' in c for c in cols_lower) or any('leg3' in c or 'leg4' in c for c in cols_lower) or 'strangle' in fname.lower():
                 strategy = 'short_strangle'
                 title = f"雙賣 (Short Strangle) ({profile_name})"
             elif any('leg1 strike' in c for c in cols_lower):
@@ -1457,7 +1710,7 @@ def get_barchart_tables():
                 strategy = 'long_call'
                 title = f"Long Call ({profile_name})"
             else:
-                strategy = 'generic'
+                strategy = 'single_option'
                 title = f"選擇權策略 ({profile_name})"
 
             tables.append({
@@ -1470,6 +1723,76 @@ def get_barchart_tables():
         return jsonify({'status': 'ok', 'tables': tables})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
+
+BARCHART_REPORTS_DIR = os.path.join(BARCHART_DIR, "reports")
+os.makedirs(BARCHART_REPORTS_DIR, exist_ok=True)
+
+@dash_app.route('/api/ai_reports', methods=['GET'])
+def get_ai_reports():
+    import glob, datetime
+    try:
+        txt_files = glob.glob(os.path.join(BARCHART_REPORTS_DIR, "*.txt")) + glob.glob(os.path.join(BARCHART_DIR, "ai_*.txt"))
+        # Exclude internal temporary files if any
+        txt_files = list(set([f for f in txt_files if os.path.isfile(f)]))
+        txt_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+
+        reports = []
+        for f in txt_files:
+            fname = os.path.basename(f)
+            mtime = datetime.datetime.fromtimestamp(os.path.getmtime(f)).strftime("%Y-%m-%d %H:%M:%S")
+            label = f"{fname} ({mtime})"
+            reports.append({
+                "filename": fname,
+                "label": label,
+                "mtime": mtime,
+                "size": os.path.getsize(f)
+            })
+
+        latest_data = None
+        if txt_files:
+            latest_file = txt_files[0]
+            with open(latest_file, "r", encoding="utf-8", errors="ignore") as fp:
+                latest_content = fp.read()
+            latest_data = {
+                "filename": os.path.basename(latest_file),
+                "content": latest_content,
+                "mtime": datetime.datetime.fromtimestamp(os.path.getmtime(latest_file)).strftime("%Y-%m-%d %H:%M:%S")
+            }
+
+        return jsonify({
+            "status": "ok",
+            "reports": reports,
+            "latest": latest_data
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@dash_app.route('/api/ai_reports/content', methods=['GET'])
+def get_ai_report_content():
+    import datetime
+    filename = request.args.get('filename', '').strip()
+    if not filename:
+        return jsonify({"status": "error", "message": "Missing filename"})
+    filename = os.path.basename(filename)
+    target_path = os.path.join(BARCHART_REPORTS_DIR, filename)
+    if not os.path.exists(target_path):
+        target_path = os.path.join(BARCHART_DIR, filename)
+
+    if not os.path.exists(target_path):
+        return jsonify({"status": "error", "message": "Report file not found"})
+
+    try:
+        with open(target_path, "r", encoding="utf-8", errors="ignore") as fp:
+            content = fp.read()
+        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(target_path)).strftime("%Y-%m-%d %H:%M:%S")
+        return jsonify({
+            "status": "ok",
+            "filename": filename,
+            "content": content,
+            "mtime": mtime
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 @dash_app.route('/api/option/barchart_quote', methods=['POST'])
 def quote_barchart_trade():
@@ -1569,11 +1892,14 @@ def quote_barchart_trade():
                 'call_conId': c_call.conId
             })
 
-        elif strategy == 'long_call':
+        elif strategy in ('single_option', 'long_call', 'long_put', 'generic'):
             strike = clean_num(payload.get('strike'))
             csv_ask = clean_num(payload.get('ask'))
             csv_bid = clean_num(payload.get('bid'))
-            c = Option(symbol, exp_date, strike, 'C', 'SMART')
+            opt_type_str = str(payload.get('type', '')).upper()
+            right = 'P' if ('PUT' in opt_type_str or strategy == 'long_put') else 'C'
+
+            c = Option(symbol, exp_date, strike, right, 'SMART')
             local_ib.qualifyContracts(c)
 
             ticker = local_ib.reqMktData(c, "", True, False)
@@ -1584,16 +1910,20 @@ def quote_barchart_trade():
                     limit_price = ticker.bid
                     break
                 elif ticker.ask and not math.isnan(ticker.ask) and ticker.ask > 0 and limit_price <= 0:
-                    limit_price = ticker.ask
+                    limit_price = ticker.bid if (ticker.bid and not math.isnan(ticker.bid) and ticker.bid > 0) else csv_bid
 
-            bid_val = ticker.bid if ticker.bid and not math.isnan(ticker.bid) else None
-            ask_val = ticker.ask if ticker.ask and not math.isnan(ticker.ask) else None
+            if limit_price <= 0:
+                limit_price = csv_bid if csv_bid > 0 else (csv_ask if csv_ask > 0 else 0.05)
+
+            bid_val = ticker.bid if ticker.bid and not math.isnan(ticker.bid) else csv_bid
+            ask_val = ticker.ask if ticker.ask and not math.isnan(ticker.ask) else csv_ask
             return jsonify({
                 'status': 'ok',
-                'strategy': 'long_call',
+                'strategy': 'single_option',
                 'symbol': symbol,
                 'exp_date': payload.get('exp_date'),
                 'strike': strike,
+                'type': 'Call' if right == 'C' else 'Put',
                 'bid': bid_val,
                 'ask': ask_val,
                 'limit_price': round(limit_price, 2),
@@ -1671,8 +2001,9 @@ def execute_barchart_trade():
                 pass
             return jsonify({'status': 'ok', 'message': res_msg})
 
-        elif strategy == 'long_call':
+        elif strategy in ('single_option', 'long_call', 'long_put', 'generic'):
             conId = payload.get('conId')
+            opt_type = payload.get('opt_type', 'Option')
             contract = Contract(conId=int(conId))
             local_ib.qualifyContracts(contract)
 
@@ -1681,7 +2012,7 @@ def execute_barchart_trade():
             order.transmit = True
             local_ib.placeOrder(contract, order)
             local_ib.sleep(1)
-            res_msg = f'已成功送出 {symbol} Long Call 下單: {action} 1口 (Bid限價 {limit_price})'
+            res_msg = f'已成功送出 {symbol} {opt_type} 下單: {action} 1口 (Limit Bid 限價 {limit_price})'
             try:
                 send_trade_notification(symbol, res_msg, payload)
             except Exception:
@@ -1810,6 +2141,13 @@ def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int
         print(f" -> 動作: {action} {qty} 單位 {symbol} @ {current_price}\n")
         return False
 
+    # 🌟 自動尋找最近可以下單的正確期貨合約
+    target_contract = None
+    if symbol.upper() != "TMF" and ib and ib.isConnected():
+        target_contract = get_target_future_contract(ib, symbol)
+        if target_contract:
+            print(f"[{symbol} 自動對沖系統] 🎯 鎖定最近可下單期貨合約: {target_contract.localSymbol} (到期日: {target_contract.lastTradeDateOrContractMonth}, conId: {target_contract.conId})")
+
     payload = {
         "passphrase": WEBHOOK_PASSPHRASE,
         "symbol": symbol,
@@ -1818,17 +2156,56 @@ def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int
         "price": str(current_price),
         "strategy_name": "delta_hedge",
     }
+    if target_contract:
+        payload["actual_symbol"] = target_contract.symbol
+        payload["expiry"] = target_contract.lastTradeDateOrContractMonth
+        payload["conId"] = target_contract.conId
+        payload["exchange"] = target_contract.exchange
+
+    sym_disp = target_contract.localSymbol if target_contract else symbol
 
     try:
-        print(f"[{symbol} 自動對沖系統] 🚨 偵測到 Delta 偏移！準備發送下單訊號至本地交易核心...")
-        print(f" -> 動作: {action} {qty} 單位 {symbol} @ {current_price}\n")
+        print(f"[{symbol} 自動對沖系統] 🚨 偵測到 Delta 偏移！準備發送下單訊號至交易核心...")
+        print(f" -> 動作: {action} {qty} 單位 {sym_disp} @ {current_price}\n")
 
         if SEND_WEBHOOK:
-            response = requests.post(local_exec_url, json=payload, timeout=10)
-            if response.status_code == 200:
-                print(f"[{symbol} 自動對沖系統] ✅ 下單委託成功: {response.text}")
-                return True
-            print(f"[{symbol} 自動對沖系統] ❌ 下單委託失敗, 狀態碼: {response.status_code}, body={response.text}")
+            try:
+                response = requests.post(local_exec_url, json=payload, timeout=10)
+                if response.status_code == 200:
+                    res_json = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
+                    res_msg = res_json.get('message', '')
+                    res_status = res_json.get('status', '')
+                    if res_status in ('cancelled', 'failed', 'error') or 'Error' in res_msg or 'rejected' in res_msg.lower() or '未成交' in res_msg:
+                        print(f"[{symbol} 自動對沖系統] ❌ 下單委託失敗或被拒絕: {response.text}")
+                        # 若 Webhook 核心報錯且有 target_contract，以本地 IB 作為備援送單
+                        if target_contract and ib and ib.isConnected():
+                            print(f"[{symbol} 自動對沖系統] 🔄 啟動本地 IB 備援下單機制...")
+                            order = MarketOrder(action, qty)
+                            order.tif = 'GTC'
+                            order.outsideRth = True
+                            order.algoStrategy = 'Adaptive'
+                            order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+                            trade = ib.placeOrder(target_contract, order)
+                            print(f"[{symbol} 自動對沖系統] 🚀 本地 IB 備援下單成功送出: {action} {qty}口 {target_contract.localSymbol}")
+                            return True
+                        return False
+                    print(f"[{symbol} 自動對沖系統] ✅ 下單委託成功: {response.text}")
+                    return True
+                else:
+                    print(f"[{symbol} 自動對沖系統] ❌ 下單委託失敗, 狀態碼: {response.status_code}, body={response.text}")
+            except Exception as req_err:
+                print(f"[{symbol} 自動對沖系統] ⚠️ Webhook 連線失敗 ({req_err})，啟動本地 IB 直接送單...")
+                if target_contract and ib and ib.isConnected():
+                    order = MarketOrder(action, qty)
+                    order.tif = 'GTC'
+                    order.outsideRth = True
+                    order.algoStrategy = 'Adaptive'
+                    order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+                    trade = ib.placeOrder(target_contract, order)
+                    print(f"[{symbol} 自動對沖系統] 🚀 本地 IB 直接下單已送出: {action} {qty}口 {target_contract.localSymbol}")
+                    return True
+                return False
+
             return False
 
         print(f"[{symbol} 自動對沖系統] 🧪 SEND_WEBHOOK=False，目前為測試模式，未實際送出。")
