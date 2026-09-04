@@ -127,7 +127,7 @@ def call_gemini_rest(prompt, api_key):
     """
     Direct REST API call with model fallback chain.
     """
-    candidate_models = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3-flash-preview"]
+    candidate_models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
 
     for m_name in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{m_name}:generateContent?key={api_key}"
@@ -177,11 +177,7 @@ def save_analysis_to_text_file(analysis_text, target_dir=REPORTS_DIR):
     latest_path = os.path.join(target_dir, "latest_ai_analysis.txt")
     root_latest_path = os.path.join(BARCHART_DIR, "latest_ai_analysis.txt")
 
-    file_content = f"""============================================================
-Barchart 選擇權異動 AI 投資建議 (Smart Money 深度分析)
-分析時間：{now_readable}
-============================================================
-
+    file_content = f"""==分析時間：{now_readable}==
 {analysis_text}
 """
 
@@ -221,7 +217,7 @@ def send_line_notification(analysis_text, archive_filename=None):
         if len(summary_lines) >= 8:
             break
 
-    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text[:400]
+    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text[:4000]
 
     line_msg = f"""📊【Barchart 選擇權異動 AI 投資建議】
 🕒 分析時間：{now_str}
@@ -230,7 +226,7 @@ def send_line_notification(analysis_text, archive_filename=None):
 🎯 核心重點速覽：
 {summary_block}
 
-💡 完整華爾街量化推演與期權籌碼分析已存成文字檔，請開啟交易看板【AI 投資建議】分頁查看完整內容！"""
+"""
 
     print(f"[INFO] 正在推播 LINE 摘要訊息到手機...")
     ok = send_push_message(line_msg.strip())
@@ -291,9 +287,9 @@ def run_analysis(stock_file=None, etf_file=None):
     # 7. 終端輸出建議
     print("\n" + "=" * 60)
     print("=== 今日 AI 投資建議 ===")
-    print("=" * 60)
+    print("=" * 6)
     print(analysis_text)
-    print("=" * 60)
+    print("=" * 6)
 
     # 8. LINE 推播（發送速覽摘要並引導查看網頁新分頁）
     send_line_notification(analysis_text, archive_fname)

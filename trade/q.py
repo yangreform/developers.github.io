@@ -430,11 +430,25 @@ DASHBOARD_HTML = """
             <span>🤖 AI 選擇權異常異動投資建議</span>
             <span class="badge" style="background-color:#238636; font-size:12px;">Gemini 深度分析</span>
         </h2>
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <select id="ai_report_select" onchange="switchAIReport(this.value)" style="background:#0d1117; color:#c9d1d9; border:1px solid #30363d; padding:6px 12px; border-radius:6px; font-size:13px;"></select>
             <button class="action-btn" onclick="loadAIReportList()">🔄 重新整理報告</button>
         </div>
     </div>
+
+    <!-- 腳本執行按鍵區塊 (py barchart_download.py 與 py barchart_analysis.py) -->
+    <div style="display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap; align-items:center; background:#161b22; padding:12px 16px; border-radius:8px; border:1px solid #30363d;">
+        <span style="font-size:13px; font-weight:600; color:#8b949e;">⚡ 腳本操作：</span>
+        <button class="action-btn" id="btn_run_download" style="background-color:#1f6feb; display:flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px;" onclick="runBarchartDownload()">
+            <span>📥</span> <span>執行 barchart_download.py</span>
+        </button>
+        <button class="action-btn" id="btn_run_analysis" style="background-color:#238636; display:flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px;" onclick="runBarchartAnalysis()">
+            <span>🧠</span> <span>執行 barchart_analysis.py</span>
+        </button>
+    </div>
+
+    <div id="ai_action_status" style="display:none; padding:12px 16px; border-radius:8px; margin-bottom:14px; font-size:13px; border:1px solid transparent;"></div>
+
     <div class="card" style="padding:16px;">
         <div id="ai_report_meta" style="margin-bottom:12px; font-size:12px; color:#8b949e; display:flex; justify-content:space-between;"></div>
         <div id="ai_report_content" style="white-space:pre-wrap; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; line-height:1.7; font-size:14px; color:#e6edf3; background:#0d1117; padding:18px; border-radius:8px; border:1px solid #30363d; overflow-x:auto;">載入中...</div>
@@ -699,6 +713,87 @@ function renderAIReportContent(data) {
     const meta = document.getElementById('ai_report_meta');
     meta.innerHTML = `<span>📄 檔案名稱：<strong>${data.filename}</strong></span><span>🕒 產出時間：${data.mtime || '-'}</span>`;
     content.textContent = data.content || '(空白報告)';
+}
+
+// ==========================================
+// Barchart Runner Functions
+// ==========================================
+async function runBarchartDownload() {
+    const btn = document.getElementById('btn_run_download');
+    const statusBox = document.getElementById('ai_action_status');
+    btn.disabled = true;
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<span>⏳</span> <span>下載執行中 (約需 15~30 秒)...</span>';
+    
+    statusBox.style.display = 'block';
+    statusBox.style.background = '#161b22';
+    statusBox.style.color = '#58a6ff';
+    statusBox.style.borderColor = '#1f6feb';
+    statusBox.innerHTML = '⏳ 正在背景執行 <code>py barchart_download.py</code>，瀏覽器自動連線 Barchart 下載個股與 ETF 異常期權 CSV，請稍候...';
+
+    try {
+        const resp = await fetch('/api/barchart/run_download', { method: 'POST' });
+        const res = await resp.json();
+        if (res.status === 'ok') {
+            statusBox.style.background = '#13231b';
+            statusBox.style.color = '#3fb950';
+            statusBox.style.borderColor = '#238636';
+            statusBox.innerHTML = `✅ <strong>barchart_download.py 執行成功！</strong> 最新期權異動 CSV 已下載完成！`;
+        } else {
+            statusBox.style.background = '#2c1517';
+            statusBox.style.color = '#f85149';
+            statusBox.style.borderColor = '#da3633';
+            statusBox.innerHTML = `❌ <strong>執行失敗：</strong> ${res.message || '未知錯誤'}`;
+        }
+    } catch (e) {
+        statusBox.style.background = '#2c1517';
+        statusBox.style.color = '#f85149';
+        statusBox.style.borderColor = '#da3633';
+        statusBox.innerHTML = `❌ <strong>連線逾時或失敗：</strong> ${e}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+    }
+}
+
+async function runBarchartAnalysis() {
+    const btn = document.getElementById('btn_run_analysis');
+    const statusBox = document.getElementById('ai_action_status');
+    btn.disabled = true;
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<span>⏳</span> <span>AI 分析與推播中 (約需 10~20 秒)...</span>';
+    
+    statusBox.style.display = 'block';
+    statusBox.style.background = '#161b22';
+    statusBox.style.color = '#58a6ff';
+    statusBox.style.borderColor = '#1f6feb';
+    statusBox.innerHTML = '⏳ 正在背景執行 <code>py barchart_analysis.py</code>，透過 Gemini 篩選優質期權合約並發送 LINE 推播...';
+
+    try {
+        const resp = await fetch('/api/barchart/run_analysis', { method: 'POST' });
+        const res = await resp.json();
+        if (res.status === 'ok') {
+            statusBox.style.background = '#13231b';
+            statusBox.style.color = '#3fb950';
+            statusBox.style.borderColor = '#238636';
+            statusBox.innerHTML = `✅ <strong>barchart_analysis.py 執行成功！</strong> AI 報告已存檔並完成 LINE 手機推播！`;
+            // 自動刷新報表列表以載入剛出爐的最新報告
+            loadAIReportList();
+        } else {
+            statusBox.style.background = '#2c1517';
+            statusBox.style.color = '#f85149';
+            statusBox.style.borderColor = '#da3633';
+            statusBox.innerHTML = `❌ <strong>執行失敗：</strong> ${res.message || '未知錯誤'}`;
+        }
+    } catch (e) {
+        statusBox.style.background = '#2c1517';
+        statusBox.style.color = '#f85149';
+        statusBox.style.borderColor = '#da3633';
+        statusBox.innerHTML = `❌ <strong>連線逾時或失敗：</strong> ${e}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+    }
 }
 
 // ==========================================
@@ -1793,6 +1888,87 @@ def get_ai_report_content():
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
+
+BARCHART_TASK_LOCK = threading.Lock()
+
+@dash_app.route('/api/barchart/run_download', methods=['POST'])
+def api_run_barchart_download():
+    import subprocess, sys
+    if not BARCHART_TASK_LOCK.acquire(blocking=False):
+        return jsonify({"status": "error", "message": "目前已有背景工作正在執行中，請稍候完成再試。"})
+
+    try:
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "barchart_download.py")
+        if not os.path.exists(script_path):
+            return jsonify({"status": "error", "message": f"找不到腳本: {script_path}"})
+
+        proc = subprocess.run(
+            [sys.executable, script_path],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True,
+            text=True,
+            timeout=180,
+            encoding="utf-8",
+            errors="replace"
+        )
+        if proc.returncode == 0:
+            return jsonify({
+                "status": "ok",
+                "message": "Barchart CSV 下載完成！",
+                "output": proc.stdout[-300:] if proc.stdout else ""
+            })
+        else:
+            err_msg = proc.stderr.strip() if proc.stderr else proc.stdout.strip()
+            return jsonify({
+                "status": "error",
+                "message": err_msg[-300:] if err_msg else f"指令退出代碼: {proc.returncode}"
+            })
+    except subprocess.TimeoutExpired:
+        return jsonify({"status": "error", "message": "下載執行逾時 (超過 180 秒)"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+    finally:
+        BARCHART_TASK_LOCK.release()
+
+
+@dash_app.route('/api/barchart/run_analysis', methods=['POST'])
+def api_run_barchart_analysis():
+    import subprocess, sys
+    if not BARCHART_TASK_LOCK.acquire(blocking=False):
+        return jsonify({"status": "error", "message": "目前已有背景工作正在執行中，請稍候完成再試。"})
+
+    try:
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "barchart_analysis.py")
+        if not os.path.exists(script_path):
+            return jsonify({"status": "error", "message": f"找不到腳本: {script_path}"})
+
+        proc = subprocess.run(
+            [sys.executable, script_path],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            encoding="utf-8",
+            errors="replace"
+        )
+        if proc.returncode == 0:
+            return jsonify({
+                "status": "ok",
+                "message": "AI 分析完成並已推播 LINE！",
+                "output": proc.stdout[-300:] if proc.stdout else ""
+            })
+        else:
+            err_msg = proc.stderr.strip() if proc.stderr else proc.stdout.strip()
+            return jsonify({
+                "status": "error",
+                "message": err_msg[-300:] if err_msg else f"指令退出代碼: {proc.returncode}"
+            })
+    except subprocess.TimeoutExpired:
+        return jsonify({"status": "error", "message": "分析執行逾時 (超過 120 秒)"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+    finally:
+        BARCHART_TASK_LOCK.release()
 
 @dash_app.route('/api/option/barchart_quote', methods=['POST'])
 def quote_barchart_trade():
