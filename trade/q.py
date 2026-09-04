@@ -332,9 +332,9 @@ DASHBOARD_HTML = """
 <body>
 
 <div class="tabs">
-    <button class="tablinks active" onclick="openTab(event, 'overview')">Overview (Delta Hedge)</button>
-    <button class="tablinks" onclick="openTab(event, 'barchart')">Barchart (選擇權策略)</button>
-    <button class="tablinks" onclick="openTab(event, 'ai_report')">AI 投資建議 (Gemini 分析)</button>
+    <button class="tablinks active" onclick="openTab(event, 'overview')">Delta Hedge</button>
+    <button class="tablinks" onclick="openTab(event, 'barchart')">Barchart</button>
+    <button class="tablinks" onclick="openTab(event, 'ai_report')">AI 投資建議</button>
 </div>
 
 <div id="overview" class="tabcontent" style="display:block;">

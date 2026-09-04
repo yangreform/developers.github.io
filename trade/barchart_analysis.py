@@ -217,7 +217,7 @@ def send_line_notification(analysis_text, archive_filename=None):
         if len(summary_lines) >= 8:
             break
 
-    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text[:4000]
+    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text[:4096]
 
     line_msg = f"""📊【Barchart 選擇權異動 AI 投資建議】
 🕒 分析時間：{now_str}
