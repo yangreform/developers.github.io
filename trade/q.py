@@ -391,9 +391,9 @@ DASHBOARD_HTML = """
       <div style="font-weight:600; color:#c9d1d9; margin-bottom:8px; font-size:13px;">⚙️ 未平倉損益下單條件設定 (修改後存入 .env)</div>
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-bottom:12px;">
         <div>
-          <label class="muted" style="font-size:11px; display:block; margin-bottom:4px;">1. 初始目標空單部位 (口)</label>
+          <label class="muted" style="font-size:11px; display:block; margin-bottom:4px;">1. 當未平倉口數等於 (口)</label>
           <input type="number" id="vxm_cfg_init_pos" step="1" oninput="markVXMDirty()" style="width:100%; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:6px 8px; border-radius:5px;" value="-2">
-          <span class="muted" style="font-size:10px;">部位 > 此值時賣出至此口數</span>
+          <span class="muted" style="font-size:10px;">當未平倉口數 = 此值時才做損益檢查</span>
         </div>
         <div>
           <label class="muted" style="font-size:11px; display:block; margin-bottom:4px;">停利回補損益門檻 (USD)</label>
@@ -583,6 +583,16 @@ function renderPositions(rows) {
 }
 
 function renderGroup(g) {
+  if (g.name === '未分類(Other)' && g.positions && g.positions.length > 1) {
+    g.positions.sort((a, b) => {
+      const da = calcDTE(a.expiry, a.dte);
+      const db = calcDTE(b.expiry, b.dte);
+      const numA = (typeof da === 'number') ? da : 999999;
+      const numB = (typeof db === 'number') ? db : 999999;
+      if (numA !== numB) return numA - numB;
+      return (a.symbol || '').localeCompare(b.symbol || '');
+    });
+  }
   const totalPnl = (g.total_pnl !== undefined && g.total_pnl !== null) ? g.total_pnl : (g.positions ? g.positions.reduce((acc, p) => acc + (Number(p.pnl) || 0), 0) : 0);
   return `
   <div class="card">
@@ -1200,7 +1210,7 @@ function updateVXMUI(d) {
     pDisp.className = d.current_pos < 0 ? "pos" : (d.current_pos > 0 ? "neg" : "");
   }
   const tDisp = document.getElementById("vxm-target-display");
-  if (tDisp && d.config) tDisp.textContent = `目標: ${d.config.target_init_pos} 口`;
+  if (tDisp && d.config) tDisp.textContent = `條件: ${d.config.target_init_pos} 口`;
   const pnlDisp = document.getElementById("vxm-pnl-display");
   if (pnlDisp && d.unrealized_pnl !== undefined) {
     const pnlVal = Number(d.unrealized_pnl);
@@ -1404,28 +1414,28 @@ def compute_vxm_evaluation(current_pos, unrealized_pnl, target_contract_symbol, 
     qty = 0
     decision_reason = ""
 
-    if current_pos > target_init_pos:
-        action = 'SELL'
-        qty = int(current_pos - target_init_pos)
-        decision_reason = f"未平倉量 ({current_pos}) > 初始目標部位 ({target_init_pos})，賣出 {qty} 口至 {target_init_pos}"
-    elif unrealized_pnl < loss_pnl:
-        action = 'SELL'
-        qty = 1
-        decision_reason = f"未平倉損益 ({unrealized_pnl:.2f}) < 損益門檻 ({loss_pnl:.2f})，加賣 1 口"
-    elif unrealized_pnl > tp_pnl:
-        action = 'BUY'
-        qty = 1
-        decision_reason = f"未平倉損益 ({unrealized_pnl:.2f}) > 停利回補損益門檻 ({tp_pnl:.2f})，加買 1 口"
-
-    if not decision_reason:
-        status_line = f"無需調整部位 (目前部位: {current_pos}, 損益: {unrealized_pnl:.2f})"
+    # 當未平倉口數 == target_init_pos 時，才執行停利/停損損益檢查
+    if current_pos == target_init_pos:
+        if unrealized_pnl < loss_pnl:
+            action = 'SELL'
+            qty = 1
+            decision_reason = f"未平倉口數 ({current_pos}) 符合條件 ({target_init_pos}) 且未平倉損益 ({unrealized_pnl:.2f}) < 停損門檻 ({loss_pnl:.2f})，加賣 1 口"
+        elif unrealized_pnl > tp_pnl:
+            action = 'BUY'
+            qty = 1
+            decision_reason = f"未平倉口數 ({current_pos}) 符合條件 ({target_init_pos}) 且未平倉損益 ({unrealized_pnl:.2f}) > 停利回補損益門檻 ({tp_pnl:.2f})，加買 1 口"
+        else:
+            status_line = f"未平倉口數 ({current_pos}) 符合條件 ({target_init_pos})，損益 ({unrealized_pnl:.2f}) 介於門檻間，無需調整"
     else:
+        status_line = f"未平倉口數 ({current_pos}) != 設定條件 ({target_init_pos})，不觸發停利/停損檢查"
+
+    if decision_reason:
         status_line = decision_reason
 
     terminal_output = (
         f"================ 開始處理 VXM 策略 ================\n"
         f"-> 鎖定最近期可交易 VXM: {target_contract_symbol} (到期: {expiry}, conId: {con_id})\n"
-        f"[VXM 狀態] 目前部位: {current_pos} 口 | 未平倉損益: {unrealized_pnl:.2f} USD | 交易合約: {target_contract_symbol}\n"
+        f"[VXM 狀態] 目前部位: {current_pos} 口 (條件: {target_init_pos}) | 未平倉損益: {unrealized_pnl:.2f} USD | 交易合約: {target_contract_symbol}\n"
         f"-> [VXM] {status_line}"
     )
 
@@ -1486,33 +1496,28 @@ def evaluate_and_run_vxm(ib_instance, execute_order=True):
     trade_qty = 0
     reason = ""
 
-    # 1 如果未平倉量 > target_init_pos，就賣出到 target_init_pos
-    if current_pos > target_init_pos:
-        trade_action = 'SELL'
-        trade_qty = int(current_pos - target_init_pos)
-        reason = f"未平倉量 ({current_pos}) > 初始目標部位 ({target_init_pos})，賣出 {trade_qty} 口至 {target_init_pos}"
-
-    # 2 損益小於門檻加賣一口
-    elif total_unrealized_pnl < loss_pnl:
-        trade_action = 'SELL'
-        trade_qty = 1
-        reason = f"未平倉損益 ({total_unrealized_pnl:.2f}) < 損益門檻 ({loss_pnl:.2f})，加賣 1 口"
-
-    # 3 損益大於停利門檻加買一口
-    elif total_unrealized_pnl > tp_pnl:
-        trade_action = 'BUY'
-        trade_qty = 1
-        reason = f"未平倉損益 ({total_unrealized_pnl:.2f}) > 停利回補損益門檻 ({tp_pnl:.2f})，加買 1 口"
-
-    if not reason:
-        status_line = f"無需調整部位 (目前部位: {current_pos}, 損益: {total_unrealized_pnl:.2f})"
+    # 當未平倉口數 == target_init_pos 時，才執行停利/停損條件檢查
+    if current_pos == target_init_pos:
+        if total_unrealized_pnl < loss_pnl:
+            trade_action = 'SELL'
+            trade_qty = 1
+            reason = f"未平倉口數 ({current_pos}) 符合條件 ({target_init_pos}) 且未平倉損益 ({total_unrealized_pnl:.2f}) < 停損門檻 ({loss_pnl:.2f})，加賣 1 口"
+        elif total_unrealized_pnl > tp_pnl:
+            trade_action = 'BUY'
+            trade_qty = 1
+            reason = f"未平倉口數 ({current_pos}) 符合條件 ({target_init_pos}) 且未平倉損益 ({total_unrealized_pnl:.2f}) > 停利回補損益門檻 ({tp_pnl:.2f})，加買 1 口"
+        else:
+            status_line = f"未平倉口數 ({current_pos}) 符合條件 ({target_init_pos})，損益 ({total_unrealized_pnl:.2f}) 介於門檻間，無需調整"
     else:
+        status_line = f"未平倉口數 ({current_pos}) != 設定條件 ({target_init_pos})，不觸發停利/停損檢查"
+
+    if reason:
         status_line = reason
 
     terminal_output = (
         f"================ 開始處理 VXM 策略 ================\n"
         f"-> 鎖定最近期可交易 VXM: {local_symbol} (到期: {expiry}, conId: {con_id})\n"
-        f"[VXM 狀態] 目前部位: {current_pos} 口 | 未平倉損益: {total_unrealized_pnl:.2f} USD | 交易合約: {trading_contract_name}\n"
+        f"[VXM 狀態] 目前部位: {current_pos} 口 (條件: {target_init_pos}) | 未平倉損益: {total_unrealized_pnl:.2f} USD | 交易合約: {trading_contract_name}\n"
         f"-> [VXM] {status_line}"
     )
 
@@ -1536,13 +1541,14 @@ def evaluate_and_run_vxm(ib_instance, execute_order=True):
                         "action": trade_action,
                         "quantity": trade_qty,
                         "current_pos": current_pos,
+                        "target_init_pos": target_init_pos,
                         "unrealized_pnl": total_unrealized_pnl,
                         "reason": reason
                     }
                     send_trade_notification(
                         symbol="VXM",
                         message=f"已執行 VXM 策略下單: {trade_action} {trade_qty} 口 {trade_contract.localSymbol}\n原因: {reason}\n未平倉損益: {total_unrealized_pnl:.2f} USD",
-                        payload_str=json.dumps(payload_dict, ensure_ascii=False, indent=2)
+                        payload_data=payload_dict
                     )
                 except Exception as ex:
                     print(f"⚠️ VXM LINE 推播發送失敗: {ex}")
@@ -3131,7 +3137,28 @@ def main():
                     if not items:
                         continue
 
-                    items.sort(key=lambda x: (len(x['_disp']), x['_disp']))
+                    if g_name == '未分類(Other)':
+                        # 未分類(Other) 用 DTE 由小排到大，無到期日(如現貨股票/現金)排在最後
+                        def _get_sort_dte(x):
+                            d = x.get('dte')
+                            if d is not None:
+                                try:
+                                    return (0, float(d))
+                                except Exception:
+                                    pass
+                            exp = x.get('expiry') or (x.get('contract') and getattr(x['contract'], 'lastTradeDateOrContractMonth', None))
+                            if exp:
+                                try:
+                                    s_exp = str(exp).replace('-', '').replace('/', '').strip()
+                                    if len(s_exp) >= 8:
+                                        exp_d = datetime.date(int(s_exp[:4]), int(s_exp[4:6]), int(s_exp[6:8]))
+                                        return (0, float((exp_d - datetime.date.today()).days))
+                                except Exception:
+                                    pass
+                            return (1, float('inf'))
+                        items.sort(key=lambda x: (_get_sort_dte(x), len(x['_disp']), x['_disp']))
+                    else:
+                        items.sort(key=lambda x: (len(x['_disp']), x['_disp']))
                     if not is_first_group:
                         #print()
                         pass
