@@ -41,13 +41,6 @@ os.makedirs(PROFILE_DIR, exist_ok=True)
 
 
 def load_credentials_from_env(env_path):
-    """
-    Parse Barchart credentials from .env supporting formats:
-      barchart_accout:jacky@weishun.cc
-      barchart_account=jacky@weishun.cc
-      barchart_password:aaaa1111
-      barchart_password=aaaa1111
-    """
     account = None
     password = None
 
