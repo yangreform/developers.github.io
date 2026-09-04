@@ -14,9 +14,7 @@ from waitress import serve
 # ==============================================================================
 # 0. 讀取 op.env / .env 設定
 # ==============================================================================
-ENV_PATH = os.path.join(os.path.dirname(__file__), 'op.env')
-if not os.path.exists(ENV_PATH):
-    ENV_PATH = os.path.join(os.path.dirname(__file__), '.env')
+ENV_PATH = os.path.join(os.path.dirname(__file__), '.env')
 env_config = {}
 if os.path.exists(ENV_PATH):
     with open(ENV_PATH, 'r', encoding='utf-8') as f:
@@ -35,14 +33,12 @@ IB_HOST = env_config.get('IB_HOST', '127.0.0.1')
 IB_PORT = int(env_config.get('IB_PORT', 4001))
 CLIENT_ID = int(env_config.get('IB_CLIENT_ID', 100)) + 6 
 
-raw_send_webhook = str(env_config.get('SEND_WEBHOOK', 'false')).strip().strip("'").strip('"').lower()
+raw_send_webhook = str(env_config.get('OP_SEND_WEBHOOK', 'false')).strip().strip("'").strip('"').lower()
 SEND_WEBHOOK = raw_send_webhook in ('true', '1')
-WEBHOOK_URL = env_config.get('WEBHOOK_URL', '')
-WEBHOOK_PASSPHRASE = env_config.get('WEBHOOK_PASSPHRASE', '')
 
 hedge_config = {}
 try:
-    hedge_config = json.loads(env_config.get('HEDGE_CONFIG_JSON', '{}'))
+    hedge_config = json.loads(env_config.get('OP_HEDGE_CONFIG_JSON', '{}'))
 except Exception as e:
     print(f"[錯誤] 解析 HEDGE_CONFIG_JSON 失敗: {e}")
 
