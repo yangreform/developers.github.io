@@ -346,66 +346,6 @@ def execute_iron_condor(legs):
         )
     ib.sleep(2)
 
-# ==============================================================================
-# 5. 每日部位檢查與風控模組
-# ==============================================================================
-def check_and_manage_positions(underlying_symbol):
-    portfolio_items = [p for p in ib.portfolio() if p.contract.symbol == underlying_symbol and p.contract.secType == 'FOP']
-    
-    if not portfolio_items:
-        return False
-        
-    total_unrealized_pnl = sum(p.unrealizedPNL for p in portfolio_items if p.unrealizedPNL)
-    total_cost_basis = sum(p.position * p.averageCost for p in portfolio_items if p.averageCost)
-    
-    net_credit_collected = -total_cost_basis
-    target_profit = net_credit_collected * 0.5
-    
-    sample_contract = portfolio_items[0].contract
-    expiry_date = datetime.datetime.strptime(sample_contract.lastTradeDateOrContractMonth, '%Y%m%d').date()
-    dte = (expiry_date - datetime.date.today()).days
-    
-    print(f"[{underlying_symbol}] 剩餘 {dte} 天到期 | 收取: {net_credit_collected:.2f} | 目標 50%: {target_profit:.2f} | 當前損益: {total_unrealized_pnl:.2f}")
-    
-    should_close = False
-    reason = ""
-    if dte <= EXIT_DTE:
-        should_close, reason = True, f"達 {dte} DTE 強制平倉"
-    elif target_profit > 0 and total_unrealized_pnl >= target_profit:
-        should_close, reason = True, f"達 50% 停利目標"
-        
-    if should_close:
-        for p in portfolio_items:
-            if p.position == 0: continue
-            action = 'BUY' if p.position < 0 else 'SELL'
-            order = MarketOrder(action, abs(p.position))
-            order.tif = 'DAY'
-            
-            closing_contract = p.contract
-            if not closing_contract.exchange:
-                closing_contract.exchange = closing_contract.primaryExchange or "SMART"
-                
-            if SEND_WEBHOOK:
-                trade = ib.placeOrder(closing_contract, order)
-                print(f"-> 已送出平倉單: {action} {abs(p.position)}口 {closing_contract.localSymbol} ({reason})，等待成交...")
-                
-                end_time = time.time() + 60
-                while time.time() < end_time:
-                    ib.sleep(1)
-                    if trade.orderStatus.status == 'Filled':
-                        break
-                        
-                if trade.orderStatus.status == 'Filled':
-                    fill_price = trade.orderStatus.avgFillPrice
-                    print(f"-> [成交確認] 平倉單已成交，平均價格: {fill_price}")
-                    send_webhook_notification(action, closing_contract.localSymbol, abs(p.position), fill_price, reason)
-                else:
-                    print(f"-> [未完全成交] 平倉單目前狀態: {trade.orderStatus.status}")
-            else:
-                print(f"-> [測試模式] 假裝平倉: {action} {abs(p.position)}口 {closing_contract.localSymbol} ({reason})")
-        return True
-    return False
-
 
 # ==============================================================================
 # 6. 主程式入口
@@ -425,8 +365,6 @@ if __name__ == '__main__':
             if not underlying_fut:
                 print(f"[略過] 無法解析 {g_name} 的期貨與期權結構。")
                 continue
-            
-            positions_closed = check_and_manage_positions(underlying_fut.symbol)
             
             current_pos = [p for p in ib.portfolio() if p.contract.symbol == underlying_fut.symbol and p.contract.secType == 'FOP']
             if not current_pos:
