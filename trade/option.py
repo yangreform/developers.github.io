@@ -2,6 +2,11 @@ import os
 import json
 import datetime
 import time
+import math
+try:
+    import zoneinfo
+except ImportError:
+    from backports import zoneinfo
 import requests
 from ib_insync import *
 
@@ -42,6 +47,29 @@ def load_op_hedge_config():
         return {}
 
 
+def get_market_today():
+    """
+    獲取美東時間 (US Eastern Date)，作為美股/CBOE/CME期權到期日與 0DTE 的計算基準。
+    """
+    try:
+        us_eastern = zoneinfo.ZoneInfo("America/New_York")
+        return datetime.datetime.now(us_eastern).date()
+    except Exception:
+        # 備援換算：UTC - 4 小時 (美東日光節約時區)
+        return (datetime.datetime.utcnow() - datetime.timedelta(hours=4)).date()
+
+
+def is_valid_price(p):
+    """驗證價格是否為有效大於 0 的非 NaN 數值。"""
+    if p is None:
+        return False
+    try:
+        val = float(p)
+        return not math.isnan(val) and val > 0
+    except (ValueError, TypeError):
+        return False
+
+
 # ==============================================================================
 # 1. 預設交易參數與商品對應表
 # ==============================================================================
@@ -54,6 +82,20 @@ DEFAULT_MIN_DTE = 30
 DEFAULT_MAX_DTE = 60
 DEFAULT_WING_WIDTH = 50.0
 TRADE_QTY = 1
+
+# 期貨標的專屬交易所映射表 (避免 Error 321: Missing exchange for security type FUT)
+FUTURE_EXCHANGE_MAP = {
+    'ES': 'CME',
+    'NQ': 'CME',
+    'RTY': 'CME',
+    'JPY': 'CME',
+    'EUR': 'CME',
+    'ZC': 'CBOT',
+    'CL': 'NYMEX',
+    'NG': 'NYMEX',
+    'GC': 'COMEX',
+    'HG': 'COMEX',
+}
 
 # 商品代碼映射 (Option Trading Class / Micro Symbol -> Standard Underlying Symbol)
 FUTURE_SYMBOL_MAP = {
@@ -72,7 +114,7 @@ FUTURE_SYMBOL_MAP = {
     'NDX': 'NDX', 'NDXP': 'NDX',
 }
 
-# 優先/標準選擇權交易類別映射表
+# 優先/標準選擇權交易類別映射表 (SPX 優先 SPXW, NDX 優先 NDXP 以鎖定 0DTE/每日合約)
 PREFERRED_TRADING_CLASS_MAP = {
     'CL': 'LO',
     'NG': 'LN',
@@ -127,8 +169,32 @@ ib = IB()
 
 def connect_ib():
     if not ib.isConnected():
-        ib.connect(IB_HOST, IB_PORT, clientId=CLIENT_ID)
-        print(f"=== [系統] 成功連接至 IBKR ({IB_HOST}:{IB_PORT}) ===")
+        base_id = CLIENT_ID
+        connected = False
+        for offset in range(15):
+            cur_id = base_id + offset
+            try:
+                ib.connect(IB_HOST, IB_PORT, clientId=cur_id, timeout=4)
+                if ib.isConnected():
+                    connected = True
+                    break
+            except Exception:
+                try:
+                    ib.disconnect()
+                except Exception:
+                    pass
+                time.sleep(0.3)
+
+        if not connected:
+            raise ConnectionError(f"無法連接至 IBKR ({IB_HOST}:{IB_PORT})，已嘗試 clientId {base_id} 至 {base_id+14}")
+
+        try:
+            # 啟用延遲/凍結市場數據 (MarketDataType=3)，防止無即時報價訂閱時噴出 Error 10168
+            ib.reqMarketDataType(3)
+        except Exception:
+            pass
+        actual_id = ib.client.clientId if ib.client else CLIENT_ID
+        print(f"=== [系統] 成功連接至 IBKR ({IB_HOST}:{IB_PORT}) | ClientId={actual_id} | 延遲市場資料已啟用 ===")
 
 
 def send_webhook_notification(action: str, symbol: str, qty: float, price: float, note: str = ""):
@@ -153,7 +219,72 @@ def send_webhook_notification(action: str, symbol: str, qty: float, price: float
 
 
 # ==============================================================================
-# 2. 動態解析群組商品 (支援期貨與 SPX/NDX 指數現貨標的)
+# 2. 穩健獲取標的現價 (支援 Live、Delayed、Close、MidPoint 與歷史 K 棒備援)
+# ==============================================================================
+def get_underlying_price(underlying):
+    """
+    穩健獲取底層標的市價，杜絕 nan：
+    1. 訂閱市場數據 (reqMktData) 取得即時/延遲報價
+    2. 檢查 marketPrice, last, markPrice, close, bid/ask 中間價
+    3. 若皆為 nan，透過 reqHistoricalData (TRADES) 取得最新日 K 收盤價備援
+    """
+    try:
+        ib.reqMarketDataType(3)
+    except Exception:
+        pass
+
+    ticker = ib.reqMktData(underlying, '', False, False)
+    price = None
+    for _ in range(3):
+        ib.sleep(1.0)
+        try:
+            mp = ticker.marketPrice()
+            if is_valid_price(mp):
+                price = float(mp)
+                break
+        except Exception:
+            pass
+
+        for cand in [ticker.last, getattr(ticker, 'markPrice', None), ticker.close]:
+            if is_valid_price(cand):
+                price = float(cand)
+                break
+        if price is not None:
+            break
+
+        if is_valid_price(ticker.bid) and is_valid_price(ticker.ask):
+            price = (float(ticker.bid) + float(ticker.ask)) / 2.0
+            break
+
+    try:
+        ib.cancelMktData(underlying)
+    except Exception:
+        pass
+
+    # 若即時/延遲數據仍未取到，請求日 K 收盤價備援 (一律使用 TRADES 適用期貨與指數)
+    if not is_valid_price(price):
+        try:
+            bars = ib.reqHistoricalData(
+                underlying,
+                endDateTime='',
+                durationStr='2 D',
+                barSizeSetting='1 day',
+                whatToShow='TRADES',
+                useRTH=False,
+                formatDate=1
+            )
+            if bars:
+                last_close = bars[-1].close
+                if is_valid_price(last_close):
+                    price = float(last_close)
+        except Exception:
+            pass
+
+    return price if is_valid_price(price) else None
+
+
+# ==============================================================================
+# 3. 動態解析群組商品 (支援期貨與 SPX/NDX 指數現貨標的)
 # ==============================================================================
 def resolve_group_symbols(group_name, symbols):
     underlying_sym = None
@@ -190,7 +321,8 @@ def resolve_group_symbols(group_name, symbols):
         return underlying_contract, opt_class, chains
 
     # 2. 處理期貨類商品 (ES, NQ, CL, GC, ZC, HG...)
-    details = ib.reqContractDetails(Future(symbol=underlying_sym))
+    fut_exchange = FUTURE_EXCHANGE_MAP.get(underlying_sym, '')
+    details = ib.reqContractDetails(Future(symbol=underlying_sym, exchange=fut_exchange))
     valid_details = [d for d in details if d.contract.exchange not in ['QBALGO', 'SMART']]
 
     if valid_details:
@@ -224,17 +356,18 @@ def resolve_group_symbols(group_name, symbols):
 
 
 # ==============================================================================
-# 3. 獲取 Butterfly 蝶式四腿合約與當前市價
+# 4. 獲取 Butterfly 蝶式四腿合約與當前市價
 # ==============================================================================
 def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, max_dte=DEFAULT_MAX_DTE, wing_width=None):
     """
-    根據商品設定的 DTE 範圍篩選到期日，並以市價最近之 ATM 履約價建立 Butterfly 蝶式：
+    根據商品設定的 DTE 範圍篩選到期日（支援 0DTE 當天到期末日期權），並以市價最近之 ATM 履約價建立 Butterfly 蝶式：
     - 上翼（Upper Wing）：賣出 1 口 Call，履約價為 中心 + wing_width
     - 中心（Center Body）：買入 1 口 Call、買入 1 口 PUT，履約價鎖定 ATM 平價
     - 下翼（Lower Wing）：賣出 1 口 PUT，履約價為 中心 - wing_width
     """
-    today = datetime.date.today()
-    target_dte = (min_dte + max_dte) // 2
+    market_today = get_market_today()
+    is_zero_dte = (min_dte == 0)
+    target_dte = 0 if is_zero_dte else ((min_dte + max_dte) // 2)
 
     class_candidates = []
     # 優先從指定的標準 opt_class 尋找符合 DTE 範圍之合約
@@ -244,33 +377,33 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
                 for exp in c.expirations:
                     try:
                         exp_date = datetime.datetime.strptime(exp, '%Y%m%d').date()
-                        dte = (exp_date - today).days
-                        if min_dte <= dte <= max_dte:
+                        dte = (exp_date - market_today).days
+                        if dte >= 0 and (min_dte <= dte <= max_dte):
                             class_candidates.append((c.tradingClass, exp, c.strikes, dte, c.multiplier))
                     except Exception:
                         pass
 
-    # 若指定類別未找到，放寬至該標的的其他月/週合約
+    # 若指定類別未找到，放寬至該標的的其他月/週/日合約
     if not class_candidates and chains:
         for c in chains:
             if not c.tradingClass.startswith(('M', 'W', 'X')) or underlying.symbol in INDEX_SYMBOLS:
                 for exp in c.expirations:
                     try:
                         exp_date = datetime.datetime.strptime(exp, '%Y%m%d').date()
-                        dte = (exp_date - today).days
-                        if min_dte <= dte <= max_dte:
+                        dte = (exp_date - market_today).days
+                        if dte >= 0 and (min_dte <= dte <= max_dte):
                             class_candidates.append((c.tradingClass, exp, c.strikes, dte, c.multiplier))
                     except Exception:
                         pass
 
-    # 備選合約：尋找大於 7 天且最接近 target_dte 的合約
+    # 若指定 0DTE 但當前恰逢休市或當天無合約，自動備選大於等於 0 且最近之到期日
     if not class_candidates and chains:
         for c in chains:
             for exp in c.expirations:
                 try:
                     exp_date = datetime.datetime.strptime(exp, '%Y%m%d').date()
-                    dte = (exp_date - today).days
-                    if dte >= 7:
+                    dte = (exp_date - market_today).days
+                    if dte >= 0:
                         class_candidates.append((c.tradingClass, exp, c.strikes, dte, c.multiplier))
                 except Exception:
                     pass
@@ -279,21 +412,23 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
         print(f"[錯誤] 找不到 {underlying.symbol} 符合條件的期權合約到期日 (DTE 設定: {min_dte}~{max_dte} 天)")
         return None
 
-    # 選取 DTE 最接近目標 DTE 的合約
-    best_candidate = min(class_candidates, key=lambda item: abs(item[3] - target_dte))
+    # 若用戶指定 0DTE，優先過濾出 dte == 0 的合約
+    if is_zero_dte:
+        zero_candidates = [c for c in class_candidates if c[3] == 0]
+        if zero_candidates:
+            class_candidates = zero_candidates
+
+    # 選取 DTE 最接近目標 DTE 的合約 (0DTE 模式下優先鎖定 0DTE，若非交易日則鎖定最近合約)
+    best_candidate = min(class_candidates, key=lambda item: (abs(item[3] - target_dte), item[3]))
     chosen_opt_class, closest_expiry, strikes, current_dte, multiplier = best_candidate
 
-    print(f"-> 鎖定 {underlying.symbol} (Class: {chosen_opt_class}) 到期日: {closest_expiry} (DTE: {current_dte} 天，商品設定範圍: {min_dte}~{max_dte} 天)")
+    dte_desc = "當天末日輪 (0DTE)" if current_dte == 0 else f"DTE: {current_dte} 天"
+    print(f"-> 鎖定 {underlying.symbol} (Class: {chosen_opt_class}) 到期日: {closest_expiry} ({dte_desc}，設定範圍: {min_dte}~{max_dte} 天)")
 
-    # 取得底層標的最新市價 (期貨或指數)
-    underlying_ticker = ib.reqTickers(underlying)
-    ib.sleep(1)
-    ref_price = underlying_ticker[0].marketPrice() if underlying_ticker else 0
-    if not ref_price or ref_price <= 0:
-        ref_price = underlying_ticker[0].close if underlying_ticker and underlying_ticker[0].close else 0
-
-    if not ref_price or ref_price <= 0:
-        print(f"[錯誤] 無法取得 {underlying.symbol} 的標的市價，無法定位 ATM 平價履約價。")
+    # 取得底層標的最新市價 (期貨或指數，具備完整防 NaN 與日 K 備援)
+    ref_price = get_underlying_price(underlying)
+    if not is_valid_price(ref_price):
+        print(f"[錯誤] 無法取得 {underlying.symbol} 的有效標的市價，無法定位 ATM 平價履約價。")
         return None
 
     print(f"-> {underlying.symbol} 當前標的市價: {ref_price:.2f}")
@@ -331,7 +466,7 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
         f"   ~ 中心 (Center Body) ATM: {center_strike} (市價: {ref_price:.2f}) [買入 Call + 買入 Put]\n"
         f"   ~ 上翼 (Call Wing) 賣出 Call: {call_wing_strike} (設定翼寬: {wing_width}, 實際間距: {actual_upper_width})\n"
         f"   ~ 下翼 (Put Wing)  賣出 Put : {put_wing_strike} (設定翼寬: {wing_width}, 實際間距: {actual_lower_width})\n"
-        f"   ~ 到期日: {closest_expiry} (DTE: {current_dte} 天)"
+        f"   ~ 到期日: {closest_expiry} ({dte_desc})"
     )
 
     # 建立 4 條腿合約物件並驗證
@@ -402,7 +537,7 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
 
 
 # ==============================================================================
-# 4. 建立並送出 Butterfly 組合單 (全部以 BID LIMIT 限價送單)
+# 5. 建立並送出 Butterfly 組合單 (全部以 BID LIMIT 限價送單)
 # ==============================================================================
 def execute_butterfly(legs):
     symbol = legs['symbol']
@@ -498,7 +633,7 @@ def execute_butterfly(legs):
 
 
 # ==============================================================================
-# 5. 主程式入口 (定期即時查詢 trade/.env 並自動執行策略)
+# 6. 主程式入口 (定期即時查詢 trade/.env 並自動執行策略)
 # ==============================================================================
 def run_strategy_cycle():
     """執行單輪 Butterfly 策略掃描與下單。"""
@@ -508,7 +643,8 @@ def run_strategy_cycle():
         print("[資訊] trade/.env 中的 OP_HEDGE_CONFIG_JSON 為空，跳過此輪。")
         return
 
-    print(f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 開始執行 Butterfly 策略掃描 (共 {len(hedge_config)} 個商品群組)...")
+    market_date = get_market_today()
+    print(f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 開始執行 Butterfly 策略掃描 (美東市場基準日: {market_date}，共 {len(hedge_config)} 個商品群組)...")
 
     for g_name, g_info in hedge_config.items():
         print(f"\n================ 開始處理群組: {g_name} ================")
@@ -517,9 +653,11 @@ def run_strategy_cycle():
             print(f"[略過] 群組 {g_name} 未指定 symbols。")
             continue
 
-        # 個別商品 DTE 開始日與結束日
-        min_dte = int(g_info.get('dte_start') or g_info.get('min_dte') or g_info.get('start_dte') or DEFAULT_MIN_DTE)
-        max_dte = int(g_info.get('dte_end') or g_info.get('max_dte') or g_info.get('end_dte') or DEFAULT_MAX_DTE)
+        # 個別商品 DTE 開始日與結束日 (0 代表 0DTE 當天到期)
+        raw_start = g_info.get('dte_start') if g_info.get('dte_start') is not None else g_info.get('min_dte')
+        raw_end = g_info.get('dte_end') if g_info.get('dte_end') is not None else g_info.get('max_dte')
+        min_dte = int(raw_start) if raw_start is not None else DEFAULT_MIN_DTE
+        max_dte = int(raw_end) if raw_end is not None else DEFAULT_MAX_DTE
         if min_dte > max_dte:
             min_dte, max_dte = max_dte, min_dte
 
@@ -534,7 +672,8 @@ def run_strategy_cycle():
         # 檢查是否已持有該商品期權部位 (包含 FOP 與 OPT)
         current_pos = [p for p in ib.portfolio() if p.contract.symbol == underlying.symbol and p.contract.secType in ['FOP', 'OPT']]
         if not current_pos:
-            print(f"-> 準備為 {underlying.symbol} (Class: {opt_class}) 建立 Butterfly 部位 (DTE: {min_dte}~{max_dte}, 翼寬: {wing_width or '預設'})...")
+            dte_label = "0DTE" if min_dte == 0 else f"{min_dte}~{max_dte}天"
+            print(f"-> 準備為 {underlying.symbol} (Class: {opt_class}) 建立 Butterfly 部位 (DTE: {dte_label}, 翼寬: {wing_width or '預設'})...")
             legs = get_butterfly_legs(
                 underlying=underlying,
                 opt_class=opt_class,
@@ -550,11 +689,33 @@ def run_strategy_cycle():
 
 
 if __name__ == '__main__':
-    try:
-        connect_ib()
-        run_strategy_cycle()
-    except Exception as e:
-        print(f"\n[錯誤] 執行異常: {e}")
-    finally:
-        if ib.isConnected():
-            ib.disconnect()
+    import sys
+    run_once = '--once' in sys.argv
+
+    while True:
+        try:
+            connect_ib()
+            run_strategy_cycle()
+        except KeyboardInterrupt:
+            print("\n[中斷] 使用者手動中斷執行。")
+            break
+        except Exception as e:
+            print(f"\n[錯誤] 執行異常: {e}")
+        finally:
+            if ib.isConnected():
+                try:
+                    ib.disconnect()
+                except Exception:
+                    pass
+
+        if run_once:
+            break
+
+        cfg = load_env_config()
+        refresh_sec = int(cfg.get('REFRESH_SECONDS', 300))
+        print(f"\n[休眠] 等待 {refresh_sec} 秒後進行下一輪掃描 (按 Ctrl+C 可停止)...")
+        try:
+            time.sleep(refresh_sec)
+        except KeyboardInterrupt:
+            print("\n[中斷] 使用者手動中斷執行。")
+            break

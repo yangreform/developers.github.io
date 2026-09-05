@@ -81,6 +81,18 @@ if %errorlevel% equ 0 (
     start "ngrok_tunnel" /min "C:\Users\Administrator\Desktop\docker_mc\CT\ngrok\ngrok.exe" http 5000
 )
 
+
+echo.
+echo [5/4] Checking ngrok...
+wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "option.py" >nul
+if %errorlevel% equ 0 (
+    echo [OK] option.py is running.
+) else (
+    echo [WARNING] option.py is NOT running! Restarting MAXIMIZED...
+    start "option.py" /max py .\option.py
+)
+
+
 echo.
 echo -------------------------------------------------------
 echo Monitoring in background... (Next check in 10s)
