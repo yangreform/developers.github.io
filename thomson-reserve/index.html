@@ -305,6 +305,93 @@
 }
 .tracking-note strong{color:#fff}
 
+/* Language Switcher */
+.lang-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+  box-shadow: 0 2px 8px rgba(21, 63, 58, 0.06);
+}
+.lang-btn:hover, .lang-btn:focus-visible {
+  border-color: var(--deep);
+  background: var(--mint);
+  color: var(--deep);
+}
+.lang-btn svg {
+  flex-shrink: 0;
+}
+.lang-btn .chevron {
+  transition: transform .2s ease;
+}
+.lang-switcher.open .lang-btn .chevron {
+  transform: rotate(180deg);
+}
+.lang-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 140px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(21, 63, 58, 0.14);
+  padding: 6px;
+  z-index: 100;
+  animation: langFadeIn .15s ease-out;
+}
+@keyframes langFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.lang-switcher.open .lang-dropdown,
+.lang-switcher:hover .lang-dropdown {
+  display: block;
+}
+.lang-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background .15s ease;
+  white-space: nowrap;
+}
+.lang-item:hover {
+  background: var(--mint);
+  color: var(--deep);
+}
+.lang-item.active {
+  font-weight: 700;
+  color: var(--deep);
+  background: rgba(111, 155, 120, 0.12);
+}
+.lang-item .check {
+  font-size: 0.85rem;
+  margin-left: 8px;
+  color: var(--deep);
+}
+
 </style>
 <meta name="keywords" content="Thomson Reserve 中文, Thomson Reserve Singapore, Upper Thomson Condo, Bright Hill Condo, Ai Tong School Condo, District 20 New Launch, Land Cost Comparison, OCR, RCR, CCR, Chuan Grove, Bedok Rise, Lentor Central, Hougang Central, Dover Drive, Kallang Close, Telok Blangah, Bukit Timah Road Newton, Dunearn Road" />
 <meta property="og:type" content="website" />
@@ -536,6 +623,17 @@
         <a href="#faq" data-track="faq">常見問題</a>
         <a href="#contact" data-track="contact">登記諮詢</a>
       </nav>
+      <div class="lang-switcher" id="langSwitcher">
+        <button class="lang-btn" type="button" aria-expanded="false" aria-label="切換語言 / Switch Language">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          <span>繁體中文</span>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="lang-dropdown">
+          <a href="/thomson-reserve/" class="lang-item active" lang="zh-Hant">繁體中文 <span class="check">✓</span></a>
+          <a href="/thomson-reserve-cn/" class="lang-item" lang="zh-Hans">简体中文</a>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -1015,6 +1113,30 @@
 })();
 </script>
 
+<script>
+(function(){
+  var switcher = document.getElementById('langSwitcher');
+  if (!switcher) return;
+  var btn = switcher.querySelector('.lang-btn');
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    var isOpen = switcher.classList.toggle('open');
+    btn.setAttribute('aria-expanded', isOpen);
+  });
+  document.addEventListener('click', function(e){
+    if (!switcher.contains(e.target)) {
+      switcher.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') {
+      switcher.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+})();
+</script>
 
 </body>
 </html>
