@@ -166,6 +166,88 @@ INDEX_SYMBOLS = {'SPX', 'NDX'}
 
 ib = IB()
 
+RECENT_IB_ERRORS = []
+
+
+def on_ib_error(reqId, errorCode, errorString, contract):
+    RECENT_IB_ERRORS.append((reqId, errorCode, errorString, contract))
+    if errorCode in (110, 201, 103, 321, 200, 399):
+        print(f"[IB 委託拒絕/警示] ReqId: {reqId} | 代碼: {errorCode} | 訊息: {errorString}")
+
+
+ib.errorEvent += on_ib_error
+
+MARKET_RULES_CACHE = {}
+
+
+def get_price_increment_rules(contract):
+    """
+    動態向 IBKR 取得合約在交易所的價格跳動點階梯規則 (Market Rule)。
+    若查無動態規則，退回內建階梯或預設值。
+    """
+    if not contract or not getattr(contract, 'conId', None):
+        return None
+    con_id = contract.conId
+    if con_id in MARKET_RULES_CACHE:
+        return MARKET_RULES_CACHE[con_id]
+
+    try:
+        details = ib.reqContractDetails(contract)
+        if details:
+            mr_ids = getattr(details[0], 'marketRuleIds', '')
+            if mr_ids:
+                first_rule_id = int(mr_ids.split(',')[0])
+                rules = ib.reqMarketRule(first_rule_id)
+                if rules:
+                    sorted_rules = sorted([(r.lowEdge, r.increment) for r in rules], key=lambda x: x[0])
+                    MARKET_RULES_CACHE[con_id] = sorted_rules
+                    return sorted_rules
+    except Exception:
+        pass
+
+    return None
+
+
+def round_to_valid_tick(symbol, price, contract=None):
+    """
+    根據 IBKR 交易所精確的階梯最小跳動點 (Market Rule) 將委託價修整為合法的限價：
+    例如：
+      - ES (Rule 235): <5 -> 0.05, 5~20 -> 0.10, 20~100 -> 0.25, >=100.0 -> 0.50
+      - NQ (Rule 85):  <5 -> 0.05, 5~100 -> 0.25, 100~500 -> 0.50, >=500.0 -> 1.00
+      - RTY (Rule 99): <5 -> 0.05, 5~20 -> 0.10, 20~100 -> 0.25, >=100.0 -> 0.50
+      - SPX / NDX:     <3 -> 0.05, >=3.0 -> 0.10
+    """
+    if price is None or price <= 0:
+        price = 0.01
+
+    rules = None
+    if contract:
+        rules = get_price_increment_rules(contract)
+
+    # 內建主要商品備援階梯表 (防止連線延遲或 API 查無時保證合法)
+    if not rules:
+        FALLBACK_RULES = {
+            'ES': [(0.0, 0.05), (5.0, 0.1), (20.0, 0.25), (100.0, 0.5)],
+            'NQ': [(0.0, 0.05), (5.0, 0.25), (100.0, 0.5), (500.0, 1.0)],
+            'RTY': [(0.0, 0.05), (5.0, 0.1), (20.0, 0.25), (100.0, 0.5)],
+            'SPX': [(0.0, 0.05), (3.0, 0.1)],
+            'NDX': [(0.0, 0.05), (3.0, 0.1)],
+        }
+        rules = FALLBACK_RULES.get(symbol)
+
+    if rules:
+        inc = rules[0][1]
+        for low_edge, increment in rules:
+            if price >= low_edge:
+                inc = increment
+            else:
+                break
+        valid_price = round(price / inc) * inc
+        return round(valid_price, 6)
+
+    min_tick = MIN_TICK_MAP.get(symbol, 0.01)
+    return round(round(price / min_tick) * min_tick, 6)
+
 
 def connect_ib():
     if not ib.isConnected():
@@ -575,15 +657,15 @@ def execute_butterfly(legs):
     if c_center_bid > 0 and p_center_bid > 0:
         synthetic_bid = (c_center_bid + p_center_bid) - (c_wing_ask + p_wing_ask)
 
-    # 嚴格執行「全部都下 BID LIMIT」
+    # 嚴格執行「全部都下 BID LIMIT」，並套用交易所合法的階梯跳動點 (Market Rule)
     raw_bid = combo_bid if combo_bid > 0 else synthetic_bid
-    min_tick = MIN_TICK_MAP.get(symbol, 0.01)
+    ref_leg = legs.get('c_center')
 
     if raw_bid > 0:
-        limit_price = round(raw_bid / min_tick) * min_tick
+        limit_price = round_to_valid_tick(symbol, raw_bid, ref_leg)
     else:
         # 若休市無買盤報價，依最小跳動點建立
-        limit_price = min_tick
+        limit_price = round_to_valid_tick(symbol, 0.05, ref_leg)
 
     limit_price = round(limit_price, 6)
 
@@ -608,11 +690,27 @@ def execute_butterfly(legs):
     )
 
     if send_live:
+        RECENT_IB_ERRORS.clear()
         trade = ib.placeOrder(combo_contract, order)
-        print(f"=== [下單成功 - BID LIMIT] 已送出委託單 ===\n{summary_str}")
+        print(f"=== [已送出委託單至 IBKR] ===\n{summary_str}")
 
-        # 等待成交
-        end_time = time.time() + 60
+        # 等待 IBKR 接收與回報 (確認是否排入訂單簿或被退回)
+        for _ in range(5):
+            ib.sleep(1)
+            if trade.orderStatus.status not in ('PendingSubmit', ''):
+                break
+
+        order_errors = [e for e in RECENT_IB_ERRORS if e[0] == trade.order.orderId or e[1] in (110, 201, 103, 321, 200)]
+        if order_errors:
+            err_code, err_msg = order_errors[-1][1], order_errors[-1][2]
+            print(f"❌ [下單被拒絕] IBKR 回報錯誤 {err_code}: {err_msg}")
+        elif trade.orderStatus.status in ('PreSubmitted', 'Submitted'):
+            print(f"✅ [委託成功確認] IBKR 已成功接收並排入市場 (狀態: {trade.orderStatus.status}, 限價: {limit_price})")
+        else:
+            print(f"ℹ️ [委託狀態] 目前狀態: {trade.orderStatus.status} (限價: {limit_price})")
+
+        # 等待成交 (最多 60 秒)
+        end_time = time.time() + 55
         while time.time() < end_time:
             ib.sleep(1)
             if trade.orderStatus.status in ('Filled', 'Cancelled'):
@@ -624,8 +722,8 @@ def execute_butterfly(legs):
             note_str = (f"成交 Butterfly (BID LIMIT): 中心 {legs['center_strike']} / "
                         f"上翼 {legs['call_wing_strike']} / 下翼 {legs['put_wing_strike']} @ {fill_price}")
             send_webhook_notification('BUY_BUTTERFLY', symbol, TRADE_QTY, fill_price, note_str)
-        else:
-            print(f"=== [委託狀態] {symbol} 委託單狀態: {trade.orderStatus.status} (限價: {limit_price}) ===")
+        elif trade.orderStatus.status != 'Filled':
+            print(f"=== [委託終止] {symbol} 最終委託單狀態: {trade.orderStatus.status} (限價: {limit_price}) ===")
     else:
         print(f"=== [測試模式 - 僅列印不送單] (OP_SEND_WEBHOOK=false) ===\n{summary_str}")
 
@@ -690,32 +788,19 @@ def run_strategy_cycle():
 
 if __name__ == '__main__':
     import sys
-    run_once = '--once' in sys.argv
 
-    while True:
-        try:
-            connect_ib()
-            run_strategy_cycle()
-        except KeyboardInterrupt:
-            print("\n[中斷] 使用者手動中斷執行。")
-            break
-        except Exception as e:
-            print(f"\n[錯誤] 執行異常: {e}")
-        finally:
-            if ib.isConnected():
-                try:
-                    ib.disconnect()
-                except Exception:
-                    pass
+    try:
+        connect_ib()
+        run_strategy_cycle()
+    except Exception as e:
+        print(f"\n[錯誤] 執行異常: {e}")
+    finally:
+        if ib.isConnected():
+            try:
+                ib.disconnect()
+            except Exception:
+                pass
+            
+    print("最後:", datetime.datetime.now().strftime('%H:%M:%S'))
+    time.sleep(60*60*20)
 
-        if run_once:
-            break
-
-        cfg = load_env_config()
-        refresh_sec = int(cfg.get('REFRESH_SECONDS', 300))
-        print(f"\n[休眠] 等待 {refresh_sec} 秒後進行下一輪掃描 (按 Ctrl+C 可停止)...")
-        try:
-            time.sleep(refresh_sec)
-        except KeyboardInterrupt:
-            print("\n[中斷] 使用者手動中斷執行。")
-            break

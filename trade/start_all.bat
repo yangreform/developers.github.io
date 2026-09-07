@@ -18,10 +18,7 @@ echo   Check Time: %date% %time%
 echo   Scheduled Restart: Every hour at :34
 echo =======================================================
 
-:: ---------------------------------------------------------
-:: 1. Scheduled Restart Check (Every hour at :34)
-:: ---------------------------------------------------------
-if "%MM%"=="34" (
+if "%MM%"=="27" (
     if "!last_killed_hour!" neq "%HH%" (
         set "last_killed_hour=%HH%"
         echo.
@@ -36,6 +33,23 @@ if "%MM%"=="34" (
         echo [%time%] Processes terminated. Watchdog will restart them now...
         timeout /t 3 /nobreak >nul
     )
+
+    echo =======================================================
+    echo "%HH%"
+ 
+    if "%HH%"=="13" (
+	echo 0DTE...
+	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "option.py" >nul
+	if !errorlevel! equ 0 (
+	    echo [OK] option.py is running.
+	) else (
+	    echo [WARNING] option.py is NOT running! Restarting MAXIMIZED...
+	    start "option" /max py .\option.py
+	)
+    )
+    echo =======================================================
+
+
 )
 
 :: ---------------------------------------------------------
@@ -82,15 +96,6 @@ if %errorlevel% equ 0 (
 )
 
 
-echo.
-echo [5/4] Checking ngrok...
-wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "option.py" >nul
-if %errorlevel% equ 0 (
-    echo [OK] option.py is running.
-) else (
-    echo [WARNING] option.py is NOT running! Restarting MAXIMIZED...
-    start "option.py" /max py .\option.py
-)
 
 
 echo.
