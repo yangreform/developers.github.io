@@ -507,13 +507,36 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
     dte_desc = "當天末日輪 (0DTE)" if current_dte == 0 else f"DTE: {current_dte} 天"
     print(f"-> 鎖定 {underlying.symbol} (Class: {chosen_opt_class}) 到期日: {closest_expiry} ({dte_desc}，設定範圍: {min_dte}~{max_dte} 天)")
 
-    # 取得底層標的最新市價 (期貨或指數，具備完整防 NaN 與日 K 備援)
-    ref_price = get_underlying_price(underlying)
+    # 1. 取得該期權合約到期日對應之「真實底層標的」
+    # （期貨期權 FOP 的不同到期月份可能掛鉤不同季度的期貨，例如 9月底期權掛鉤 12月期貨而非 9月期貨）
+    actual_underlying = underlying
+    is_idx = (underlying.secType == 'IND')
+    opt_exchange = 'SMART' if is_idx else underlying.exchange
+
+    if not is_idx and strikes:
+        try:
+            mid_sample_strike = strikes[len(strikes) // 2]
+            sample_opt = FuturesOption(underlying.symbol, closest_expiry, mid_sample_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
+            ib.qualifyContracts(sample_opt)
+            details = ib.reqContractDetails(sample_opt)
+            if details and getattr(details[0], 'underConId', None):
+                target_fut = Contract(conId=details[0].underConId)
+                ib.qualifyContracts(target_fut)
+                actual_underlying = target_fut
+        except Exception as e:
+            print(f"[提示] 查詢期權具體掛鉤期貨異常 ({e})，使用預設期貨標的")
+
+    # 2. 取得底層標的最新市價 (優先以該期權真實掛鉤合約報價為準，杜絕現價與到期月份不對齊)
+    ref_price = get_underlying_price(actual_underlying)
+    if not is_valid_price(ref_price) and actual_underlying != underlying:
+        ref_price = get_underlying_price(underlying)
+
     if not is_valid_price(ref_price):
-        print(f"[錯誤] 無法取得 {underlying.symbol} 的有效標的市價，無法定位 ATM 平價履約價。")
+        print(f"[錯誤] 無法取得 {actual_underlying.symbol} 的有效標的市價，無法定位 ATM 平價履約價。")
         return None
 
-    print(f"-> {underlying.symbol} 當前標的市價: {ref_price:.2f}")
+    under_desc = getattr(actual_underlying, 'localSymbol', actual_underlying.symbol)
+    print(f"-> {underlying.symbol} 期權真實掛鉤標的: {under_desc} (當前標的市價: {ref_price:.2f})")
 
     # 決定動態翼寬 WING_WIDTH (優先採用群組個別設定，無設定則退回預設對應表)
     if wing_width is None or float(wing_width) <= 0:
@@ -596,6 +619,7 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
 
     return {
         'symbol': underlying.symbol,
+        'actual_underlying': actual_underlying,
         'exchange': opt_exchange,
         'sec_type': underlying.secType,
         'underlying_price': ref_price,
@@ -677,9 +701,11 @@ def execute_butterfly(legs):
     env_cfg = load_env_config()
     send_live = str(env_cfg.get('OP_SEND_WEBHOOK', 'false')).strip().lower() in ('true', '1')
 
+    actual_und = legs.get('actual_underlying')
+    und_name = getattr(actual_und, 'localSymbol', symbol) if actual_und else symbol
     summary_str = (
         f"Butterfly (蝶式四腿組合單):\n"
-        f"  標的代號: {symbol} (市價: {legs['underlying_price']:.2f})\n"
+        f"  標的代號: {symbol} (真實掛鉤: {und_name}, 市價: {legs['underlying_price']:.2f})\n"
         f"  中心 ATM (買入 Call & Put): {legs['center_strike']}\n"
         f"  上翼 (賣出 Call): {legs['call_wing_strike']} (+{legs['wing_width']})\n"
         f"  下翼 (賣出 Put) : {legs['put_wing_strike']} (-{legs['wing_width']})\n"
