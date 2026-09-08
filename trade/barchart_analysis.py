@@ -139,7 +139,7 @@ def call_gemini_rest(prompt, api_key):
             ],
             "generationConfig": {
                 "temperature": 0.3,
-                "maxOutputTokens": 4096
+                "maxOutputTokens": 8096
             }
         }
 
@@ -217,7 +217,7 @@ def send_line_notification(analysis_text, archive_filename=None):
         if len(summary_lines) >= 8:
             break
 
-    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text[:4096]
+    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text
 
     line_msg = f"""📊【Barchart 選擇權異動 AI 投資建議】
 🕒 分析時間：{now_str}

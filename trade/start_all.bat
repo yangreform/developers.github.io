@@ -18,14 +18,12 @@ echo   Check Time: %date% %time%
 echo   Scheduled Restart: Every hour at :34
 echo =======================================================
 
-if "%MM%"=="27" (
+if "%MM%"=="34" (
     if "!last_killed_hour!" neq "%HH%" (
         set "last_killed_hour=%HH%"
         echo.
         echo [!] Scheduled restart time %HH%:%MM% reached.
         echo Terminating main.py, q.py, option.py for fresh restart...
-        wmic process where "name='python.exe' and commandline like '%%main.py%%'" call terminate >nul 2>&1
-        wmic process where "name='py.exe' and commandline like '%%main.py%%'" call terminate >nul 2>&1
         wmic process where "name='python.exe' and commandline like '%%q.py%%'" call terminate >nul 2>&1
         wmic process where "name='py.exe' and commandline like '%%q.py%%'" call terminate >nul 2>&1
         wmic process where "name='python.exe' and commandline like '%%option.py%%'" call terminate >nul 2>&1
@@ -37,7 +35,7 @@ if "%MM%"=="27" (
     echo =======================================================
     echo "%HH%"
  
-    if "%HH%"=="13" (
+    if "%HH%"=="03" (
 	echo 0DTE...
 	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "option.py" >nul
 	if !errorlevel! equ 0 (
@@ -55,15 +53,15 @@ if "%MM%"=="27" (
 :: ---------------------------------------------------------
 :: 2. Process Watchdog & Auto-Restart
 :: ---------------------------------------------------------
-echo.
-echo [1/4] Checking main.py...
-wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "main.py" >nul
-if %errorlevel% equ 0 (
-    echo  [OK] main.py is running.
-) else (
-    echo  [WARNING] main.py is NOT running! Restarting MINIMIZED...
-    start "main.py" /min py .\main.py
-)
+::echo.
+::echo [1/4] Checking main.py...
+::wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "main.py" >nul
+::if %errorlevel% equ 0 (
+::    echo  [OK] main.py is running.
+::) else (
+::    echo  [WARNING] main.py is NOT running! Restarting MINIMIZED...
+::    start "main.py" /min py .\main.py
+::)
 
 echo.
 echo [2/4] Checking router.py...
