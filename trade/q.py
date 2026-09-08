@@ -2314,87 +2314,215 @@ def start_dashboard_server():
 
 
 # ==============================================================================
-# 🌟 Auto Delta Hedge Sender
+# 🌟 Futures Code Helper
+# ==============================================================================
+def get_futures_code(prefix: str = "TMF") -> str:
+    now = datetime.datetime.now()
+    month_map = "ABCDEFGHIJKL"
+    month_calendar = calendar.monthcalendar(now.year, now.month)
+
+    # Taiwan monthly futures generally expire on the 3rd Wednesday.
+    third_wednesday = [week[calendar.WEDNESDAY] for week in month_calendar if week[calendar.WEDNESDAY] != 0][2]
+
+    if now.day > third_wednesday or (now.day == third_wednesday and now.hour >= 11):
+        target_month, target_year = now.month + 1, now.year
+        if target_month > 12:
+            target_month, target_year = 1, target_year + 1
+        return f"{prefix}{month_map[target_month - 1]}{str(target_year)[-1]}"
+    return f"{prefix}{month_map[now.month - 1]}{str(now.year)[-1]}"
+
+
+# ==============================================================================
+# 🌟 Auto Delta Hedge Sender (直接下單至 IBKR / 永豐 Shioaji，不再透過 main.py / Webhook)
 # ==============================================================================
 def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int | float) -> bool:
-    local_exec_url = "http://127.0.0.1:5000/webhook"
-    if not WEBHOOK_PASSPHRASE:
-        print(f"[{symbol} 自動對沖系統] ⚠️ WEBHOOK_PASSPHRASE 未設定，只印出訊號不送單。")
-        print(f" -> 動作: {action} {qty} 單位 {symbol} @ {current_price}\n")
-        return False
-
-    # 🌟 自動尋找最近可以下單的正確期貨合約
-    target_contract = None
-    if symbol.upper() != "TMF" and ib and ib.isConnected():
-        target_contract = get_target_future_contract(ib, symbol)
-        if target_contract:
-            print(f"[{symbol} 自動對沖系統] 🎯 鎖定最近可下單期貨合約: {target_contract.localSymbol} (到期日: {target_contract.lastTradeDateOrContractMonth}, conId: {target_contract.conId})")
-
-    payload = {
-        "passphrase": WEBHOOK_PASSPHRASE,
-        "symbol": symbol,
-        "action": action,
-        "quantity": str(qty),
-        "price": str(current_price),
-        "strategy_name": "delta_hedge",
-    }
-    if target_contract:
-        payload["actual_symbol"] = target_contract.symbol
-        payload["expiry"] = target_contract.lastTradeDateOrContractMonth
-        payload["conId"] = target_contract.conId
-        payload["exchange"] = target_contract.exchange
-
-    sym_disp = target_contract.localSymbol if target_contract else symbol
+    """
+    Delta 對沖自動下單：
+    - 國外期貨 (MES, MNQ, M2K, XC, MJY, M6E, MHG, MNG, MCL, MGC 等): 直接透過本地 IB (ib.placeOrder) 下單
+    - 國內期貨 (TMF 台指期貨): 直接透過永豐證券 Shioaji (api.place_order) 下單
+    - 依據 SEND_WEBHOOK 開關控制：True 實際送出委託，False 僅在終端機列印測試訊號
+    - 下單後送出 LINE 推播通知
+    """
+    global api
+    action = (action or "").upper()
+    sym_upper = (symbol or "").upper()
+    qty_int = max(1, int(round(float(qty))))
 
     try:
-        print(f"[{symbol} 自動對沖系統] 🚨 偵測到 Delta 偏移！準備發送下單訊號至交易核心...")
-        print(f" -> 動作: {action} {qty} 單位 {sym_disp} @ {current_price}\n")
+        # -------------------------------------------------------------
+        # 1. 國內期貨：台指期貨 (TMF) 透過 Shioaji 直接下單
+        # -------------------------------------------------------------
+        if sym_upper == "TMF":
+            print(f"[{symbol} 自動對沖系統] 🚨 偵測到 Delta 偏移！準備執行 TMF 對沖下單...")
+            print(f" -> 動作: {action} {qty_int}口 {symbol} @ 市價\n")
 
-        if SEND_WEBHOOK:
-            try:
-                response = requests.post(local_exec_url, json=payload, timeout=10)
-                if response.status_code == 200:
-                    res_json = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
-                    res_msg = res_json.get('message', '')
-                    res_status = res_json.get('status', '')
-                    if res_status in ('cancelled', 'failed', 'error') or 'Error' in res_msg or 'rejected' in res_msg.lower() or '未成交' in res_msg:
-                        print(f"[{symbol} 自動對沖系統] ❌ 下單委託失敗或被拒絕: {response.text}")
-                        # 若 Webhook 核心報錯且有 target_contract，以本地 IB 作為備援送單
-                        if target_contract and ib and ib.isConnected():
-                            print(f"[{symbol} 自動對沖系統] 🔄 啟動本地 IB 備援下單機制...")
-                            order = MarketOrder(action, qty)
-                            order.tif = 'GTC'
-                            order.outsideRth = True
-                            order.algoStrategy = 'Adaptive'
-                            order.algoParams = [TagValue('adaptivePriority', 'Patient')]
-                            trade = ib.placeOrder(target_contract, order)
-                            print(f"[{symbol} 自動對沖系統] 🚀 本地 IB 備援下單成功送出: {action} {qty}口 {target_contract.localSymbol}")
-                            return True
-                        return False
-                    print(f"[{symbol} 自動對沖系統] ✅ 下單委託成功: {response.text}")
-                    return True
-                else:
-                    print(f"[{symbol} 自動對沖系統] ❌ 下單委託失敗, 狀態碼: {response.status_code}, body={response.text}")
-            except Exception as req_err:
-                print(f"[{symbol} 自動對沖系統] ⚠️ Webhook 連線失敗 ({req_err})，啟動本地 IB 直接送單...")
-                if target_contract and ib and ib.isConnected():
-                    order = MarketOrder(action, qty)
-                    order.tif = 'GTC'
-                    order.outsideRth = True
-                    order.algoStrategy = 'Adaptive'
-                    order.algoParams = [TagValue('adaptivePriority', 'Patient')]
-                    trade = ib.placeOrder(target_contract, order)
-                    print(f"[{symbol} 自動對沖系統] 🚀 本地 IB 直接下單已送出: {action} {qty}口 {target_contract.localSymbol}")
-                    return True
+            if not SEND_WEBHOOK:
+                print(f"[{symbol} 自動對沖系統] 🧪 SEND_WEBHOOK=False，目前為測試模式，未實際送出。")
+                return True
+
+            if api is None:
+                api = init_shioaji()
+
+            if not api or not getattr(api, 'futopt_account', None):
+                print(f"[{symbol} 自動對沖系統] ❌ Shioaji 未連線或未找到期貨帳戶 (futopt_account)，無法下單！")
                 return False
 
+            target_code = get_futures_code("TMF")
+            contract = None
+            try:
+                if hasattr(api, 'Contracts') and hasattr(api.Contracts, 'Futures') and hasattr(api.Contracts.Futures, 'TMF'):
+                    contract = api.Contracts.Futures.TMF.get(target_code)
+            except Exception as c_err:
+                print(f"[{symbol} 自動對沖系統] ⚠️ 搜尋 TMF 合約異常: {c_err}")
+
+            if not contract:
+                print(f"[{symbol} 自動對沖系統] ❌ 找不到 TMF 近月期貨合約: {target_code}")
+                return False
+
+            sj_action = sj.constant.Action.Buy if action == "BUY" else sj.constant.Action.Sell
+            order = api.Order(
+                action=sj_action,
+                price=0,
+                quantity=qty_int,
+                price_type=sj.constant.FuturesPriceType.MKT,
+                order_type=sj.constant.OrderType.IOC,
+                octype=sj.constant.FuturesOCType.Auto,
+                account=api.futopt_account,
+            )
+
+            print(f"[{symbol} 自動對沖系統] 🚀 正在直接送出 Shioaji 委託: {target_code} {action} {qty_int}口...")
+            trade = api.place_order(contract, order)
+
+            # 等待 Shioaji 委託狀態更新 (IOC 通常非常快速)
+            end_time = time.time() + 3
+            while trade.status.status.name in ['PendingSubmit', 'Submitted', 'PreSubmitted'] and time.time() < end_time:
+                time.sleep(0.1)
+
+            sj_status = getattr(trade.status.status, 'name', str(trade.status.status))
+            deals = getattr(trade.status, 'deals', []) or []
+            filled_qty = sum(getattr(d, 'quantity', 0) for d in deals)
+            remain_qty = qty_int - filled_qty
+            avg_price = (sum(d.price * d.quantity for d in deals) / filled_qty) if filled_qty > 0 else 0.0
+
+            if sj_status == 'Filled' or (filled_qty == qty_int):
+                msg = f'全數成交 {filled_qty}口 @ {avg_price:.2f}'
+                result_status = 'success'
+            elif sj_status in ('Cancelled', 'Inactive', 'Failed') and filled_qty > 0:
+                msg = f'部分成交 {filled_qty}/{qty_int}口 @ {avg_price:.2f}，剩餘{remain_qty}口因 IOC 取消'
+                result_status = 'partial'
+            else:
+                msg = f'完全未成交，狀態: {sj_status}'
+                result_status = 'cancelled'
+
+            print(f"[{symbol} 自動對沖系統] 📢 Shioaji 對沖結果: {msg}")
+
+            res_msg = f'[{symbol} 自動對沖] {action} {qty_int}口 {target_code}: {msg}'
+            try:
+                payload_data = {
+                    "strategy": "delta_hedge",
+                    "symbol": symbol,
+                    "contract": target_code,
+                    "action": action,
+                    "quantity": qty_int,
+                    "price": current_price,
+                    "avg_fill_price": avg_price,
+                    "status": result_status,
+                }
+                send_trade_notification(symbol, res_msg, payload_data)
+            except Exception as notify_err:
+                print(f"⚠️ LINE 推播發送失敗: {notify_err}")
+
+            return result_status in ('success', 'partial')
+
+        # -------------------------------------------------------------
+        # 2. 國外期貨：IBKR 期貨 (MES, MNQ, M2K, XC, MJY, M6E 等) 直接下單
+        # -------------------------------------------------------------
+        if not ib or not ib.isConnected():
+            print(f"[{symbol} 自動對沖系統] ❌ IB 未連線，無法執行對沖下單！")
             return False
 
-        print(f"[{symbol} 自動對沖系統] 🧪 SEND_WEBHOOK=False，目前為測試模式，未實際送出。")
-        return True
+        target_contract = get_target_future_contract(ib, symbol)
+        if not target_contract:
+            print(f"[{symbol} 自動對沖系統] ❌ 找不到 {symbol} 的有效近月期貨合約！")
+            return False
+
+        sym_disp = getattr(target_contract, 'localSymbol', target_contract.symbol)
+        print(f"[{symbol} 自動對沖系統] 🎯 鎖定最近可下單期貨合約: {sym_disp} (到期日: {target_contract.lastTradeDateOrContractMonth}, conId: {target_contract.conId})")
+
+        print(f"[{symbol} 自動對沖系統] 🚨 偵測到 Delta 偏移！準備執行 IB 對沖下單...")
+        print(f" -> 動作: {action} {qty_int}口 {sym_disp} @ {current_price}\n")
+
+        if not SEND_WEBHOOK:
+            print(f"[{symbol} 自動對沖系統] 🧪 SEND_WEBHOOK=False，目前為測試模式，未實際送出。")
+            return True
+
+        order = MarketOrder(action, qty_int)
+        order.outsideRth = True
+        order.algoStrategy = 'Adaptive'
+        order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+        order.tif = 'GTC'
+        if TARGET_ACCOUNT:
+            order.account = TARGET_ACCOUNT
+
+        print(f"[{symbol} 自動對沖系統] 🚀 正在直接送出本地 IB 委託: {action} {qty_int}口 {sym_disp} (Adaptive Patient)...")
+        trade = ib.placeOrder(target_contract, order)
+
+        # 等待委託確認 (Adaptive Algo 等待至多 5 秒)
+        end_time = time.time() + 5
+        while not trade.isDone() and time.time() < end_time:
+            ib.sleep(0.5)
+
+        ib_status = trade.orderStatus.status
+        filled_qty = trade.orderStatus.filled
+        remain_qty = trade.orderStatus.remaining
+        avg_price = trade.orderStatus.avgFillPrice
+
+        error_msg = ""
+        for log_entry in trade.log:
+            if getattr(log_entry, 'errorCode', 0) != 0 or 'Error' in getattr(log_entry, 'message', '') or 'rejected' in getattr(log_entry, 'message', '').lower():
+                error_msg = getattr(log_entry, 'message', '').replace('<br>', ' ')
+                break
+
+        if ib_status == 'Filled':
+            msg = f'全數成交 {filled_qty}口 @ {avg_price}'
+            result_status = 'success'
+        elif ib_status in ('Submitted', 'PreSubmitted'):
+            msg = f'委託已送出 (Adaptive Algo)，目前狀態: {ib_status}，已成交 {filled_qty}口'
+            result_status = 'submitted'
+        elif ib_status in ('Cancelled', 'Inactive') and filled_qty > 0:
+            msg = f'部分成交 {filled_qty}/{int(filled_qty + remain_qty)}口 @ {avg_price}，剩餘{remain_qty}口因故取消'
+            result_status = 'partial'
+        else:
+            if error_msg:
+                msg = f'完全未成交，發生錯誤: {error_msg}'
+            else:
+                msg = f'完全未成交，狀態: {ib_status}（市場未開盤或流動性不足）'
+            result_status = 'cancelled'
+
+        print(f"[{symbol} 自動對沖系統] 📢 IB 下單結果: {msg}")
+
+        res_msg = f'[{symbol} 自動對沖] {action} {qty_int}口 {sym_disp}: {msg}'
+        try:
+            payload_data = {
+                "strategy": "delta_hedge",
+                "symbol": symbol,
+                "contract": sym_disp,
+                "action": action,
+                "quantity": qty_int,
+                "price": current_price,
+                "avg_fill_price": avg_price,
+                "status": result_status,
+                "conId": getattr(target_contract, 'conId', ''),
+                "expiry": getattr(target_contract, 'lastTradeDateOrContractMonth', ''),
+            }
+            send_trade_notification(symbol, res_msg, payload_data)
+        except Exception as notify_err:
+            print(f"⚠️ LINE 推播發送失敗: {notify_err}")
+
+        return result_status in ('success', 'submitted', 'partial')
 
     except Exception as e:
-        print(f"[{symbol} 自動對沖系統] ❌ 下單請求發生異常: {e}")
+        print(f"[{symbol} 自動對沖系統] ❌ 下單過程發生異常: {e}")
         return False
 
 
@@ -2739,21 +2867,6 @@ def clear_screen():
 def format_price(price, decimals: int = 2) -> str:
     return "N/A" if price is None else f"{price:.{decimals}f}"
 
-
-def get_futures_code(prefix: str = "TMF") -> str:
-    now = datetime.datetime.now()
-    month_map = "ABCDEFGHIJKL"
-    month_calendar = calendar.monthcalendar(now.year, now.month)
-
-    # Taiwan monthly futures generally expire on the 3rd Wednesday.
-    third_wednesday = [week[calendar.WEDNESDAY] for week in month_calendar if week[calendar.WEDNESDAY] != 0][2]
-
-    if now.day > third_wednesday or (now.day == third_wednesday and now.hour >= 11):
-        target_month, target_year = now.month + 1, now.year
-        if target_month > 12:
-            target_month, target_year = 1, target_year + 1
-        return f"{prefix}{month_map[target_month - 1]}{str(target_year)[-1]}"
-    return f"{prefix}{month_map[now.month - 1]}{str(now.year)[-1]}"
 
 
 def get_account_details(ib_client: IB) -> dict[str, str]:
