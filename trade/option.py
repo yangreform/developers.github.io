@@ -730,8 +730,54 @@ def execute_butterfly(legs):
         if order_errors:
             err_code, err_msg = order_errors[-1][1], order_errors[-1][2]
             print(f"❌ [下單被拒絕] IBKR 回報錯誤 {err_code}: {err_msg}")
+            reject_msg = (
+                f"【IBKR 下單被拒絕警示】\n"
+                f"商品: {symbol} (掛鉤: {und_name})\n"
+                f"策略: Butterfly 蝶式四腿組合單\n"
+                f"錯誤代碼: {err_code}\n"
+                f"錯誤訊息: {err_msg}\n"
+                f"委託限價: ${limit_price}"
+            )
+            try:
+                send_trade_notification(symbol, reject_msg, {"error_code": err_code, "error_msg": err_msg})
+                print(f"-> 📲 已發送下單被拒絕警示至 LINE")
+            except Exception as e:
+                print(f"❌ [LINE 推播異常] {e}")
         elif trade.orderStatus.status in ('PreSubmitted', 'Submitted'):
             print(f"✅ [委託成功確認] IBKR 已成功接收並排入市場 (狀態: {trade.orderStatus.status}, 限價: {limit_price})")
+            submit_msg = (
+                f"【IBKR 下單成功通知】\n"
+                f"商品: {symbol} (掛鉤: {und_name})\n"
+                f"策略: Butterfly 蝶式四腿組合單\n"
+                f"到期日: {legs['expiry']} (DTE: {legs['dte']} 天)\n"
+                f"中心 ATM (買入 Call & Put): {legs['center_strike']}\n"
+                f"上翼 (賣出 Call): {legs['call_wing_strike']} (+{legs['wing_width']})\n"
+                f"下翼 (賣出 Put) : {legs['put_wing_strike']} (-{legs['wing_width']})\n"
+                f"委託方式: BID LIMIT (限價買入 {TRADE_QTY} 口)\n"
+                f"委託限價: ${limit_price}\n"
+                f"排單狀態: {trade.orderStatus.status}\n"
+                f"淨 Delta: {legs['total_delta']:+.3f} | 淨 Theta: {legs['total_theta']:.2f}"
+            )
+            payload = {
+                "symbol": symbol,
+                "action": "BUY_BUTTERFLY_SUBMITTED",
+                "quantity": TRADE_QTY,
+                "price": limit_price,
+                "status": trade.orderStatus.status,
+                "order_id": trade.order.orderId,
+                "center_strike": legs['center_strike'],
+                "call_wing": legs['call_wing_strike'],
+                "put_wing": legs['put_wing_strike'],
+                "expiry": legs['expiry'],
+                "dte": legs['dte'],
+                "net_delta": round(legs['total_delta'], 3),
+                "net_theta": round(legs['total_theta'], 2),
+            }
+            try:
+                send_trade_notification(symbol, submit_msg, payload)
+                print(f"-> 📲 已發送 IBKR 下單成功推播至 LINE")
+            except Exception as e:
+                print(f"❌ [LINE 推播異常] {e}")
         else:
             print(f"ℹ️ [委託狀態] 目前狀態: {trade.orderStatus.status} (限價: {limit_price})")
 
@@ -745,9 +791,28 @@ def execute_butterfly(legs):
         if trade.orderStatus.status == 'Filled':
             fill_price = trade.orderStatus.avgFillPrice
             print(f"=== [成交確認] {symbol} Butterfly 已成交，平均價格: {fill_price} ===")
-            note_str = (f"成交 Butterfly (BID LIMIT): 中心 {legs['center_strike']} / "
-                        f"上翼 {legs['call_wing_strike']} / 下翼 {legs['put_wing_strike']} @ {fill_price}")
-            send_webhook_notification('BUY_BUTTERFLY', symbol, TRADE_QTY, fill_price, note_str)
+            fill_msg = (
+                f"【IBKR 成交確認通知】\n"
+                f"商品: {symbol} (掛鉤: {und_name})\n"
+                f"策略: Butterfly 蝶式四腿組合單\n"
+                f"狀態: 完全成交 (Filled)\n"
+                f"成交均價: ${fill_price}\n"
+                f"成交數量: {TRADE_QTY} 口\n"
+                f"中心 ATM: {legs['center_strike']} / 上翼: {legs['call_wing_strike']} / 下翼: {legs['put_wing_strike']}"
+            )
+            fill_payload = {
+                "symbol": symbol,
+                "action": "BUY_BUTTERFLY_FILLED",
+                "quantity": TRADE_QTY,
+                "price": fill_price,
+                "status": "Filled",
+                "order_id": trade.order.orderId,
+            }
+            try:
+                send_trade_notification(symbol, fill_msg, fill_payload)
+                print(f"-> 📲 已發送 IBKR 成交確認推播至 LINE")
+            except Exception as e:
+                print(f"❌ [LINE 推播異常] {e}")
         elif trade.orderStatus.status != 'Filled':
             print(f"=== [委託終止] {symbol} 最終委託單狀態: {trade.orderStatus.status} (限價: {limit_price}) ===")
     else:
