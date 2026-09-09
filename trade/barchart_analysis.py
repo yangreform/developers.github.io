@@ -75,21 +75,25 @@ def load_gemini_api_key(env_path=ENV_FILE):
 
 def get_latest_csv_file(pattern, directory=BARCHART_DIR):
     """
-    Find the newest CSV matching pattern in directory.
+    Find the newest CSV matching pattern in directory, with fallback to old/ subdirectory.
     """
     matches = glob.glob(os.path.join(directory, pattern))
+    if not matches:
+        old_dir = os.path.join(directory, "old")
+        if os.path.exists(old_dir):
+            matches = glob.glob(os.path.join(old_dir, pattern))
     if not matches:
         return None
     matches.sort(key=os.path.getmtime, reverse=True)
     return matches[0]
 
 
-def clean_and_prepare_data(stock_csv, etf_csv, top_n_stocks=60, top_n_etfs=40):
+def clean_and_prepare_data(stock_csv, etf_csv, bull_put_csv=None, top_n_stocks=60, top_n_etfs=40, top_n_bull_put=30):
     """
     Read, clean, and filter CSV data using Pandas:
-      - Filter 7 <= DTE <= 120 (removes 0DTE noise)
-      - Sort by Vol/OI ratio descending
-      - Keep top N highest-conviction signals for prompt efficiency
+      - Stocks & ETFs: Filter 7 <= DTE <= 120 (removes 0DTE noise), sort by Vol/OI descending
+      - Bull Put Spreads: Filter valid spreads, sort by Loss Prob asc / Max Profit% desc
+      - Returns combined string data for Gemini prompt
     """
     print(f"[INFO] 讀取個股 CSV: {os.path.basename(stock_csv)}")
     df_stock = pd.read_csv(stock_csv)
@@ -116,10 +120,37 @@ def clean_and_prepare_data(stock_csv, etf_csv, top_n_stocks=60, top_n_etfs=40):
     if top_n_etfs and len(df_etf_filtered) > top_n_etfs:
         df_etf_filtered = df_etf_filtered.head(top_n_etfs)
 
-    print(f"[INFO] 清洗完成：個股篩選 {len(df_stock_filtered)} 筆，ETF 篩選 {len(df_etf_filtered)} 筆")
+    df_bull_put_filtered = None
+    if bull_put_csv and os.path.exists(bull_put_csv):
+        print(f"[INFO] 讀取 Bull Put Spread CSV: {os.path.basename(bull_put_csv)}")
+        try:
+            df_bp = pd.read_csv(bull_put_csv)
+            # Remove footer rows and empty rows
+            df_bp = df_bp.dropna(subset=["Symbol", "Exp Date"])
+            df_bp = df_bp[~df_bp["Symbol"].astype(str).str.contains("Downloaded", case=False, na=False)]
 
-    data_str = "【個股異常期權數據】\n" + df_stock_filtered.to_csv(index=False) + \
-               "\n\n【ETF異常期權數據】\n" + df_etf_filtered.to_csv(index=False)
+            # Sort by Loss Prob ascending (lowest probability of loss first)
+            if "Loss Prob" in df_bp.columns:
+                loss_clean = df_bp["Loss Prob"].astype(str).str.replace("%", "").str.strip()
+                df_bp["_loss_sort"] = pd.to_numeric(loss_clean, errors="coerce")
+                df_bp = df_bp.sort_values(by="_loss_sort", ascending=True)
+                df_bp = df_bp.drop(columns=["_loss_sort"])
+
+            if top_n_bull_put and len(df_bp) > top_n_bull_put:
+                df_bp = df_bp.head(top_n_bull_put)
+
+            df_bull_put_filtered = df_bp
+            print(f"[INFO] 清洗完成：Bull Put 篩選 {len(df_bull_put_filtered)} 筆候選組合")
+        except Exception as bp_err:
+            print(f"[WARN] 讀取 Bull Put CSV 異常: {bp_err}")
+
+    bp_count = len(df_bull_put_filtered) if df_bull_put_filtered is not None else 0
+    print(f"[INFO] 數據準備完成：個股篩選 {len(df_stock_filtered)} 筆，ETF 篩選 {len(df_etf_filtered)} 筆，Bull Put 篩選 {bp_count} 筆")
+
+    data_str = "【個股異常期權數據 (UOA)】\n" + df_stock_filtered.to_csv(index=False) + \
+               "\n\n【ETF異常期權數據 (UOA)】\n" + df_etf_filtered.to_csv(index=False)
+    if df_bull_put_filtered is not None and not df_bull_put_filtered.empty:
+        data_str += "\n\n【Bull Put Spread 垂直價差篩選數據】\n" + df_bull_put_filtered.to_csv(index=False)
     return data_str
 
 
@@ -208,24 +239,36 @@ def send_line_notification(analysis_text, archive_filename=None):
 
     # Extract key lines for executive summary
     summary_lines = []
-    for line in analysis_text.split("\n"):
-        clean_l = line.strip()
-        if not clean_l:
-            continue
-        if any(keyword in clean_l for keyword in ["1.", "2.", "3.", "4.", "首選", "標的", "Buy", "Call", "Put", "Strangle", "雙賣"]):
-            summary_lines.append(clean_l.replace("*", ""))
-        if len(summary_lines) >= 8:
-            break
+    if "【手機速覽摘要】" in analysis_text:
+        parts = analysis_text.split("【手機速覽摘要】", 1)[1]
+        for line in parts.split("\n"):
+            line_str = line.strip()
+            if not line_str or line_str.startswith("---") or line_str.startswith("###"):
+                if summary_lines:
+                    break
+                continue
+            summary_lines.append(line_str.replace("*", ""))
+            if len(summary_lines) >= 6:
+                break
 
-    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text
+    if not summary_lines:
+        for line in analysis_text.split("\n"):
+            clean_l = line.strip()
+            if not clean_l:
+                continue
+            if any(keyword in clean_l for keyword in ["1.", "2.", "3.", "首選", "建議一", "建議二", "建議三", "Bull Put", "標的", "Buy", "Call", "Put", "雙賣"]):
+                summary_lines.append(clean_l.replace("*", ""))
+            if len(summary_lines) >= 8:
+                break
 
-    line_msg = f"""📊【Barchart 選擇權異動 AI 投資建議】
+    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text[:500]
+
+    line_msg = f"""📊【Barchart 選擇權 AI 三大投資建議】
 🕒 分析時間：{now_str}
 📁 存檔檔名：{archive_filename or 'latest_ai_analysis.txt'}
 
 🎯 核心重點速覽：
 {summary_block}
-
 """
 
     print(f"[INFO] 正在推播 LINE 摘要訊息到手機...")
@@ -237,9 +280,9 @@ def send_line_notification(analysis_text, archive_filename=None):
     return ok
 
 
-def run_analysis(stock_file=None, etf_file=None):
+def run_analysis(stock_file=None, etf_file=None, bull_put_file=None):
     print("=" * 60)
-    print(" Barchart 選擇權異動 AI 分析模組啟動")
+    print(" Barchart 選擇權異動與價差 AI 分析模組啟動")
     print("=" * 60)
 
     # 1. 讀取 API Key
@@ -254,6 +297,8 @@ def run_analysis(stock_file=None, etf_file=None):
         stock_file = get_latest_csv_file("unusual-stock-options-activity-*.csv")
     if not etf_file:
         etf_file = get_latest_csv_file("unusual-etf-options-activity-*.csv")
+    if not bull_put_file:
+        bull_put_file = get_latest_csv_file("*bull-put*.csv")
 
     if not stock_file or not os.path.exists(stock_file):
         print(f"[ERROR] 在 {BARCHART_DIR} 找不到個股 CSV 檔案")
@@ -263,16 +308,60 @@ def run_analysis(stock_file=None, etf_file=None):
         print(f"[ERROR] 在 {BARCHART_DIR} 找不到 ETF CSV 檔案")
         sys.exit(1)
 
+    if bull_put_file and os.path.exists(bull_put_file):
+        print(f"[INFO] 找到最新 Bull Put Spread CSV: {os.path.basename(bull_put_file)}")
+    else:
+        print(f"[WARN] 在 {BARCHART_DIR} 未找到 Bull Put Spread CSV 檔案，將僅分析個股與 ETF")
+        bull_put_file = None
+
     # 3. 清洗與篩選數據
-    data_str = clean_and_prepare_data(stock_file, etf_file)
+    data_str = clean_and_prepare_data(stock_file, etf_file, bull_put_file)
 
     # 4. 組裝 Prompt
-    prompt = f"""你是一位頂級的華爾街量化分析師，擅長追蹤 Smart Money (聰明錢) 動向。
-請根據以下我提供的 Barchart 異常選擇權 (UOA) 數據，進行以下任務：
-1. 幫我找出一個最適合做 Buy Call 或 Buy Put 突破的個股。
-2. 幫我找出一個最適合做 Buy Call 或 Buy Put 突破的 ETF。
-3. 說明挑選理由 (考量 Vol/OI 倍數、Delta、籌碼支撐壓力)。
-4. 如果有適合雙賣收租 (Short Strangle) 的標的，請額外提出。
+    prompt = f"""你是一位頂級的華爾街量化與衍生品資深分析師，擅長追蹤 Smart Money (聰明錢) 動向以及期權價差收租策略。
+請根據以下我提供的三份 Barchart 數據（個股異常期權 UOA、ETF 異常期權 UOA、Bull Put 垂直價差篩選器），為我產出包含【三大核心投資建議】的量化分析報告：
+
+請嚴格遵守以下格式產出：
+
+【手機速覽摘要】
+1. 個股突破首選：[標的代碼] [建議方向 Buy Call / Buy Put]，核心理由與合約行使價/到期日
+2. ETF 趨勢首選：[標的代碼] [建議方向 Buy Call / Buy Put]，宏觀邏輯與合約行使價/到期日
+3. Bull Put 最佳組合：[標的代碼] [賣出 Leg1 / 買入 Leg2 Put]，到期日、最大報酬率%、跌破機率%
+
+---
+
+### 📊 詳細深度量化分析報告
+
+#### 📌 【投資建議一：個股突破交易】（來源：個股異常期權 UOA）
+- **推薦標的代號**：
+- **建議策略**：Buy Call 或 Buy Put
+- **合約規格**：履約價 (Strike)、到期日 (Exp Date / DTE)、Delta、Vol/OI 倍數
+- **進場理由與量化籌碼**：分析主力資金 (Smart Money) 爆量建倉意圖、支撐壓力與波動率
+
+#### 📌 【投資建議二：ETF 趨勢/宏觀對沖】（來源：ETF 異常期權 UOA）
+- **推薦標的代號**：
+- **建議策略**：Buy Call 或 Buy Put
+- **合約規格**：履約價 (Strike)、到期日 (Exp Date / DTE)、Delta、Vol/OI 倍數
+- **進場理由與宏觀局勢**：大盤/板塊資金流向、避險或做多意圖
+
+#### 📌 【投資建議三：Bull Put 垂直價差最佳商品組合】（來源：Bull Put Spread 數據）
+- **推薦標的代號**：
+- **最佳商品組合規格 (Spread 結構)**：
+  - 標的現價 (Price)：
+  - 到期日 (Exp Date) 與天數 (DTE)：
+  - 賣出下翼 Put (Leg 1 Short Strike @ Bid)：
+  - 買入保護 Put (Leg 2 Long Strike @ Ask)：
+  - 淨權利金收入 (Net Credit / Max Profit)：
+  - 最大風險虧損 (Max Loss)：
+  - 損益兩平點 (Break-Even) 與安全緩衝空間 (BE Buffer %)：
+  - 最大報酬率 (Max Profit %)：
+  - 跌破虧損機率 (Loss Probability) / 預估勝率：
+  - 隱含波動率位階 (IV Rank)：
+- **最佳組合評選理由**：說明為何此組為當前全部候選組合中的最佳解（考量安全邊際、下檔支撐力道、報酬率與勝率之性價比 Risk/Reward）。
+
+---
+### 💡 綜合風控與部位管理建議
+（包含止損停利設定、保證金運用與 Greeks Delta/Theta 對沖提醒）
 
 數據如下：
 {data_str}
@@ -286,10 +375,10 @@ def run_analysis(stock_file=None, etf_file=None):
 
     # 7. 終端輸出建議
     print("\n" + "=" * 60)
-    print("=== 今日 AI 投資建議 ===")
-    print("=" * 6)
+    print("=== 今日 AI 三大投資建議 ===")
+    print("=" * 60)
     print(analysis_text)
-    print("=" * 6)
+    print("=" * 60)
 
     # 8. LINE 推播（發送速覽摘要並引導查看網頁新分頁）
     send_line_notification(analysis_text, archive_fname)
@@ -298,4 +387,5 @@ def run_analysis(stock_file=None, etf_file=None):
 if __name__ == "__main__":
     stock_arg = sys.argv[1] if len(sys.argv) > 1 else None
     etf_arg = sys.argv[2] if len(sys.argv) > 2 else None
-    run_analysis(stock_arg, etf_arg)
+    bull_put_arg = sys.argv[3] if len(sys.argv) > 3 else None
+    run_analysis(stock_arg, etf_arg, bull_put_arg)

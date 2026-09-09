@@ -890,21 +890,36 @@ async function loadBarchartData() {
     }
 }
 
-async function onBullPutAction(btn, row) {
+async function onBullPutAction(btn, tIdx, rIdx) {
+    const row = (typeof tIdx === 'number' && window.BARCHART_TABLES && window.BARCHART_TABLES[tIdx])
+        ? window.BARCHART_TABLES[tIdx].rows[rIdx]
+        : (tIdx && typeof tIdx === 'object' ? tIdx : rIdx);
+    if (!row) {
+        alert("無法讀取此筆 Bull Put Spread 資料！");
+        return;
+    }
+
     const origText = btn.innerText;
     btn.disabled = true;
     btn.innerText = "查詢報價中...";
+
+    const symbol = row.Symbol || row.symbol || '';
+    const expDate = row['Exp Date'] || row['Expiration Date'] || row.exp_date || '';
+    const leg1Strike = row['Leg1 Strike'] || row['Leg 1 Strike'] || row['Short Put Strike'] || row['Sell Put Strike'] || row.leg1_strike || 0;
+    const leg2Strike = row['Leg2 Strike'] || row['Leg 2 Strike'] || row['Long Put Strike'] || row['Buy Put Strike'] || row.leg2_strike || 0;
+    const maxProfit = row['Max Profit'] || row['Credit'] || row.max_profit || 0;
+
     try {
         const resp = await fetch('/api/option/barchart_quote', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 strategy: 'bull_put',
-                symbol: row.Symbol,
-                exp_date: row['Exp Date'],
-                leg1_strike: row['Leg1 Strike'],
-                leg2_strike: row['Leg2 Strike'],
-                max_profit: row['Max Profit'] || 0
+                symbol: symbol,
+                exp_date: expDate,
+                leg1_strike: leg1Strike,
+                leg2_strike: leg2Strike,
+                max_profit: maxProfit
             })
         });
         const q = await resp.json();
@@ -957,14 +972,25 @@ async function onBullPutAction(btn, row) {
     }
 }
 
-async function onShortStrangleAction(btn, row) {
+async function onShortStrangleAction(btn, tIdx, rIdx) {
+    const row = (typeof tIdx === 'number' && window.BARCHART_TABLES && window.BARCHART_TABLES[tIdx])
+        ? window.BARCHART_TABLES[tIdx].rows[rIdx]
+        : (tIdx && typeof tIdx === 'object' ? tIdx : rIdx);
+    if (!row) {
+        alert("無法讀取此筆雙賣資料！");
+        return;
+    }
+
     const origText = btn.innerText;
     btn.disabled = true;
     btn.innerText = "查詢報價中...";
 
+    const symbol = row.Symbol || row.symbol || '';
+    const expDate = row['Exp Date'] || row['Expiration Date'] || row.exp_date || row['Expiry'] || '';
     // 取得同位置的 Short Put 與 Short Call 履約價
     let shortPut = row['Short Put Strike'] || row['Short Put'] || row['Sell Put Strike'] || row['Sell Put'] || row['Leg2 Strike'] || row['Leg1 Strike'] || row['Put Strike'] || row['SP'] || 0;
     let shortCall = row['Short Call Strike'] || row['Short Call'] || row['Sell Call Strike'] || row['Sell Call'] || row['Leg3 Strike'] || row['Leg2 Strike'] || row['Call Strike'] || row['SC'] || 0;
+    let maxProfit = row['Max Profit'] || row['Credit'] || row['Midpoint'] || 0;
 
     try {
         const resp = await fetch('/api/option/barchart_quote', {
@@ -972,11 +998,11 @@ async function onShortStrangleAction(btn, row) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 strategy: 'short_strangle',
-                symbol: row.Symbol,
-                exp_date: row['Exp Date'] || row['Expiration Date'] || row['Expiry'],
+                symbol: symbol,
+                exp_date: expDate,
                 short_put_strike: shortPut,
                 short_call_strike: shortCall,
-                max_profit: row['Max Profit'] || row['Credit'] || row['Midpoint'] || 0
+                max_profit: maxProfit
             })
         });
         const q = await resp.json();
@@ -1029,21 +1055,36 @@ async function onShortStrangleAction(btn, row) {
     }
 }
 
-async function onLongCallAction(btn, row) {
+async function onLongCallAction(btn, tIdx, rIdx) {
+    const row = (typeof tIdx === 'number' && window.BARCHART_TABLES && window.BARCHART_TABLES[tIdx])
+        ? window.BARCHART_TABLES[tIdx].rows[rIdx]
+        : (tIdx && typeof tIdx === 'object' ? tIdx : rIdx);
+    if (!row) {
+        alert("無法讀取此筆期權合約資料！");
+        return;
+    }
+
     const origText = btn.innerText;
     btn.disabled = true;
     btn.innerText = "查詢報價中...";
+
+    const symbol = row.Symbol || row.symbol || '';
+    const expDate = row['Exp Date'] || row['Expiration Date'] || row.exp_date || '';
+    const strike = row.Strike || row.strike || 0;
+    const bid = row.Bid || row.bid || 0;
+    const ask = row.Ask || row.ask || 0;
+
     try {
         const resp = await fetch('/api/option/barchart_quote', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 strategy: 'long_call',
-                symbol: row.Symbol,
-                exp_date: row['Exp Date'],
-                strike: row.Strike,
-                bid: row.Bid || 0,
-                ask: row.Ask || 0
+                symbol: symbol,
+                exp_date: expDate,
+                strike: strike,
+                bid: bid,
+                ask: ask
             })
         });
         const q = await resp.json();
@@ -1980,11 +2021,19 @@ def api_run_barchart_analysis():
 def quote_barchart_trade():
     payload = request.get_json(silent=True) or {}
     strategy = payload.get('strategy')
-    symbol = payload.get('symbol')
-    exp_date = str(payload.get('exp_date', '')).replace('-', '').strip()
+    symbol = (payload.get('symbol') or '').strip().upper()
+    raw_exp = str(payload.get('exp_date', '')).strip()
+    exp_date = raw_exp.replace('-', '').replace('/', '')
+    if len(exp_date) != 8 or not exp_date.isdigit():
+        for fmt in ("%Y%m%d", "%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%Y/%m/%d"):
+            try:
+                exp_date = datetime.datetime.strptime(raw_exp, fmt).strftime("%Y%m%d")
+                break
+            except ValueError:
+                pass
     
     if not symbol or not exp_date:
-        return jsonify({'status': 'error', 'message': 'Missing symbol or expiry date'})
+        return jsonify({'status': 'error', 'message': f'缺少標的代號或到期日 (symbol: {symbol}, exp_date: {raw_exp})'})
 
     import random, asyncio, math
     from ib_insync import IB, Option, Contract, ComboLeg
@@ -2007,6 +2056,11 @@ def quote_barchart_trade():
             c1 = Option(symbol, exp_date, leg1, 'P', 'SMART')
             c2 = Option(symbol, exp_date, leg2, 'P', 'SMART')
             local_ib.qualifyContracts(c1, c2)
+            if not c1.conId or not c2.conId:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'無法在 IBKR 找到對應的期權合約: {symbol} {exp_date} P{leg1} / P{leg2}，請確認標的代號或到期日是否正確。'
+                })
 
             contract = Contract(secType='BAG', symbol=symbol, currency='USD', exchange='SMART')
             l1 = ComboLeg(conId=c1.conId, ratio=1, action='BUY', exchange='SMART')
@@ -2014,7 +2068,7 @@ def quote_barchart_trade():
             contract.comboLegs = [l1, l2]
 
             ticker = local_ib.reqMktData(contract, "", True, False)
-            limit_price = credit * 2.0
+            limit_price = credit if credit > 0 else 1.0
             for _ in range(15):
                 local_ib.sleep(0.1)
                 if ticker.bid and not math.isnan(ticker.bid) and ticker.bid > 0:
@@ -2044,6 +2098,11 @@ def quote_barchart_trade():
             c_put = Option(symbol, exp_date, short_put, 'P', 'SMART')
             c_call = Option(symbol, exp_date, short_call, 'C', 'SMART')
             local_ib.qualifyContracts(c_put, c_call)
+            if not c_put.conId or not c_call.conId:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'無法在 IBKR 找到對應的期權合約: {symbol} {exp_date} P{short_put} / C{short_call}，請確認標的代號或到期日是否正確。'
+                })
 
             contract = Contract(secType='BAG', symbol=symbol, currency='USD', exchange='SMART')
             l1 = ComboLeg(conId=c_put.conId, ratio=1, action='BUY', exchange='SMART')
@@ -2083,6 +2142,11 @@ def quote_barchart_trade():
 
             c = Option(symbol, exp_date, strike, right, 'SMART')
             local_ib.qualifyContracts(c)
+            if not c.conId:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'無法在 IBKR 找到對應的期權合約: {symbol} {exp_date} {right}{strike}，請確認標的代號或到期日是否正確。'
+                })
 
             ticker = local_ib.reqMktData(c, "", True, False)
             limit_price = csv_bid if csv_bid > 0 else csv_ask
@@ -2152,6 +2216,8 @@ def execute_barchart_trade():
             contract.comboLegs = [l1, l2]
 
             order = LimitOrder(action, 1, limit_price)
+            if TARGET_ACCOUNT:
+                order.account = TARGET_ACCOUNT
             order.tif = 'DAY'
             order.transmit = True
             local_ib.placeOrder(contract, order)
@@ -2172,6 +2238,8 @@ def execute_barchart_trade():
             contract.comboLegs = [l1, l2]
 
             order = LimitOrder(action, 1, limit_price)
+            if TARGET_ACCOUNT:
+                order.account = TARGET_ACCOUNT
             order.tif = 'DAY'
             order.transmit = True
             local_ib.placeOrder(contract, order)
@@ -2190,6 +2258,8 @@ def execute_barchart_trade():
             local_ib.qualifyContracts(contract)
 
             order = LimitOrder(action, 1, limit_price)
+            if TARGET_ACCOUNT:
+                order.account = TARGET_ACCOUNT
             order.tif = 'DAY'
             order.transmit = True
             local_ib.placeOrder(contract, order)
