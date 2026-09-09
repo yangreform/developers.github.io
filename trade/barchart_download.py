@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Barchart Unusual Options Activity Downloader
+Barchart Options Downloader
 --------------------------------------------
 Downloads CSVs for:
-  1. Stocks: https://www.barchart.com/options/unusual-activity/stocks
-  2. ETFs:   https://www.barchart.com/options/unusual-activity/etfs
+  1. Stocks:          https://www.barchart.com/options/unusual-activity/stocks
+  2. ETFs:            https://www.barchart.com/options/unusual-activity/etfs
+  3. Bull Put Spread: https://www.barchart.com/options/vertical-spreads/bull-put-spread?popularScreener=221982&setPopularScreener=true&orderBy=lossProbability&orderDir=asc
 Target Folder: trade/Barchart/
 Download trigger: https://www.barchart.com/my/download (Toolbar Download button)
-Fallback: Authenticated in-browser Core API export matching exact official CSV format.
+Fallback: Authenticated in-browser Core API / DOM export matching exact official CSV format.
 """
 
 import os
@@ -17,6 +18,7 @@ import time
 import glob
 import json
 import csv
+import re
 import datetime
 import argparse
 from pathlib import Path
@@ -38,6 +40,25 @@ PROFILE_DIR = os.path.join(TARGET_DIR, "chrome_profile")
 
 os.makedirs(TARGET_DIR, exist_ok=True)
 os.makedirs(PROFILE_DIR, exist_ok=True)
+
+
+def get_chrome_major_version():
+    """
+    Detect installed Chrome major version on Windows to avoid ChromeDriver version mismatch.
+    """
+    try:
+        import winreg
+        for key_path in (r'Software\Google\Chrome\BLBeacon', r'Software\Wow6432Node\Google\Chrome\BLBeacon'):
+            for hkey in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+                try:
+                    with winreg.OpenKey(hkey, key_path) as k:
+                        v, _ = winreg.QueryValueEx(k, 'version')
+                        return int(v.split('.')[0])
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return None
 
 
 def load_credentials_from_env(env_path):
@@ -80,7 +101,17 @@ def init_driver(download_dir=TARGET_DIR, profile_dir=PROFILE_DIR, headless=False
     if headless:
         options.add_argument("--headless=new")
 
-    driver = uc.Chrome(options=options)
+    kwargs = {"options": options}
+    major_v = get_chrome_major_version()
+    if major_v:
+        kwargs["version_main"] = major_v
+
+    try:
+        driver = uc.Chrome(**kwargs)
+    except Exception as e:
+        print(f"[WARN] Failed to start Chrome with version_main={major_v}: {e}, falling back to default uc.Chrome")
+        driver = uc.Chrome(options=options)
+
     driver.set_page_load_timeout(45)
 
     # Configure Chrome CDP to allow automatic file downloads directly into target directory
@@ -212,6 +243,43 @@ def wait_for_file_download(directory, before_snapshot, timeout=20):
             if os.path.getmtime(f) > start and os.path.getsize(f) > 500:
                 return f
 
+    return None
+
+
+def scrape_and_save_table_dom(driver, category="bull_put", target_dir=TARGET_DIR):
+    """
+    DOM scraping fallback if native CSV download is blocked or fails:
+    Extracts headers and rows from rendered HTML table in Barchart page.
+    """
+    try:
+        tables = driver.find_elements(By.CSS_SELECTOR, "div.bc-table-scrollable table, table.bc-data-grid, table")
+        if not tables:
+            print(f"[ERROR] No tables found on page for {category.upper()}")
+            return None
+
+        table = tables[0]
+        rows = table.find_elements(By.TAG_NAME, "tr")
+        if not rows:
+            print(f"[ERROR] Table has no rows for {category.upper()}")
+            return None
+
+        today_str = datetime.date.today().strftime("%m-%d-%Y")
+        filename = f"bull-put-spread-option-screener-advanced-bull-put-screener-{today_str}.csv"
+        output_path = os.path.join(target_dir, filename)
+
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            for row in rows:
+                cols = row.find_elements(By.CSS_SELECTOR, "th, td")
+                if cols:
+                    row_text = [c.text.strip().replace("\n", " ") for c in cols]
+                    writer.writerow(row_text)
+
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            print(f"[SUCCESS] DOM Scraped {len(rows)} rows to {output_path}")
+            return output_path
+    except Exception as e:
+        print(f"[ERROR] Failed DOM scrape fallback: {e}")
     return None
 
 
@@ -347,12 +415,12 @@ def fetch_and_save_via_api(driver, category="stocks", target_dir=TARGET_DIR):
 def download_page_csv(driver, page_url, category="stocks", target_dir=TARGET_DIR):
     """
     Navigate to page, click the download button (https://www.barchart.com/my/download),
-    and if direct download doesn't trigger or is hit by membership limit, use the authenticated API fallback.
+    and if direct download doesn't trigger or is hit by membership limit, use the fallback.
     """
     print(f"\n[INFO] --------------------------------------------------")
     print(f"[INFO] Processing {category.upper()}: {page_url}")
     driver.get(page_url)
-    time.sleep(5)
+    time.sleep(7)
     dismiss_popups(driver)
 
     # Snapshot existing files before download
@@ -368,23 +436,26 @@ def download_page_csv(driver, page_url, category="stocks", target_dir=TARGET_DIR
         driver.execute_script("arguments[0].click();", btn)
 
         # Wait for file download
-        downloaded_file = wait_for_file_download(target_dir, before_snapshot, timeout=12)
+        downloaded_file = wait_for_file_download(target_dir, before_snapshot, timeout=15)
 
     if downloaded_file and os.path.exists(downloaded_file):
         print(f"[SUCCESS] Native CSV Download Succeeded: {downloaded_file} (Size: {os.path.getsize(downloaded_file):,} bytes)")
         return downloaded_file
 
-    print(f"[INFO] Native download was not triggered or limit reached; executing high-reliability API exporter...")
-    fallback_file = fetch_and_save_via_api(driver, category=category, target_dir=target_dir)
+    print(f"[INFO] Native download was not triggered or limit reached; executing fallback...")
+    if category == "bull_put":
+        fallback_file = scrape_and_save_table_dom(driver, category=category, target_dir=target_dir)
+    else:
+        fallback_file = fetch_and_save_via_api(driver, category=category, target_dir=target_dir)
     return fallback_file
 
 
-def run_download(headless=False):
+def run_download(headless=False, category="all"):
     """
-    Main entry point to download both Stocks and ETFs options activity.
+    Main entry point to download Stocks, ETFs, and Bull Put Spread options activity.
     """
     print("=" * 60)
-    print(" Barchart Unusual Options Activity Downloader Starting")
+    print(" Barchart Options Downloader Starting")
     print(f" Output Directory: {TARGET_DIR}")
     print("=" * 60)
 
@@ -402,14 +473,22 @@ def run_download(headless=False):
         login_if_needed(driver, account, password)
 
         # Step 2: Download Stocks unusual activity
-        stocks_url = "https://www.barchart.com/options/unusual-activity/stocks"
-        stocks_file = download_page_csv(driver, stocks_url, category="stocks", target_dir=TARGET_DIR)
-        downloaded["stocks"] = stocks_file
+        if category in ("all", "stocks"):
+            stocks_url = "https://www.barchart.com/options/unusual-activity/stocks"
+            stocks_file = download_page_csv(driver, stocks_url, category="stocks", target_dir=TARGET_DIR)
+            downloaded["stocks"] = stocks_file
 
         # Step 3: Download ETFs unusual activity
-        etfs_url = "https://www.barchart.com/options/unusual-activity/etfs"
-        etfs_file = download_page_csv(driver, etfs_url, category="etfs", target_dir=TARGET_DIR)
-        downloaded["etfs"] = etfs_file
+        if category in ("all", "etfs"):
+            etfs_url = "https://www.barchart.com/options/unusual-activity/etfs"
+            etfs_file = download_page_csv(driver, etfs_url, category="etfs", target_dir=TARGET_DIR)
+            downloaded["etfs"] = etfs_file
+
+        # Step 4: Download Bull Put Spread
+        if category in ("all", "bull_put"):
+            bull_put_url = "https://www.barchart.com/options/vertical-spreads/bull-put-spread?popularScreener=221982&setPopularScreener=true&orderBy=lossProbability&orderDir=asc"
+            bull_put_file = download_page_csv(driver, bull_put_url, category="bull_put", target_dir=TARGET_DIR)
+            downloaded["bull_put"] = bull_put_file
 
     finally:
         print("[INFO] Closing browser session...")
@@ -422,16 +501,18 @@ def run_download(headless=False):
             size = os.path.getsize(file_path)
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 lines = sum(1 for _ in f)
-            print(f"  - {cat.upper():<7}: {os.path.basename(file_path)} ({lines:,} lines, {size:,} bytes)")
+            print(f"  - {cat.upper():<9}: {os.path.basename(file_path)} ({lines:,} lines, {size:,} bytes)")
         else:
-            print(f"  - {cat.upper():<7}: FAILED")
+            print(f"  - {cat.upper():<9}: FAILED")
     print("=" * 60)
     return downloaded
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Barchart Unusual Options Activity Downloader")
+    parser = argparse.ArgumentParser(description="Barchart Options Activity Downloader")
     parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    parser.add_argument("--category", choices=["all", "stocks", "etfs", "bull_put"], default="all", help="Category to download (default: all)")
     args = parser.parse_args()
 
-    run_download(headless=args.headless)
+    run_download(headless=args.headless, category=args.category)
+
