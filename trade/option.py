@@ -146,6 +146,22 @@ WING_WIDTH_MAP = {
     'CL': 5.0,
 }
 
+# 預設買入限價上限 (若 .env 中的個別商品未指定 bid_up 則採用此表)
+DEFAULT_BID_UP_MAP = {
+    'ZC': 20.0,
+    'NQ': 600.0,
+    'ES': 180.0,
+    'SPX': 10.0,
+    'NDX': 40.0,
+    'JPY': 0.0010,
+    'EUR': 0.02,
+    'HG': 0.10,
+    'GC': 100.0,
+    'RTY': 25.0,
+    'NG': 0.10,
+    'CL': 2.5,
+}
+
 # 各商品最小跳動點 (用於精準四捨五入至合法的 Limit Price)
 MIN_TICK_MAP = {
     'ES': 0.25,
@@ -440,12 +456,13 @@ def resolve_group_symbols(group_name, symbols):
 # ==============================================================================
 # 4. 獲取 Butterfly 蝶式四腿合約與當前市價
 # ==============================================================================
-def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, max_dte=DEFAULT_MAX_DTE, wing_width=None):
+def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, max_dte=DEFAULT_MAX_DTE, wing_width=None, bid_up=None):
     """
     根據商品設定的 DTE 範圍篩選到期日（支援 0DTE 當天到期末日期權），並以市價最近之 ATM 履約價建立 Butterfly 蝶式：
     - 上翼（Upper Wing）：賣出 1 口 Call，履約價為 中心 + wing_width
     - 中心（Center Body）：買入 1 口 Call、買入 1 口 PUT，履約價鎖定 ATM 平價
     - 下翼（Lower Wing）：賣出 1 口 PUT，履約價為 中心 - wing_width
+    - 限價上限（bid_up）：鎖定委託限價之最高上限 min(即時bid, bid_up)
     """
     market_today = get_market_today()
     is_zero_dte = (min_dte == 0)
@@ -543,6 +560,14 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
         wing_width = WING_WIDTH_MAP.get(underlying.symbol, DEFAULT_WING_WIDTH)
     wing_width = float(wing_width)
 
+    # 決定限價上限 BID_UP (優先採用群組設定，若無設定則退回預設對應表)
+    if bid_up is None or float(bid_up) <= 0:
+        bid_up = DEFAULT_BID_UP_MAP.get(underlying.symbol, None)
+    try:
+        bid_up = float(bid_up) if bid_up is not None else None
+    except (ValueError, TypeError):
+        bid_up = None
+
     # 1. 鎖定中心 ATM 履約價
     valid_strikes = sorted(list(set(strikes)))
     center_strike = min(valid_strikes, key=lambda s: abs(s - ref_price))
@@ -631,6 +656,7 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
         'call_wing_strike': call_wing_strike,
         'put_wing_strike': put_wing_strike,
         'wing_width': wing_width,
+        'bid_up': bid_up,
         'dte': current_dte,
         'expiry': closest_expiry,
         'total_delta': total_delta,
@@ -684,12 +710,34 @@ def execute_butterfly(legs):
     # 嚴格執行「全部都下 BID LIMIT」，並套用交易所合法的階梯跳動點 (Market Rule)
     raw_bid = combo_bid if combo_bid > 0 else synthetic_bid
     ref_leg = legs.get('c_center')
+    bid_up = legs.get('bid_up')
 
-    if raw_bid > 0:
-        limit_price = round_to_valid_tick(symbol, raw_bid, ref_leg)
+    # 執行 bid_up 限價上限保護: min(即時查詢到的bid價格, bid_up)
+    chosen_bid = raw_bid
+    if bid_up is not None and float(bid_up) > 0:
+        bid_up_val = float(bid_up)
+        if raw_bid > 0:
+            if raw_bid > bid_up_val:
+                print(f"-> 🛡️ [價格上限保護] 即時查詢 Bid (${raw_bid}) 超過設定上限 bid_up (${bid_up_val})，依規則只下單上限價: ${bid_up_val}")
+                chosen_bid = bid_up_val
+            else:
+                print(f"-> ℹ️ [價格檢驗正常] 即時查詢 Bid (${raw_bid}) <= bid_up (${bid_up_val})，採用即時價: ${raw_bid}")
+                chosen_bid = raw_bid
+        else:
+            chosen_bid = min(0.05, bid_up_val)
+
+    if chosen_bid > 0:
+        limit_price = round_to_valid_tick(symbol, chosen_bid, ref_leg)
     else:
         # 若休市無買盤報價，依最小跳動點建立
-        limit_price = round_to_valid_tick(symbol, 0.05, ref_leg)
+        default_p = 0.05
+        if bid_up is not None and float(bid_up) > 0:
+            default_p = min(default_p, float(bid_up))
+        limit_price = round_to_valid_tick(symbol, default_p, ref_leg)
+
+    # 確保跳動點修整後不超過 bid_up (若有設定 bid_up)
+    if bid_up is not None and float(bid_up) > 0 and limit_price > float(bid_up):
+        limit_price = round_to_valid_tick(symbol, float(bid_up), ref_leg)
 
     limit_price = round(limit_price, 6)
 
@@ -697,9 +745,12 @@ def execute_butterfly(legs):
     order = LimitOrder('BUY', TRADE_QTY, limit_price)
     order.tif = 'DAY'
 
-    # 即時查詢 trade/.env 中的 OP_SEND_WEBHOOK 開關
+    # 即時查詢 trade/.env 中的 OP_SEND_WEBHOOK 開關與目標帳號
     env_cfg = load_env_config()
     send_live = str(env_cfg.get('OP_SEND_WEBHOOK', 'false')).strip().lower() in ('true', '1')
+    target_acct = env_cfg.get('IB_TARGET_ACCOUNT', '').strip()
+    if target_acct:
+        order.account = target_acct
 
     actual_und = legs.get('actual_underlying')
     und_name = getattr(actual_und, 'localSymbol', symbol) if actual_und else symbol
@@ -711,7 +762,7 @@ def execute_butterfly(legs):
         f"  下翼 (賣出 Put) : {legs['put_wing_strike']} (-{legs['wing_width']})\n"
         f"  到期日: {legs['expiry']} (DTE: {legs['dte']} 天)\n"
         f"  下單方式: BID LIMIT (限價買入)\n"
-        f"  委託限價: ${limit_price} (Market Bid: {combo_bid}, Synthetic Bid: {synthetic_bid:.4f})\n"
+        f"  委託限價: ${limit_price} (即時Bid: {raw_bid}, 上限bid_up: {bid_up if bid_up is not None else '無'})\n"
         f"  淨 Delta: {legs['total_delta']:+.3f} | 淨 Theta: {legs['total_theta']:.2f}"
     )
 
@@ -754,7 +805,7 @@ def execute_butterfly(legs):
                 f"上翼 (賣出 Call): {legs['call_wing_strike']} (+{legs['wing_width']})\n"
                 f"下翼 (賣出 Put) : {legs['put_wing_strike']} (-{legs['wing_width']})\n"
                 f"委託方式: BID LIMIT (限價買入 {TRADE_QTY} 口)\n"
-                f"委託限價: ${limit_price}\n"
+                f"委託限價: ${limit_price} (即時Bid: {raw_bid}, 上限: {bid_up if bid_up is not None else '無'})\n"
                 f"排單狀態: {trade.orderStatus.status}\n"
                 f"淨 Delta: {legs['total_delta']:+.3f} | 淨 Theta: {legs['total_theta']:.2f}"
             )
@@ -763,6 +814,8 @@ def execute_butterfly(legs):
                 "action": "BUY_BUTTERFLY_SUBMITTED",
                 "quantity": TRADE_QTY,
                 "price": limit_price,
+                "bid_up": bid_up,
+                "raw_bid": raw_bid,
                 "status": trade.orderStatus.status,
                 "order_id": trade.order.orderId,
                 "center_strike": legs['center_strike'],
@@ -853,6 +906,9 @@ def run_strategy_cycle():
         # 個別商品動態翼寬 WING_WIDTH
         wing_width = g_info.get('wing_width')
 
+        # 個別商品買入限價上限 BID_UP
+        bid_up = g_info.get('bid_up')
+
         underlying, opt_class, chains = resolve_group_symbols(g_name, symbols)
         if not underlying:
             print(f"[略過] 無法解析 {g_name} 的期貨/指數與期權結構。")
@@ -862,14 +918,15 @@ def run_strategy_cycle():
         current_pos = [p for p in ib.portfolio() if p.contract.symbol == underlying.symbol and p.contract.secType in ['FOP', 'OPT']]
         if not current_pos:
             dte_label = "0DTE" if min_dte == 0 else f"{min_dte}~{max_dte}天"
-            print(f"-> 準備為 {underlying.symbol} (Class: {opt_class}) 建立 Butterfly 部位 (DTE: {dte_label}, 翼寬: {wing_width or '預設'})...")
+            print(f"-> 準備為 {underlying.symbol} (Class: {opt_class}) 建立 Butterfly 部位 (DTE: {dte_label}, 翼寬: {wing_width or '預設'}, bid_up: {bid_up or '預設'})...")
             legs = get_butterfly_legs(
                 underlying=underlying,
                 opt_class=opt_class,
                 chains=chains,
                 min_dte=min_dte,
                 max_dte=max_dte,
-                wing_width=wing_width
+                wing_width=wing_width,
+                bid_up=bid_up
             )
             if legs:
                 execute_butterfly(legs)

@@ -1568,8 +1568,13 @@ def evaluate_and_run_vxm(ib_instance, execute_order=True):
     if execute_order and trade_action and trade_qty > 0:
         if now_ts - VXM_CACHE.get("last_trade_time", 0) > 60:
             if SEND_WEBHOOK:
+                from ib_insync import TagValue
                 order = MarketOrder(trade_action, trade_qty)
                 order.tif = 'DAY'
+                order.algoStrategy = 'Adaptive'
+                order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+                if TARGET_ACCOUNT:
+                    order.account = TARGET_ACCOUNT
                 trade = ib_instance.placeOrder(trade_contract, order)
                 VXM_CACHE["last_trade_time"] = now_ts
                 print(f"🚀 [VXM 下單成功] 已送出 {trade_action} {trade_qty} 口 {trade_contract.localSymbol}，原因: {reason}")
@@ -1799,6 +1804,8 @@ def close_dash_position():
         order.tif = 'DAY'
         order.algoStrategy = 'Adaptive'
         order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+        if TARGET_ACCOUNT:
+            order.account = TARGET_ACCOUNT
         
         local_ib.placeOrder(contract, order)
         local_ib.sleep(1)
