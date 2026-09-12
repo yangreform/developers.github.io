@@ -255,9 +255,13 @@ def analyze_and_report_with_retry(downloaded=None, max_retries=3):
 # ==============================================================================
 # 4. 主程式排程入口
 # ==============================================================================
-def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_archive=False):
+def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_archive=False, skip_order=False, dry_run=False):
     """
-    完整執行自動化 3 步驟流程
+    完整執行自動化 4 步驟流程：
+      1. 歸檔舊檔 (archive_existing_csvs)
+      2. 下載數據 (download_new_csvs)
+      3. AI 量化分析 (analyze_and_report_with_retry)
+      4. 自動向 IBKR 下單 (barchart_placeOrder)
     """
     start_time = time.time()
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -282,6 +286,19 @@ def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_a
     # 步驟 3: 量化 AI 分析與推播 (失敗自動重試三次)
     analysis_text, archive_fname = analyze_and_report_with_retry(downloaded=downloaded, max_retries=max_retries)
 
+    # 步驟 4: 根據 AI 建議自動向 IBKR 下單 (Adaptive Patient + Attached Profit Taker / Stop Loss)
+    if not skip_order:
+        print("\n" + "=" * 65)
+        print("【步驟 4】調用 barchart_placeOrder 執行 IBKR 三大建議自動下單")
+        print("=" * 65)
+        try:
+            from barchart_placeOrder import place_barchart_orders
+            place_barchart_orders(dry_run=dry_run)
+        except Exception as e:
+            print(f"[ERROR] 執行自動下單階段發生異常: {e}")
+    else:
+        print("[INFO] 已跳過步驟 4 (自動向 IBKR 下單)")
+
     elapsed = time.time() - start_time
     print("\n" + "#" * 65)
     print(f"# ✅ Barchart 自動化流程全部順利完成！(總耗時: {elapsed:.1f} 秒)")
@@ -291,10 +308,12 @@ def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_a
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Barchart Options 自動化下載、量化分析與推播整合腳本")
+    parser = argparse.ArgumentParser(description="Barchart Options 自動化下載、量化分析、推播與 IBKR 自動下單整合腳本")
     parser.add_argument("--headless", action="store_true", help="以 Headless 無瀏覽器介面模式執行下載")
     parser.add_argument("--skip-download", action="store_true", help="跳過下載步驟，直接使用現有 CSV 進行分析")
     parser.add_argument("--skip-archive", action="store_true", help="跳過舊檔案歸檔步驟")
+    parser.add_argument("--skip-order", action="store_true", help="跳過向 IBKR 下單步驟")
+    parser.add_argument("--dry-run", action="store_true", help="以模擬模式執行下單（預查現價與計算附屬單，不實際送單至 IBKR）")
     parser.add_argument("--retries", type=int, default=3, help="Gemini 取得報告之最大重試次數 (預設: 3 次)")
     args = parser.parse_args()
 
@@ -302,5 +321,7 @@ if __name__ == "__main__":
         headless=args.headless,
         max_retries=args.retries,
         skip_download=args.skip_download,
-        skip_archive=args.skip_archive
+        skip_archive=args.skip_archive,
+        skip_order=args.skip_order,
+        dry_run=args.dry_run
     )

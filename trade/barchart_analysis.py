@@ -207,6 +207,7 @@ def save_analysis_to_text_file(analysis_text, target_dir=REPORTS_DIR):
     archive_path = os.path.join(target_dir, archive_filename)
     latest_path = os.path.join(target_dir, "latest_ai_analysis.txt")
     root_latest_path = os.path.join(BARCHART_DIR, "latest_ai_analysis.txt")
+    base_latest_path = os.path.join(BASE_DIR, "latest_ai_analysis.txt")
 
     file_content = f"""==分析時間：{now_readable}==
 {analysis_text}
@@ -221,8 +222,11 @@ def save_analysis_to_text_file(analysis_text, target_dir=REPORTS_DIR):
     with open(root_latest_path, "w", encoding="utf-8") as f:
         f.write(file_content)
 
+    with open(base_latest_path, "w", encoding="utf-8") as f:
+        f.write(file_content)
+
     print(f"[INFO] 完整文字檔已成功存檔至：{archive_path}")
-    print(f"[INFO] 最新文字檔已同步至：{latest_path}")
+    print(f"[INFO] 最新文字檔已同步至：{latest_path} 及 {base_latest_path}")
     return archive_filename, archive_path
 
 
@@ -261,7 +265,7 @@ def send_line_notification(analysis_text, archive_filename=None):
             if len(summary_lines) >= 8:
                 break
 
-    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text[:500]
+    summary_block = "\n".join(summary_lines) if summary_lines else analysis_text[:8096]
 
     line_msg = f"""📊【Barchart 選擇權 AI 三大投資建議】
 🕒 分析時間：{now_str}

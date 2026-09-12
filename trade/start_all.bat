@@ -32,8 +32,6 @@ if "%MM%"=="34" (
         timeout /t 3 /nobreak >nul
     )
 
-    echo =======================================================
-    echo "%HH%"
  
     if "%HH%"=="03" (
 	echo 0DTE...
@@ -45,7 +43,18 @@ if "%MM%"=="34" (
 	    start "option" /max py .\option.py
 	)
     )
-    echo =======================================================
+
+
+    if "%HH%"=="22" (
+	echo barchart
+	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "barchart_auto.py" >nul
+	if !errorlevel! equ 0 (
+	    echo [OK] barchart_auto.py is running.
+	) else (
+	    echo [WARNING] barchart_auto.py is NOT running! Restarting MAXIMIZED...
+	    start "barchart" /max py .\barchart_auto.py
+	)
+    )
 
 
 )
