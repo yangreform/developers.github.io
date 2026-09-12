@@ -314,11 +314,11 @@ def run_analysis(stock_file=None, etf_file=None, bull_put_file=None):
         print(f"[WARN] 在 {BARCHART_DIR} 未找到 Bull Put Spread CSV 檔案，將僅分析個股與 ETF")
         bull_put_file = None
 
-    # 3. 清洗與篩選數據
-    data_str = clean_and_prepare_data(stock_file, etf_file, bull_put_file)
-
-    # 4. 組裝 Prompt
-    prompt = f"""你是一位頂級的華爾街量化與衍生品資深分析師，擅長追蹤 Smart Money (聰明錢) 動向以及期權價差收租策略。
+def build_analysis_prompt(data_str):
+    """
+    組裝華爾街量化期權深度分析 Prompt (包含個股突破、ETF 趨勢、Bull Put 垂直價差最佳商品組合)。
+    """
+    return f"""你是一位頂級的華爾街量化與衍生品資深分析師，擅長追蹤 Smart Money (聰明錢) 動向以及期權價差收租策略。
 請根據以下我提供的三份 Barchart 數據（個股異常期權 UOA、ETF 異常期權 UOA、Bull Put 垂直價差篩選器），為我產出包含【三大核心投資建議】的量化分析報告：
 
 請嚴格遵守以下格式產出：
@@ -366,6 +366,47 @@ def run_analysis(stock_file=None, etf_file=None, bull_put_file=None):
 數據如下：
 {data_str}
 """
+
+
+def run_analysis(stock_file=None, etf_file=None, bull_put_file=None):
+    print("=" * 60)
+    print(" Barchart 選擇權異動與價差 AI 分析模組啟動")
+    print("=" * 60)
+
+    # 1. 讀取 API Key
+    api_key = load_gemini_api_key(ENV_FILE)
+    if not api_key:
+        print("[ERROR] 無法在 trade/.env 找到 gemini_api 設定")
+        sys.exit(1)
+    print(f"[INFO] 成功自 trade/.env 載入 gemini_api (長度: {len(api_key)})")
+
+    # 2. 獲取最新 CSV 檔案
+    if not stock_file:
+        stock_file = get_latest_csv_file("unusual-stock-options-activity-*.csv")
+    if not etf_file:
+        etf_file = get_latest_csv_file("unusual-etf-options-activity-*.csv")
+    if not bull_put_file:
+        bull_put_file = get_latest_csv_file("*bull-put*.csv")
+
+    if not stock_file or not os.path.exists(stock_file):
+        print(f"[ERROR] 在 {BARCHART_DIR} 找不到個股 CSV 檔案")
+        sys.exit(1)
+
+    if not etf_file or not os.path.exists(etf_file):
+        print(f"[ERROR] 在 {BARCHART_DIR} 找不到 ETF CSV 檔案")
+        sys.exit(1)
+
+    if bull_put_file and os.path.exists(bull_put_file):
+        print(f"[INFO] 找到最新 Bull Put Spread CSV: {os.path.basename(bull_put_file)}")
+    else:
+        print(f"[WARN] 在 {BARCHART_DIR} 未找到 Bull Put Spread CSV 檔案，將僅分析個股與 ETF")
+        bull_put_file = None
+
+    # 3. 清洗與篩選數據
+    data_str = clean_and_prepare_data(stock_file, etf_file, bull_put_file)
+
+    # 4. 組裝 Prompt
+    prompt = build_analysis_prompt(data_str)
 
     # 5. 呼叫 Gemini
     analysis_text = call_gemini_rest(prompt, api_key)
