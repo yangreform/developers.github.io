@@ -32,6 +32,16 @@ if "%MM%"=="34" (
         timeout /t 3 /nobreak >nul
     )
 
+    if "%HH%"=="02" (
+	echo barchart
+	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "barchart_auto.py" >nul
+	if !errorlevel! equ 0 (
+	    echo [OK] barchart_auto.py is running.
+	) else (
+	    echo [WARNING] barchart_auto.py is NOT running! Restarting MAXIMIZED...
+	    start "barchart" /max py .\barchart_auto.py
+	)
+    )
  
     if "%HH%"=="03" (
 	echo 0DTE...
@@ -44,21 +54,7 @@ if "%MM%"=="34" (
 	)
     )
 
-
-    if "%HH%"=="22" (
-	echo barchart
-	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "barchart_auto.py" >nul
-	if !errorlevel! equ 0 (
-	    echo [OK] barchart_auto.py is running.
-	) else (
-	    echo [WARNING] barchart_auto.py is NOT running! Restarting MAXIMIZED...
-	    start "barchart" /max py .\barchart_auto.py
-	)
-    )
-
-
 )
-
 :: ---------------------------------------------------------
 :: 2. Process Watchdog & Auto-Restart
 :: ---------------------------------------------------------
@@ -93,10 +89,6 @@ if %errorlevel% equ 0 (
     start "ngrok_tunnel" /min "C:\Users\Administrator\Desktop\docker_mc\CT\ngrok\ngrok.exe" http 5000
 )
 
-
-
-
-echo.
 echo -------------------------------------------------------
 echo Monitoring in background... (Next check in 10s)
 timeout /t 10 >nul
