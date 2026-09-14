@@ -117,21 +117,46 @@ FUTURE_SYMBOL_ALIAS = {
 FUTURE_CONTRACT_CACHE = {}
 
 
-def is_unexpired(exp_str: str, today_str: str) -> bool:
+def is_unexpired(exp_str: str, today_str: str, min_days: int = 2) -> bool:
+    """
+    檢查期貨合約是否具備足夠的到期天數 (DTE) 以供新開倉/對沖交易：
+    1. 必須具備足夠的剩餘天數 (DTE >= min_days，預設 2 天)，避免在到期當日或前 1-2 天新開倉。
+    2. 避開 IBKR 實物交割 (Physical Delivery) 與臨期平倉 (Near-Expiration) 風控限制 (Error 201)。
+    3. 當合約 DTE < min_days 時，判定為不可下單合約，促使系統自動往後換月 (Rollover)。
+    """
     if not exp_str:
         return False
     clean_exp = str(exp_str).strip()
-    if len(clean_exp) >= 8:
-        return clean_exp[:8] >= today_str
-    if len(clean_exp) == 6:
-        return clean_exp >= today_str[:6]
-    return clean_exp >= today_str
+    try:
+        import calendar
+        if len(clean_exp) >= 8:
+            exp_date = datetime.date(int(clean_exp[:4]), int(clean_exp[4:6]), int(clean_exp[6:8]))
+        elif len(clean_exp) == 6:
+            year = int(clean_exp[:4])
+            month = int(clean_exp[4:6])
+            last_day = calendar.monthrange(year, month)[1]
+            exp_date = datetime.date(year, month, last_day)
+        else:
+            return False
+
+        if len(today_str) >= 8:
+            today_date = datetime.date(int(today_str[:4]), int(today_str[4:6]), int(today_str[6:8]))
+        else:
+            today_date = datetime.date.today()
+
+        dte = (exp_date - today_date).days
+        return dte >= min_days
+    except Exception:
+        if len(clean_exp) >= 8:
+            return clean_exp[:8] > today_str
+        return clean_exp > today_str
 
 
-def get_target_future_contract(ib_instance, symbol: str):
+def get_target_future_contract(ib_instance, symbol: str, min_days_to_expiry: int = 2):
     """
     自動搜尋並回傳該商品最近可以下單的正確合法期貨合約。
-    支援自動過濾已到期合約、按到期日排序取最近月，並自動進行合約資格化 (qualifyContracts)。
+    支援自動過濾已到期與臨期合約 (DTE >= min_days_to_expiry，預設 2 天，避開 IBKR Error 201 實物交割與臨期風控限制)、
+    按到期日排序取最近月，並自動進行合約資格化 (qualifyContracts)。
     """
     if not ib_instance or not ib_instance.isConnected():
         return None
@@ -145,7 +170,7 @@ def get_target_future_contract(ib_instance, symbol: str):
     cached = FUTURE_CONTRACT_CACHE.get(cache_key)
     if cached:
         contract, cached_time = cached
-        if (now_ts - cached_time < 1800) and is_unexpired(contract.lastTradeDateOrContractMonth, today_str):
+        if (now_ts - cached_time < 1800) and is_unexpired(contract.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry):
             return contract
 
     details = []
@@ -169,7 +194,7 @@ def get_target_future_contract(ib_instance, symbol: str):
     valid_details = [
         d for d in details
         if d.contract.exchange not in ['QBALGO', 'SMART']
-        and is_unexpired(d.contract.lastTradeDateOrContractMonth, today_str)
+        and is_unexpired(d.contract.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry)
     ]
 
     if not valid_details:
