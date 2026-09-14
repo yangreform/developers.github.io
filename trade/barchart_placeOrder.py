@@ -146,31 +146,61 @@ def parse_report_suggestions(report_text):
         exp_date = exp_match.group(1).replace("-", "").replace("/", "") if exp_match else None
 
         is_bull_put = ("BULL PUT" in s.upper()) or ("垂直價差" in s) or ("SPREAD" in s.upper())
-        if is_bull_put and ("賣出" in s or "SHORT STRIKE" in s.upper()):
+        if is_bull_put and ("賣出" in s or "SHORT STRIKE" in s.upper() or "SPREAD" in s.upper()):
             # Bull Put Spread (垂直價差組合單)
             short_put = None
             long_put = None
             ref_credit = None
 
             for line in s.split("\n"):
-                if ("賣出下翼" in line) or ("Leg 1 Short" in line):
-                    m = re.search(r'[：:]\s*[\*\$]*(\d+\.?\d*)', line)
-                    if m:
+                line_clean = line.strip()
+                if any(k in line_clean for k in ["賣出下翼", "Leg 1 Short", "Short Strike", "Short Put"]):
+                    after = line_clean.split("：")[-1] if "：" in line_clean else line_clean.split(":")[-1]
+                    m = re.search(r'(?:Strike\s*)?\$?(\d+\.?\d*)', after.replace("*", "").strip(), re.IGNORECASE)
+                    if m and float(m.group(1)) > 0:
                         short_put = float(m.group(1))
-                elif ("買入保護" in line) or ("Leg 2 Long" in line):
-                    m = re.search(r'[：:]\s*[\*\$]*(\d+\.?\d*)', line)
-                    if m:
+                    else:
+                        m2 = re.search(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', line_clean, re.IGNORECASE)
+                        if m2:
+                            short_put = float(m2.group(1))
+
+                elif any(k in line_clean for k in ["買入保護", "Leg 2 Long", "Long Strike", "Long Put"]):
+                    after = line_clean.split("：")[-1] if "：" in line_clean else line_clean.split(":")[-1]
+                    m = re.search(r'(?:Strike\s*)?\$?(\d+\.?\d*)', after.replace("*", "").strip(), re.IGNORECASE)
+                    if m and float(m.group(1)) > 0:
                         long_put = float(m.group(1))
-                elif ("淨權利金收入" in line) or ("Net Credit" in line):
-                    m = re.search(r'[：:]\s*[\*\$]*(\d+\.?\d*)', line)
-                    if m:
+                    else:
+                        m2 = re.search(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', line_clean, re.IGNORECASE)
+                        if m2:
+                            long_put = float(m2.group(1))
+
+                elif any(k in line_clean for k in ["淨權利金收入", "Net Credit", "淨權利金", "淨收入權利金", "淨信用"]) and ref_credit is None:
+                    after = line_clean.split("：")[-1] if "：" in line_clean else line_clean.split(":")[-1]
+                    m = re.search(r'\$?(\d+\.?\d*)', after.replace("*", "").strip())
+                    if m and float(m.group(1)) > 0:
                         ref_credit = float(m.group(1))
 
+            # 備援 1: 單行描述 (例如: "賣出 727.00 Put / 買入 710.00 Put")
             if not short_put or not long_put:
-                bp_inline = re.search(r'賣出\s*\*?\$?(\d+\.?\d*)\s*Put.*?買入\s*\*?\$?(\d+\.?\d*)\s*Put', s, re.IGNORECASE)
+                bp_inline = re.search(r'賣出[^\d]*(\d+\.?\d*)\s*(?:塊|點)?\s*(?:Strike\s*)?Put.*?買入[^\d]*(\d+\.?\d*)\s*(?:塊|點)?\s*(?:Strike\s*)?Put', s, re.IGNORECASE)
                 if bp_inline:
                     short_put = float(bp_inline.group(1))
                     long_put = float(bp_inline.group(2))
+
+            # 備援 2: 自報告總覽摘要行提取
+            if not short_put or not long_put:
+                bp_summary = re.search(r'Bull\s*Put.*?賣出\s*\*?\$?(\d+\.?\d*)\s*Put.*?買入\s*\*?\$?(\d+\.?\d*)\s*Put', report_text, re.IGNORECASE)
+                if bp_summary:
+                    short_put = float(bp_summary.group(1))
+                    long_put = float(bp_summary.group(2))
+
+            # 備援 3: 自該段文字所有 Strike 數值中排序取前兩大
+            if not short_put or not long_put:
+                strikes_found = [float(x) for x in re.findall(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', s, re.IGNORECASE) if float(x) > 0]
+                if len(strikes_found) >= 2:
+                    s1, s2 = strikes_found[0], strikes_found[1]
+                    short_put = max(s1, s2)
+                    long_put = min(s1, s2)
 
             suggestions.append({
                 "id": i,
@@ -374,8 +404,13 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
 
     elif stype == "bull_put":
         # Bull Put 垂直價差 (賣出短腳 Put + 買入長腳 Put)
-        short_put = item["short_put_strike"]
-        long_put = item["long_put_strike"]
+        short_put = item.get("short_put_strike")
+        long_put = item.get("long_put_strike")
+
+        if not short_put or not long_put or not exp_date:
+            err = f"❌ [合約參數缺失] 無法下單 Bull Put: Strike={short_put}/{long_put}, ExpDate={exp_date}"
+            print(err)
+            return {"status": "error", "message": err, "item": item}
 
         c_short = Option(symbol, exp_date, short_put, "P", "SMART")
         c_long = Option(symbol, exp_date, long_put, "P", "SMART")
