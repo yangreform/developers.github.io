@@ -792,3 +792,4 @@ if __name__ == "__main__":
         symbol_override=args.symbol,
         retries=args.retries,
     )
+    time.sleep(60*60*20)
