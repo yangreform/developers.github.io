@@ -216,8 +216,12 @@ def parse_report_suggestions(report_text):
             })
         else:
             # 單腿選擇權 (Buy Call / Buy Put / Sell Put)
-            strike_match = re.search(r'履約價[^\n:]*[：:]\s*\*?\$?(\d+\.?\d*)', s)
+            strike_match = re.search(r'(?:履約價|Strike)[^\n:]*[：:]\s*[\*\$]*\s*(\d+\.?\d*)', s, re.IGNORECASE)
             strike = float(strike_match.group(1)) if strike_match else None
+            if not strike:
+                m_st = re.search(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', s, re.IGNORECASE)
+                if m_st:
+                    strike = float(m_st.group(1))
 
             # 抓取參考現價或權利金 (支援 "Ask 僅 $0.51", "Ask: $0.51", "最新成交價 / Ask: $0.52 / $0.55")
             ref_match = re.search(r'Ask[^\$\d\n]*\$?(\d+\.?\d*)', s, re.IGNORECASE)
@@ -241,7 +245,103 @@ def parse_report_suggestions(report_text):
                 "raw_strategy": raw_strat,
             })
 
+    # 若從詳細區塊中未能解析出完整 3 項建議，啟動速覽摘要備援解析
+    if len(suggestions) < 3:
+        suggestions = parse_from_summary_fallback(report_text, suggestions)
+
     return suggestions
+
+
+def parse_from_summary_fallback(report_text, existing_suggestions=None):
+    """
+    備援機制：若無法從詳細分析段落解析出完整 3 項建議，
+    嘗試自【手機速覽摘要】或條列行中補足缺失的建議項目。
+    """
+    existing_ids = {item["id"] for item in (existing_suggestions or [])}
+    found = list(existing_suggestions or [])
+
+    lines = report_text.split("\n")
+    for line in lines:
+        line_clean = line.strip()
+        if not line_clean:
+            continue
+
+        # 建議 1 / 建議 2：單腿期權
+        if any(k in line_clean for k in ["個股突破", "ETF 趨勢", "個股", "ETF"]) and any(s in line_clean for s in ["Buy", "Call", "Put", "看多", "看空"]):
+            cand_id = 2 if any(k in line_clean for k in ["ETF", "趨勢", "2."]) else 1
+            if cand_id in existing_ids:
+                continue
+
+            m_sym = re.search(r'[\*`]*([A-Z]{1,5})[\*`]*\s*(?:【|\(|\||:|\s*Sell|\s*Buy)', line_clean)
+            if not m_sym:
+                m_sym = re.search(r'：\s*[\*`]*([A-Z]{1,5})[\*`]*', line_clean)
+            sym = m_sym.group(1).strip() if m_sym else None
+
+            strat_str = line_clean.upper()
+            is_put = "PUT" in strat_str or "看空" in line_clean
+            right = "P" if is_put else "C"
+            action = "SELL" if "SELL" in strat_str else "BUY"
+
+            m_strike = re.search(r'(?:履約價|Strike)[^\d]*\$?(\d+\.?\d*)', line_clean, re.IGNORECASE)
+            strike = float(m_strike.group(1)) if m_strike else None
+
+            m_exp = re.search(r'(\d{4}[-/]\d{2}[-/]\d{2})', line_clean)
+            exp_date = m_exp.group(1).replace("-", "").replace("/", "") if m_exp else None
+
+            if sym and strike and exp_date:
+                found.append({
+                    "id": cand_id,
+                    "type": "single_option",
+                    "symbol": sym,
+                    "strategy": f"{action} {'Call' if right == 'C' else 'Put'}",
+                    "action": action,
+                    "right": right,
+                    "exp_date": exp_date,
+                    "strike": strike,
+                    "ref_price": None,
+                    "raw_strategy": f"{action} {'Call' if right == 'C' else 'Put'}",
+                })
+                existing_ids.add(cand_id)
+
+        # 建議 3：Bull Put 垂直價差
+        elif any(k in line_clean for k in ["Bull Put", "垂直價差", "雙賣"]):
+            cand_id = 3
+            if cand_id in existing_ids:
+                continue
+
+            m_sym = re.search(r'[\*`]*([A-Z]{1,5})[\*`]*\s*(?:【|\(|\||:|\s*Sell|\s*Buy)', line_clean)
+            if not m_sym:
+                m_sym = re.search(r'：\s*[\*`]*([A-Z]{1,5})[\*`]*', line_clean)
+            sym = m_sym.group(1).strip() if m_sym else None
+
+            m_strikes = re.findall(r'(?:賣出|Sell|買入|Buy|Strike)[^\d]*(\d+\.?\d*)', line_clean, re.IGNORECASE)
+            s_nums = [float(x) for x in m_strikes if float(x) > 0]
+            if len(s_nums) >= 2:
+                short_p = max(s_nums[0], s_nums[1])
+                long_p = min(s_nums[0], s_nums[1])
+            else:
+                short_p, long_p = None, None
+
+            m_exp = re.search(r'(\d{4}[-/]\d{2}[-/]\d{2})', line_clean)
+            exp_date = m_exp.group(1).replace("-", "").replace("/", "") if m_exp else None
+
+            if sym and short_p and long_p and exp_date:
+                found.append({
+                    "id": 3,
+                    "type": "bull_put",
+                    "symbol": sym,
+                    "strategy": "Bull Put Spread",
+                    "action": "SELL",
+                    "exp_date": exp_date,
+                    "short_put_strike": short_p,
+                    "long_put_strike": long_p,
+                    "ref_price": None,
+                    "raw_strategy": "Bull Put Spread",
+                })
+                existing_ids.add(cand_id)
+
+    found.sort(key=lambda x: x["id"])
+    return found
 
 
 # ==============================================================================
@@ -294,8 +394,13 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
     order_records = []
 
     if stype == "single_option":
-        strike = item["strike"]
-        right = item["right"]
+        strike = item.get("strike")
+        right = item.get("right")
+
+        if not strike or not exp_date or not right:
+            err = f"❌ [合約參數缺失] 無法下單 {symbol}: Strike={strike}, ExpDate={exp_date}, Right={right}"
+            print(err)
+            return {"status": "error", "message": err, "item": item}
 
         contract = Option(symbol, exp_date, strike, right, "SMART")
         qualified = ib.qualifyContracts(contract)
@@ -334,6 +439,9 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
                 current_price = ticker.close
             else:
                 current_price = ref_price
+
+        if current_price is None or math.isnan(current_price) or current_price <= 0:
+            current_price = ref_price or 1.00
 
         current_price = max(0.05, round(current_price, 2))
         print(f"  -> 預查現價成功: ${current_price:.2f} (即時Bid: {ticker.bid}, Ask: {ticker.ask}, 參考價: {ref_price})")

@@ -65,10 +65,12 @@ try:
         call_gemini_rest,
         save_analysis_to_text_file,
         send_line_notification,
+        is_report_complete,
     )
 except ImportError as e:
     print(f"[ERROR] 無法自 barchart_analysis 載入分析函式: {e}")
     load_gemini_api_key = None
+    is_report_complete = None
 
 try:
     from notifier import send_push_message
@@ -206,12 +208,13 @@ def analyze_and_report_with_retry(downloaded=None, max_retries=3):
         print(f"\n[INFO] 正在向 Gemini 請求深度量化分析報告 (嘗試第 {attempt}/{max_retries} 次)...")
         try:
             res = call_gemini_rest(prompt, api_key)
-            if res and len(res.strip()) > 100:
+            complete_check = is_report_complete(res) if is_report_complete else (len(res.strip()) > 1000)
+            if res and complete_check:
                 analysis_text = res
                 print(f"[SUCCESS] ✅ 成功取得 Gemini 深度量化分析報告 (第 {attempt} 次嘗試成功，長度: {len(analysis_text)} 字)！")
                 break
             else:
-                raise ValueError("Gemini 回傳內容為空或長度過短")
+                raise ValueError("Gemini 回傳內容為空、過短或缺少三大投資建議完整區塊")
         except Exception as e:
             last_error = e
             print(f"[WARN] ⚠️ 第 {attempt}/{max_retries} 次取得報告失敗: {e}")

@@ -31,9 +31,11 @@ if sys.platform == "win32":
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_FILE = os.path.join(BASE_DIR, ".env")
 BARCHART_DIR = os.path.join(BASE_DIR, "Barchart")
+OLD_DIR = os.path.join(BARCHART_DIR, "old")
 REPORTS_DIR = os.path.join(BARCHART_DIR, "reports")
 
 os.makedirs(BARCHART_DIR, exist_ok=True)
+os.makedirs(OLD_DIR, exist_ok=True)
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
 # Add trade dir to sys.path to import notifier
@@ -73,17 +75,46 @@ def load_gemini_api_key(env_path=ENV_FILE):
     return None
 
 
+def is_valid_csv_file(file_path, min_rows=1):
+    """
+    檢查 CSV 檔案是否存在、非空且含有實際數據行（排除僅有表頭或下載 footer 標記）
+    """
+    if not file_path or not os.path.exists(file_path):
+        return False
+    if os.path.getsize(file_path) < 350:
+        return False
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            valid_lines = [l.strip() for l in f if l.strip() and not l.strip().startswith('"Downloaded') and not l.strip().startswith("Downloaded")]
+        return len(valid_lines) >= (min_rows + 1)
+    except Exception:
+        return False
+
+
 def get_latest_csv_file(pattern, directory=BARCHART_DIR):
     """
-    Find the newest CSV matching pattern in directory, with fallback to old/ subdirectory.
+    尋找指定目錄或 old/ 目錄下最新且含有實際數據的 CSV 檔案。
     """
-    matches = glob.glob(os.path.join(directory, pattern))
+    # 1. 優先在根目錄中尋找含有數據的檔案
+    matches = [f for f in glob.glob(os.path.join(directory, pattern)) if is_valid_csv_file(f)]
+    # 2. 若根目錄無有效檔案，搜尋 old/ 歷史目錄
     if not matches:
         old_dir = os.path.join(directory, "old")
         if os.path.exists(old_dir):
-            matches = glob.glob(os.path.join(old_dir, pattern))
+            matches = [f for f in glob.glob(os.path.join(old_dir, pattern)) if is_valid_csv_file(f)]
+
+    # 3. 若均無滿足條件的檔案，退回取任意匹配檔案
     if not matches:
+        all_m = glob.glob(os.path.join(directory, pattern))
+        if not all_m:
+            old_dir = os.path.join(directory, "old")
+            if os.path.exists(old_dir):
+                all_m = glob.glob(os.path.join(old_dir, pattern))
+        if all_m:
+            all_m.sort(key=os.path.getmtime, reverse=True)
+            return all_m[0]
         return None
+
     matches.sort(key=os.path.getmtime, reverse=True)
     return matches[0]
 
@@ -93,6 +124,7 @@ def clean_and_prepare_data(stock_csv, etf_csv, bull_put_csv=None, top_n_stocks=6
     Read, clean, and filter CSV data using Pandas:
       - Stocks & ETFs: Filter 7 <= DTE <= 120 (removes 0DTE noise), sort by Vol/OI descending
       - Bull Put Spreads: Filter valid spreads, sort by Loss Prob asc / Max Profit% desc
+      - 自動備援：若當前 Bull Put CSV 筆數為 0，自動向歷史目錄 old/ 搜尋最新有效價差數據
       - Returns combined string data for Gemini prompt
     """
     print(f"[INFO] 讀取個股 CSV: {os.path.basename(stock_csv)}")
@@ -120,29 +152,66 @@ def clean_and_prepare_data(stock_csv, etf_csv, bull_put_csv=None, top_n_stocks=6
     if top_n_etfs and len(df_etf_filtered) > top_n_etfs:
         df_etf_filtered = df_etf_filtered.head(top_n_etfs)
 
+    # Bull Put 垂直價差篩選與備援機制
     df_bull_put_filtered = None
+    candidate_bp_files = []
     if bull_put_csv and os.path.exists(bull_put_csv):
-        print(f"[INFO] 讀取 Bull Put Spread CSV: {os.path.basename(bull_put_csv)}")
+        candidate_bp_files.append(bull_put_csv)
+
+    # 搜尋 Barchart 與 old/ 目錄下所有可用的 Bull Put CSV 作為備援
+    all_bp_found = glob.glob(os.path.join(BARCHART_DIR, "*bull-put*.csv")) + glob.glob(os.path.join(OLD_DIR, "*bull-put*.csv"))
+    all_bp_found.sort(key=os.path.getmtime, reverse=True)
+    for f in all_bp_found:
+        if f not in candidate_bp_files:
+            candidate_bp_files.append(f)
+
+    all_bp_dfs = []
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+
+    for bp_file in candidate_bp_files:
+        if not os.path.exists(bp_file) or os.path.getsize(bp_file) < 350:
+            continue
         try:
-            df_bp = pd.read_csv(bull_put_csv)
-            # Remove footer rows and empty rows
+            df_bp = pd.read_csv(bp_file)
             df_bp = df_bp.dropna(subset=["Symbol", "Exp Date"])
             df_bp = df_bp[~df_bp["Symbol"].astype(str).str.contains("Downloaded", case=False, na=False)]
 
-            # Sort by Loss Prob ascending (lowest probability of loss first)
-            if "Loss Prob" in df_bp.columns:
-                loss_clean = df_bp["Loss Prob"].astype(str).str.replace("%", "").str.strip()
-                df_bp["_loss_sort"] = pd.to_numeric(loss_clean, errors="coerce")
-                df_bp = df_bp.sort_values(by="_loss_sort", ascending=True)
-                df_bp = df_bp.drop(columns=["_loss_sort"])
+            # 過濾已過期合約 (到期日需大於等於今天，避免選中歷史過期合約)
+            df_bp = df_bp[df_bp["Exp Date"].astype(str) >= today_str]
 
-            if top_n_bull_put and len(df_bp) > top_n_bull_put:
-                df_bp = df_bp.head(top_n_bull_put)
+            # 若有 DTE 欄位，優先保留波段價差組合 (DTE >= 5)
+            if "DTE" in df_bp.columns:
+                df_bp["DTE"] = pd.to_numeric(df_bp["DTE"], errors="coerce")
+                df_bp_future = df_bp[df_bp["DTE"] >= 5]
+                if not df_bp_future.empty:
+                    df_bp = df_bp_future
 
-            df_bull_put_filtered = df_bp
-            print(f"[INFO] 清洗完成：Bull Put 篩選 {len(df_bull_put_filtered)} 筆候選組合")
+            if not df_bp.empty:
+                all_bp_dfs.append(df_bp)
+                # 累積已達 top_n 筆數即停止檢索
+                if sum(len(d) for d in all_bp_dfs) >= top_n_bull_put:
+                    break
         except Exception as bp_err:
-            print(f"[WARN] 讀取 Bull Put CSV 異常: {bp_err}")
+            print(f"[WARN] 讀取 Bull Put CSV 異常 ({os.path.basename(bp_file)}): {bp_err}")
+
+    if all_bp_dfs:
+        combined_bp = pd.concat(all_bp_dfs, ignore_index=True)
+        # 去重
+        dedup_cols = [c for c in ["Symbol", "Exp Date", "Leg1 Strike", "Leg2 Strike"] if c in combined_bp.columns]
+        if dedup_cols:
+            combined_bp = combined_bp.drop_duplicates(subset=dedup_cols)
+
+        if "Loss Prob" in combined_bp.columns:
+            loss_clean = combined_bp["Loss Prob"].astype(str).str.replace("%", "").str.strip()
+            combined_bp["_loss_sort"] = pd.to_numeric(loss_clean, errors="coerce")
+            combined_bp = combined_bp.sort_values(by="_loss_sort", ascending=True)
+            combined_bp = combined_bp.drop(columns=["_loss_sort"])
+
+        if top_n_bull_put and len(combined_bp) > top_n_bull_put:
+            combined_bp = combined_bp.head(top_n_bull_put)
+
+        df_bull_put_filtered = combined_bp
+        print(f"[INFO] 清洗完成：Bull Put 篩選 {len(df_bull_put_filtered)} 筆未過期候選組合 (標的: {list(df_bull_put_filtered['Symbol'].unique())[:6]})")
 
     bp_count = len(df_bull_put_filtered) if df_bull_put_filtered is not None else 0
     print(f"[INFO] 數據準備完成：個股篩選 {len(df_stock_filtered)} 筆，ETF 篩選 {len(df_etf_filtered)} 筆，Bull Put 篩選 {bp_count} 筆")
@@ -154,11 +223,25 @@ def clean_and_prepare_data(stock_csv, etf_csv, bull_put_csv=None, top_n_stocks=6
     return data_str
 
 
+def is_report_complete(text):
+    """
+    驗證 AI 回傳的報告是否完整且具備三大核心建議，杜絕模型提早中斷被截斷。
+    """
+    if not text or len(text.strip()) < 1000:
+        return False
+    # 必須同時包含個股、ETF、Bull Put 建議段落
+    has_s1 = any(k in text for k in ["投資建議一", "建議一", "個股突破"])
+    has_s2 = any(k in text for k in ["投資建議二", "建議二", "ETF"])
+    has_s3 = any(k in text for k in ["投資建議三", "建議三", "Bull Put", "垂直價差"])
+    return has_s1 and has_s2 and has_s3
+
+
 def call_gemini_rest(prompt, api_key):
     """
     Direct REST API call with model fallback chain.
+    優先使用產出穩定且完整的 gemini-3.7-flash 及 gemini-3.6-flash，嚴格校驗回傳報告完整性。
     """
-    candidate_models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
+    candidate_models = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.8-flash"]
 
     for m_name in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{m_name}:generateContent?key={api_key}"
@@ -176,21 +259,26 @@ def call_gemini_rest(prompt, api_key):
 
         print(f"[INFO] 正在呼叫 Gemini 模型：{m_name} ...")
         try:
-            r = requests.post(url, json=payload, timeout=60)
+            r = requests.post(url, json=payload, timeout=90)
             if r.status_code == 200:
                 res_json = r.json()
-                text = res_json["candidates"][0]["content"]["parts"][0]["text"]
-                print(f"[SUCCESS] 模型 {m_name} 呼叫成功！")
-                return text
+                cand = res_json.get("candidates", [{}])[0]
+                text = cand.get("content", {}).get("parts", [{}])[0].get("text", "")
+
+                if is_report_complete(text):
+                    print(f"[SUCCESS] 模型 {m_name} 呼叫成功且報告完整 (長度: {len(text)} 字)！")
+                    return text
+                else:
+                    print(f"[WARN] 模型 {m_name} 回傳內容不完整或過短 (長度: {len(text)} 字)，嘗試下一個備用模型...")
             else:
                 err_msg = r.json().get("error", {}).get("message", r.text[:200])
                 print(f"[WARN] 模型 {m_name} 回應錯誤 (代碼 {r.status_code}): {err_msg}，嘗試備用模型...")
         except Exception as e:
             print(f"[WARN] 模型 {m_name} 連線異常: {e}，嘗試備用模型...")
 
-        time.sleep(1)
+        time.sleep(2)
 
-    raise RuntimeError("所有 Gemini 模型呼叫均未成功。")
+    raise RuntimeError("所有 Gemini 模型呼叫均未成功或回傳報告均不完整。")
 
 
 def save_analysis_to_text_file(analysis_text, target_dir=REPORTS_DIR):
