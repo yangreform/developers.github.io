@@ -161,6 +161,10 @@ class InsiderSelectionSkill:
    - 評估該標的是否處於產業轉折點、AI/伺服器科技循環、景氣防禦、或價值重估階段。
 3. **選出「唯一最好一檔商品」**：
    - 綜合以上內部人掃貨力道與勝率，在所有候選標的中挑選出最具上漲爆發力、機構跟進意願最高、性價比最佳的「唯一一檔商品」。
+4. **期權流動性與可交易性 (Optionability)**：
+   - 我們的後續步驟為挑選該標的之 CALL 期權大單並下單。因此請優先挑選知名度高、中大型市值、具有熱絡期權鏈（Options Chain）的活躍標的，避免無期權成交的大單死水標的。
+5. **嚴格白名單約束**：
+   - 推薦的標的代號 (Symbol) 必須 100% 出現於上述【標的內部人淨買入總額排行榜】之中，嚴禁推薦清單以外的股票！
 
 【輸出格式規範】
 請務必嚴格依循下列 Markdown 結構輸出，代號必須清晰以便程式正則擷取：
@@ -182,9 +186,9 @@ class InsiderSelectionSkill:
 """
         return prompt
 
-    def parse_symbol_from_report(self, report_text, excluded_symbols=None):
+    def parse_symbol_from_report(self, report_text, excluded_symbols=None, valid_symbols=None):
         """
-        自分析報告中提取標的代號，若命中了排除名單則判定為無效
+        自分析報告中提取標的代號，若命中了排除名單或不在候選名單中則判定為無效
         """
         patterns = [
             r'推薦標的代號[^\n:]*[：:]\s*[\*`]*([A-Za-z0-9]+)',
@@ -192,6 +196,7 @@ class InsiderSelectionSkill:
             r'標的代號[^\n:]*[：:]\s*[\*`]*([A-Za-z0-9]+)',
         ]
         excluded_set = {s.upper() for s in (excluded_symbols or [])}
+        valid_set = {s.upper() for s in (valid_symbols or [])} if valid_symbols else None
 
         for p in patterns:
             m = re.search(p, report_text, re.IGNORECASE)
@@ -200,6 +205,9 @@ class InsiderSelectionSkill:
                 if sym not in ("BUY", "CALL", "PUT", "STOCK", "NONE", "N/A", "SYMBOL"):
                     if sym in excluded_set:
                         print(f"[WARN] [SelectionSkill] AI 推薦的標的 {sym} 位於排除名單中！")
+                        return None
+                    if valid_set and sym not in valid_set:
+                        print(f"[WARN] [SelectionSkill] AI 推薦的標的 {sym} 未出現在本次內部人數據白名單中（可能為模型幻覺），判定無效！")
                         return None
                     return sym
         return None
@@ -235,12 +243,14 @@ class InsiderSelectionSkill:
         insider_report = None
         selected_symbol = None
 
+        valid_symbols = top_summary["Symbol"].tolist() if not top_summary.empty else []
+
         for attempt in range(1, max_retries + 1):
             print(f"[INFO] [SelectionSkill] 正在向 Gemini 請求內部人量化分析報告 (嘗試第 {attempt}/{max_retries} 次)...")
             try:
                 report = call_gemini_for_skill(prompt, self.api_key) if call_gemini_for_skill else None
                 if report and len(report.strip()) > 100:
-                    sym = self.parse_symbol_from_report(report, excluded_symbols=excluded_symbols)
+                    sym = self.parse_symbol_from_report(report, excluded_symbols=excluded_symbols, valid_symbols=valid_symbols)
                     if sym:
                         insider_report = report
                         selected_symbol = sym

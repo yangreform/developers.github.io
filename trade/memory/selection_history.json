@@ -43,6 +43,15 @@
       },
       "status": "recommended",
       "notes": "Selected by Skills Pipeline on 2026-09-14 17:37:42"
+    },
+    {
+      "symbol": "UPST",
+      "recommended_at": "2026-09-14 18:03:21",
+      "company_name": "Upstart Holdings Inc",
+      "insider_net_buy": 1277500.0,
+      "selected_call": {},
+      "status": "no_options_flow",
+      "notes": "Selected by Skills Pipeline on 2026-09-14 18:02:57 (no options flow)"
     }
   ]
 }

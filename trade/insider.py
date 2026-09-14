@@ -467,29 +467,67 @@ def run_insider_pipeline(
         print(f"\n✨ 【Selection Skill 選定成果】: 標的 {selected_symbol} ({company_name}), 內部人淨增持: ${net_buy_total:,.2f}")
         save_report_and_notify(insider_report, "latest_insider", f"Barchart 內部人交易 AI 最佳推薦 ({selected_symbol})")
 
-        # 4. 步驟 3: 下載/定位該標的之 Options Flow 數據
-        print(f"\n📥 【步驟 3】取得 {selected_symbol} 期權大單流向 CSV (Options Flow)")
-        print("-" * 70)
-        if not skip_download:
-            if not driver:
-                account, password = load_credentials_from_env(ENV_FILE)
-                driver = init_driver(download_dir=BARCHART_DIR, profile_dir=PROFILE_DIR, headless=headless)
-                login_if_needed(driver, account, password)
-            options_flow_csv = download_options_flow_csv(driver, selected_symbol, target_dir=BARCHART_DIR)
-        else:
-            candidates = glob.glob(os.path.join(BARCHART_DIR, f"*{selected_symbol.lower()}*options-flow*.csv"))
-            if not candidates:
-                candidates = glob.glob(os.path.join(BARCHART_DIR, "*options-flow*.csv"))
-            if not candidates:
-                candidates = glob.glob(os.path.join(OLD_DIR, f"*{selected_symbol.lower()}*options-flow*.csv"))
-            if not candidates:
-                candidates = glob.glob(os.path.join(OLD_DIR, "*options-flow*.csv"))
-            if candidates:
-                candidates.sort(key=os.path.getmtime, reverse=True)
-                options_flow_csv = candidates[0]
-                print(f"[INFO] (跳過下載) 使用現存 Options Flow CSV: {options_flow_csv}")
+        # 4. 步驟 3 & 4: 下載與解讀期權大單 (具備候選標的自動備援機制)
+        candidates_to_try = [selected_symbol]
+        if not symbol_override and "top_candidates" in selection_result:
+            for c in selection_result["top_candidates"]:
+                if c not in candidates_to_try and c not in memory.get_excluded_symbols():
+                    candidates_to_try.append(c)
+
+        flow_skill = OptionsFlowSkill(env_path=ENV_FILE)
+        active_symbol = selected_symbol
+        contract_info = None
+        call_report = None
+
+        for sym in candidates_to_try:
+            print(f"\n📥 【步驟 3】取得 {sym} 期權大單流向 CSV (Options Flow)")
+            print("-" * 70)
+            cur_csv = None
+            try:
+                if not skip_download:
+                    if not driver:
+                        account, password = load_credentials_from_env(ENV_FILE)
+                        driver = init_driver(download_dir=BARCHART_DIR, profile_dir=PROFILE_DIR, headless=headless)
+                        login_if_needed(driver, account, password)
+                    cur_csv = download_options_flow_csv(driver, sym, target_dir=BARCHART_DIR)
+                else:
+                    candidates = glob.glob(os.path.join(BARCHART_DIR, f"*{sym.lower()}*options-flow*.csv"))
+                    if not candidates:
+                        candidates = glob.glob(os.path.join(OLD_DIR, f"*{sym.lower()}*options-flow*.csv"))
+                    if not candidates:
+                        candidates = glob.glob(os.path.join(BARCHART_DIR, "*options-flow*.csv"))
+                    if not candidates:
+                        candidates = glob.glob(os.path.join(OLD_DIR, "*options-flow*.csv"))
+                    if candidates:
+                        candidates.sort(key=os.path.getmtime, reverse=True)
+                        cur_csv = candidates[0]
+                        print(f"[INFO] (跳過下載) 使用現存 Options Flow CSV: {cur_csv}")
+                    else:
+                        print(f"[WARN] 未找到任何現存的 {sym} Options Flow CSV 檔案。")
+                        continue
+            except Exception as dl_err:
+                print(f"[WARN] 下載或尋找 {sym} Options Flow 異常: {dl_err}")
+                continue
+
+            if not cur_csv or not os.path.exists(cur_csv):
+                continue
+
+            print(f"\n🐋 【步驟 4】呼叫 Flow Skill 解讀 {sym} 期權大單並挑選最佳 CALL")
+            print("-" * 70)
+            flow_result = flow_skill.select_best_call(
+                csv_path=cur_csv,
+                symbol=sym,
+                max_retries=retries
+            )
+
+            if flow_result.get("status") == "ok" and flow_result.get("contract"):
+                active_symbol = sym
+                contract_info = flow_result["contract"]
+                call_report = flow_result["report_text"]
+                print(f"[SUCCESS] ✅ 成功鎖定具備主力 CALL 大單之標的: {active_symbol}")
+                break
             else:
-                raise FileNotFoundError(f"未找到任何現存的 {selected_symbol} Options Flow CSV 檔案。")
+                print(f"[WARN] 標的 {sym} 無任何 CALL 買權大單 (可能無期權合約或無大單)，嘗試下一候選標的...")
 
         # 關閉瀏覽器釋放資源
         if driver:
@@ -499,41 +537,43 @@ def run_insider_pipeline(
             except Exception:
                 pass
 
-        # 5. 步驟 4: Flow Skill 期權大單流向分析，精選最佳 CALL
-        print(f"\n🐋 【步驟 4】呼叫 Flow Skill 解讀 {selected_symbol} 期權大單並挑選最佳 CALL")
-        print("-" * 70)
-        flow_skill = OptionsFlowSkill(env_path=ENV_FILE)
-        flow_result = flow_skill.select_best_call(
-            csv_path=options_flow_csv,
-            symbol=selected_symbol,
-            max_retries=retries
-        )
+        if contract_info:
+            selected_symbol = active_symbol
+            save_report_and_notify(call_report, "latest_insider_call", f"{selected_symbol} 期權大單 AI 最佳 CALL 推薦")
+            print(f"\n✨ 【Flow Skill 精選合約】: {contract_info['symbol']} Strike=${contract_info['strike']} Exp={contract_info['exp_date']} RefPrice=${contract_info['ref_price']}")
 
-        call_report = flow_result["report_text"]
-        contract_info = flow_result["contract"]
-        save_report_and_notify(call_report, "latest_insider_call", f"{selected_symbol} 期權大單 AI 最佳 CALL 推薦")
+            # 6. 步驟 5: 寫入 Memory Skill (記錄本次推薦與合約，納入冷卻名單)
+            print("\n💾 【步驟 5】更新 Memory Skill 歷史推薦記憶庫")
+            print("-" * 70)
+            memory.record_selection(
+                symbol=selected_symbol,
+                company_name=company_name,
+                net_buy_total=net_buy_total,
+                contract=contract_info,
+                reason=f"Selected by Skills Pipeline on {now_str}"
+            )
 
-        print(f"\n✨ 【Flow Skill 精選合約】: {contract_info['symbol']} Strike=${contract_info['strike']} Exp={contract_info['exp_date']} RefPrice=${contract_info['ref_price']}")
-
-        # 6. 步驟 5: 寫入 Memory Skill (記錄本次推薦與合約，納入冷卻名單)
-        print("\n💾 【步驟 5】更新 Memory Skill 歷史推薦記憶庫")
-        print("-" * 70)
-        memory.record_selection(
-            symbol=selected_symbol,
-            company_name=company_name,
-            net_buy_total=net_buy_total,
-            contract=contract_info,
-            reason=f"Selected by Skills Pipeline on {now_str}"
-        )
-
-        # 7. 步驟 6: 連線 IBKR 下單 (預查限價 + Bracket Adaptive Patient)
-        print("\n⚡ 【步驟 6】連線 IBKR 執行自動化期權委託")
-        print("-" * 70)
-        if not skip_order:
-            order_res = execute_ibkr_call_order(contract_info, dry_run=dry_run)
-            print(f"[INFO] 下單處理結果: {order_res.get('status')} - {order_res.get('desc', order_res.get('message'))}")
+            # 7. 步驟 6: 連線 IBKR 下單 (預查限價 + Bracket Adaptive Patient)
+            print("\n⚡ 【步驟 6】連線 IBKR 執行自動化期權委託")
+            print("-" * 70)
+            if not skip_order:
+                order_res = execute_ibkr_call_order(contract_info, dry_run=dry_run)
+                print(f"[INFO] 下單處理結果: {order_res.get('status')} - {order_res.get('desc', order_res.get('message'))}")
+            else:
+                print("[INFO] 已略過 IBKR 下單步驟 (--skip-order)")
         else:
-            print("[INFO] 已略過 IBKR 下單步驟 (--skip-order)")
+            msg = f"⚠️ 內部人推薦標的 ({', '.join(candidates_to_try)}) 均無足夠之期權 CALL 大單數據，已跳過期權下單程序。"
+            print(f"\n{msg}")
+            save_report_and_notify(msg, "latest_insider_call", f"{selected_symbol} 期權大單無數據提醒")
+            # 仍記錄選股標的至記憶庫
+            memory.record_selection(
+                symbol=selected_symbol,
+                company_name=company_name,
+                net_buy_total=net_buy_total,
+                contract={},
+                status="no_options_flow",
+                reason=f"Selected by Skills Pipeline on {now_str} (no options flow)"
+            )
 
     finally:
         if driver:

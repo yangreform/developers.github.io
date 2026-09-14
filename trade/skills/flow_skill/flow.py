@@ -68,6 +68,9 @@ class OptionsFlowSkill:
 
         # 移除無效與 footer 行
         df = df[df["Symbol"].notna() & (~df["Symbol"].astype(str).str.contains("Downloaded", case=False, na=False))]
+        if df.empty or "Type" not in df.columns:
+            print(f"[WARN] [FlowSkill] {sym_clean} Options Flow 表格為空或無有效交易數據。")
+            return "", pd.DataFrame()
 
         # 數值型態清理
         numeric_cols = ["Price~", "Strike", "DTE", "Trade", "Size", "Premium", "Volume", "Open Int", "Delta"]
@@ -78,7 +81,8 @@ class OptionsFlowSkill:
         # 專注於 CALL 買權
         df_call = df[df["Type"].astype(str).str.upper() == "CALL"].copy()
         if df_call.empty:
-            raise ValueError(f"[FlowSkill] 在 {os.path.basename(csv_path)} 中找不到任何 CALL 買權數據。")
+            print(f"[WARN] [FlowSkill] 在 {os.path.basename(csv_path)} 中未發現任何 CALL 買權數據。")
+            return "", pd.DataFrame()
 
         # 過濾 0DTE (優先保留 DTE >= min_dte)
         df_call_filtered = df_call[df_call["DTE"] >= min_dte]
@@ -193,6 +197,15 @@ class OptionsFlowSkill:
 
         # 1. 清洗數據
         flow_data_str, top_calls = self.clean_and_prepare_flow(csv_path, sym_clean)
+        if top_calls.empty or not flow_data_str:
+            print(f"[WARN] [FlowSkill] {sym_clean} 無任何可用之 CALL 買權大單數據。")
+            return {
+                "status": "no_call_data",
+                "symbol": sym_clean,
+                "contract": None,
+                "report_text": f"⚠️ 標的 {sym_clean} 在 Barchart 期權大單流向中無任何 CALL 買權大單（該標的可能無活躍期權或當日主力無期權大單）。",
+                "top_calls_count": 0,
+            }
 
         # 2. 構建 Prompt
         prompt = self.build_prompt(sym_clean, flow_data_str)
