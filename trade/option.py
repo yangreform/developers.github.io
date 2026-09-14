@@ -531,24 +531,53 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
     dte_desc = "當天末日輪 (0DTE)" if current_dte == 0 else f"DTE: {current_dte} 天"
     print(f"-> 鎖定 {underlying.symbol} (Class: {chosen_opt_class}) 到期日: {closest_expiry} ({dte_desc}，設定範圍: {min_dte}~{max_dte} 天)")
 
-    # 1. 取得該期權合約到期日對應之「真實底層標的」
-    # （期貨期權 FOP 的不同到期月份可能掛鉤不同季度的期貨，例如 9月底期權掛鉤 12月期貨而非 9月期貨）
+    # 1. 取得該期權合約到期日對應之「真實合約細節」與「真實底層標的」
+    # （期貨期權 FOP 的不同到期月份可能掛鉤不同季度的期貨，例如 10月期權掛鉤 12月期貨 NQZ6 而非 9月期貨 NQU6）
     actual_underlying = underlying
     is_idx = (underlying.secType == 'IND')
     opt_exchange = 'SMART' if is_idx else underlying.exchange
 
-    if not is_idx and strikes:
-        try:
-            mid_sample_strike = strikes[len(strikes) // 2]
-            sample_opt = FuturesOption(underlying.symbol, closest_expiry, mid_sample_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
-            ib.qualifyContracts(sample_opt)
-            details = ib.reqContractDetails(sample_opt)
-            if details and getattr(details[0], 'underConId', None):
+    query_contract = (
+        Option(underlying.symbol, lastTradeDateOrContractMonth=closest_expiry, exchange=opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+        if is_idx else
+        FuturesOption(underlying.symbol, lastTradeDateOrContractMonth=closest_expiry, exchange=opt_exchange, tradingClass=chosen_opt_class)
+    )
+    details = ib.reqContractDetails(query_contract)
+
+    # 若帶有 tradingClass 查無資料，放寬不帶 tradingClass 查詢該到期日
+    if not details:
+        fallback_contract = (
+            Option(underlying.symbol, lastTradeDateOrContractMonth=closest_expiry, exchange=opt_exchange, currency='USD')
+            if is_idx else
+            FuturesOption(underlying.symbol, lastTradeDateOrContractMonth=closest_expiry, exchange=opt_exchange)
+        )
+        details = ib.reqContractDetails(fallback_contract)
+
+    exact_contract_map = {}
+    if details:
+        # 1.1 精準取得「該特定到期日實際存在」的合法履約價清單，杜絕使用到近月才有的 10/25 點履約價
+        exact_strikes = sorted(list(set(d.contract.strike for d in details)))
+        valid_strikes = exact_strikes if exact_strikes else sorted(list(set(strikes)))
+
+        # 1.2 校正 tradingClass 為真實合約的 tradingClass
+        if details[0].contract.tradingClass:
+            chosen_opt_class = details[0].contract.tradingClass
+
+        # 1.3 取得底層真實掛鉤期貨合約 (例如 10月期權掛鉤 12月期貨 NQZ6 而非 9月期貨 NQU6)
+        if not is_idx and getattr(details[0], 'underConId', None):
+            try:
                 target_fut = Contract(conId=details[0].underConId)
                 ib.qualifyContracts(target_fut)
-                actual_underlying = target_fut
-        except Exception as e:
-            print(f"[提示] 查詢期權具體掛鉤期貨異常 ({e})，使用預設期貨標的")
+                if target_fut.conId:
+                    actual_underlying = target_fut
+            except Exception as e:
+                print(f"[提示] 查詢期權具體掛鉤期貨異常 ({e})，使用預設期貨標的")
+
+        # 1.4 快取該到期日的合法合約物件 (可直接使用已具備 conId 之合約)
+        for d in details:
+            exact_contract_map[(d.contract.strike, d.contract.right)] = d.contract
+    else:
+        valid_strikes = sorted(list(set(strikes)))
 
     # 2. 取得底層標的最新市價 (優先以該期權真實掛鉤合約報價為準，杜絕現價與到期月份不對齊)
     ref_price = get_underlying_price(actual_underlying)
@@ -576,7 +605,6 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
         bid_up = None
 
     # 1. 鎖定中心 ATM 履約價
-    valid_strikes = sorted(list(set(strikes)))
     center_strike = min(valid_strikes, key=lambda s: abs(s - ref_price))
 
     # 2. 鎖定上翼 (Upper Wing / 賣出 Call，履約價為 中心 + wing_width)
@@ -608,19 +636,22 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
     )
 
     # 建立 4 條腿合約物件並驗證
-    is_idx = (underlying.secType == 'IND')
-    opt_exchange = 'SMART' if is_idx else underlying.exchange
+    c_center = exact_contract_map.get((center_strike, 'C'))
+    p_center = exact_contract_map.get((center_strike, 'P'))
+    c_wing = exact_contract_map.get((call_wing_strike, 'C'))
+    p_wing = exact_contract_map.get((put_wing_strike, 'P'))
 
-    if is_idx:
-        c_center = Option(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
-        p_center = Option(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
-        c_wing = Option(underlying.symbol, closest_expiry, call_wing_strike, 'C', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
-        p_wing = Option(underlying.symbol, closest_expiry, put_wing_strike, 'P', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
-    else:
-        c_center = FuturesOption(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
-        p_center = FuturesOption(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, tradingClass=chosen_opt_class)
-        c_wing = FuturesOption(underlying.symbol, closest_expiry, call_wing_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
-        p_wing = FuturesOption(underlying.symbol, closest_expiry, put_wing_strike, 'P', opt_exchange, tradingClass=chosen_opt_class)
+    if not all([c_center, p_center, c_wing, p_wing]):
+        if is_idx:
+            c_center = c_center or Option(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+            p_center = p_center or Option(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+            c_wing = c_wing or Option(underlying.symbol, closest_expiry, call_wing_strike, 'C', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+            p_wing = p_wing or Option(underlying.symbol, closest_expiry, put_wing_strike, 'P', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+        else:
+            c_center = c_center or FuturesOption(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
+            p_center = p_center or FuturesOption(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, tradingClass=chosen_opt_class)
+            c_wing = c_wing or FuturesOption(underlying.symbol, closest_expiry, call_wing_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
+            p_wing = p_wing or FuturesOption(underlying.symbol, closest_expiry, put_wing_strike, 'P', opt_exchange, tradingClass=chosen_opt_class)
 
     qualified = ib.qualifyContracts(c_center, p_center, c_wing, p_wing)
     if len(qualified) < 4:
