@@ -48,6 +48,15 @@ except ImportError:
     print("[WARN] Could not import send_push_message from notifier.py")
     send_push_message = None
 
+try:
+    from trade.skills import UoaAnalysisSkill, call_gemini_for_skill
+except ImportError:
+    try:
+        from skills import UoaAnalysisSkill, call_gemini_for_skill
+    except ImportError:
+        UoaAnalysisSkill = None
+        call_gemini_for_skill = None
+
 
 def load_gemini_api_key(env_path=ENV_FILE):
     """
@@ -239,9 +248,24 @@ def is_report_complete(text):
 def call_gemini_rest(prompt, api_key):
     """
     Direct REST API call with model fallback chain.
-    優先使用產出穩定且完整的 gemini-3.7-flash 及 gemini-3.6-flash，嚴格校驗回傳報告完整性。
+    優先使用產出最為迅速且穩定的 gemini-3.6-flash (~3s)，次選 gemini-3.8-flash，備援 gemini-3.7-flash。
     """
-    candidate_models = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.8-flash"]
+    if call_gemini_for_skill:
+        res = call_gemini_for_skill(
+            prompt=prompt,
+            api_key=api_key,
+            candidate_models=["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.7-flash"],
+            timeout=50,
+            min_chars=1000,
+            validate_func=is_report_complete,
+            max_output_tokens=8096,
+            temperature=0.3,
+        )
+        if res and is_report_complete(res):
+            return res
+        raise RuntimeError("所有 Gemini 模型呼叫均未成功或回傳報告均不完整。")
+
+    candidate_models = ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.7-flash"]
 
     for m_name in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{m_name}:generateContent?key={api_key}"
@@ -259,7 +283,7 @@ def call_gemini_rest(prompt, api_key):
 
         print(f"[INFO] 正在呼叫 Gemini 模型：{m_name} ...")
         try:
-            r = requests.post(url, json=payload, timeout=90)
+            r = requests.post(url, json=payload, timeout=50)
             if r.status_code == 200:
                 res_json = r.json()
                 cand = res_json.get("candidates", [{}])[0]
@@ -279,6 +303,7 @@ def call_gemini_rest(prompt, api_key):
         time.sleep(2)
 
     raise RuntimeError("所有 Gemini 模型呼叫均未成功或回傳報告均不完整。")
+
 
 
 def save_analysis_to_text_file(analysis_text, target_dir=REPORTS_DIR):
@@ -461,6 +486,19 @@ def build_analysis_prompt(data_str):
 
 
 def run_analysis(stock_file=None, etf_file=None, bull_put_file=None):
+    if UoaAnalysisSkill:
+        print("=" * 60)
+        print(" Barchart 選擇權異動與價差 AI 分析模組啟動 (UoaAnalysisSkill)")
+        print("=" * 60)
+        skill = UoaAnalysisSkill()
+        text, fname = skill.run_pipeline(stock_file=stock_file, etf_file=etf_file, bull_put_file=bull_put_file)
+        print("\n" + "=" * 60)
+        print("=== 今日 AI 三大投資建議 ===")
+        print("=" * 60)
+        print(text)
+        print("=" * 60)
+        return text, fname
+
     print("=" * 60)
     print(" Barchart 選擇權異動與價差 AI 分析模組啟動")
     print("=" * 60)
@@ -515,6 +553,7 @@ def run_analysis(stock_file=None, etf_file=None, bull_put_file=None):
 
     # 8. LINE 推播（發送速覽摘要並引導查看網頁新分頁）
     send_line_notification(analysis_text, archive_fname)
+
 
 
 if __name__ == "__main__":

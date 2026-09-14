@@ -77,6 +77,14 @@ try:
 except ImportError:
     send_push_message = None
 
+try:
+    from trade.skills import UoaAnalysisSkill
+except ImportError:
+    try:
+        from skills import UoaAnalysisSkill
+    except ImportError:
+        UoaAnalysisSkill = None
+
 
 # ==============================================================================
 # 1. 歸檔舊檔案：將 trade/Barchart 根目錄下所有 CSV 移至 trade/Barchart/old/
@@ -150,15 +158,15 @@ def download_new_csvs(headless=False):
 
 
 # ==============================================================================
-# 3. 量化 AI 分析：載入 gemini_api，傳 3 個 CSV 獲得深度報告，重試三次，推播 LINE
+# 3. 量化 AI 分析：呼叫 UoaAnalysisSkill，傳 3 個 CSV 獲得深度報告，重試三次，推播 LINE
 # ==============================================================================
 def analyze_and_report_with_retry(downloaded=None, max_retries=3):
     """
-    載入 gemini_api，傳送 3 個 CSV 獲得詳細深度量化分析報告。
+    載入 gemini_api，透過 UoaAnalysisSkill 傳送 3 個 CSV 獲得詳細深度量化分析報告。
     若取不到報告，就再試三次；取得成功後儲存完整文字檔並推播最後摘要到手機 LINE。
     """
     print("\n" + "=" * 65)
-    print("【步驟 3】Gemini AI 深度量化分析與手機推播")
+    print("【步驟 3】呼叫 UoaSkill 進行 Gemini AI 深度量化分析與手機推播")
     print("=" * 65)
 
     # 1. 載入 Gemini API Key
@@ -174,6 +182,38 @@ def analyze_and_report_with_retry(downloaded=None, max_retries=3):
         raise ValueError(err_msg)
 
     print(f"[INFO] 成功自 trade/.env 載入 gemini_api (金鑰前綴: {api_key[:8]}...)")
+
+    if UoaAnalysisSkill:
+        uoa_skill = UoaAnalysisSkill(api_key=api_key)
+        try:
+            analysis_text, archive_fname = uoa_skill.run_pipeline(
+                downloaded=downloaded,
+                max_retries=max_retries,
+                push_line=True,
+            )
+        except Exception as e:
+            err_report = (
+                f"❌【Barchart AI 分析異常】\n"
+                f"已連續嘗試 {max_retries} 次均無法取得 Gemini 深度量化分析報告。\n"
+                f"最後錯誤訊息: {e}\n"
+                f"時間: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            print(f"\n[FATAL] {err_report}")
+            if send_push_message:
+                try:
+                    send_push_message(err_report)
+                    print(f"[INFO] 已發送失敗警示推播至手機 LINE")
+                except Exception as pe:
+                    print(f"[WARN] LINE 警示推播失敗: {pe}")
+            raise RuntimeError(f"連續嘗試 {max_retries} 次均無法取得分析報告: {e}")
+
+        # 終端機印出報告完整內容
+        print("\n" + "=" * 65)
+        print("=== 今日 AI 三大投資建議詳細報告 ===")
+        print("=" * 65)
+        print(analysis_text)
+        print("=" * 65)
+        return analysis_text, archive_fname
 
     # 2. 確認 3 個 CSV 檔案路徑
     stock_file = (downloaded.get("stocks") if downloaded else None) or get_latest_csv_file("unusual-stock-options-activity-*.csv")
@@ -253,6 +293,7 @@ def analyze_and_report_with_retry(downloaded=None, max_retries=3):
     # 8. 推播最後摘要訊息到手機 LINE
     send_line_notification(analysis_text, archive_fname)
     return analysis_text, archive_fname
+
 
 
 # ==============================================================================
