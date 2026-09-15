@@ -16,7 +16,8 @@ echo =======================================================
 echo   Check Time: %date% %time%
 echo =======================================================
 
-if "%MM%"=="34" (
+:: if "%MM%"=="34" (
+if "%MM%"=="00" (
     if "!last_killed_hour!" neq "%HH%" (
         set "last_killed_hour=%HH%"
         echo [!] Scheduled restart time %HH%:%MM% reached.
@@ -26,23 +27,29 @@ if "%MM%"=="34" (
         timeout /t 3 /nobreak >nul
     )
 
+    if "%HH%"=="00" (
+	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "open_Shioaji.py" >nul
+	if !errorlevel! equ 0 (
+	    echo [OK] open_Shioaji.py is running.
+	) else (
+	    start "open_Shioaji" /max py .\open_Shioaji.py
+	)
+    )
+
     if "%HH%"=="01" (
 	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "insider.py" >nul
 	if !errorlevel! equ 0 (
 	    echo [OK] insider.py is running.
 	) else (
-	    echo [WARNING] insider.py is NOT running! Restarting MAXIMIZED...
 	    start "insider" /max py .\insider.py
 	)
     )
-
 
     if "%HH%"=="02" (
 	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "barchart_auto.py" >nul
 	if !errorlevel! equ 0 (
 	    echo [OK] barchart_auto.py is running.
 	) else (
-	    echo [WARNING] barchart_auto.py is NOT running! Restarting MAXIMIZED...
 	    start "barchart" /max py .\barchart_auto.py
 	)
     )
@@ -52,7 +59,6 @@ if "%MM%"=="34" (
 	if !errorlevel! equ 0 (
 	    echo [OK] option.py is running.
 	) else (
-	    echo [WARNING] option.py is NOT running! Restarting MAXIMIZED...
 	    start "option" /max py .\option.py
 	)
     )
