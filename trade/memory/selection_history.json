@@ -4,54 +4,21 @@
   "blacklist": [],
   "history": [
     {
-      "symbol": "UBER",
-      "recommended_at": "2026-09-13 14:40:02",
-      "company_name": "Uber Technologies Inc",
-      "insider_net_buy": 15200000.0,
+      "symbol": "RSG",
+      "recommended_at": "2026-09-15 01:39:43",
+      "company_name": "Republic Services",
+      "insider_net_buy": 159592998.0,
       "selected_call": {
-        "strike": 75.0,
+        "symbol": "RSG",
+        "strike": 240.0,
         "exp_date": "20261120",
-        "ref_price": 4.15
-      },
-      "status": "recommended"
-    },
-    {
-      "symbol": "GME",
-      "recommended_at": "2026-09-14 11:53:09",
-      "company_name": "Gamestop Corp",
-      "insider_net_buy": 21705932.0,
-      "selected_call": {
-        "strike": 22.0,
-        "exp_date": "20261016",
-        "ref_price": 2.5
-      },
-      "status": "recommended"
-    },
-    {
-      "symbol": "INBX",
-      "recommended_at": "2026-09-14 17:38:49",
-      "company_name": "Inhibrx Biosciences Inc",
-      "insider_net_buy": 3384131.0,
-      "selected_call": {
-        "symbol": "INBX",
-        "strike": 20.0,
-        "exp_date": "20261030",
-        "ref_price": 2.07,
+        "ref_price": 3.0,
         "strategy": "Buy Call",
         "right": "C",
         "action": "BUY"
       },
       "status": "recommended",
-      "notes": "Selected by Skills Pipeline on 2026-09-14 17:37:42"
-    },
-    {
-      "symbol": "UPST",
-      "recommended_at": "2026-09-14 18:03:21",
-      "company_name": "Upstart Holdings Inc",
-      "insider_net_buy": 1277500.0,
-      "selected_call": {},
-      "status": "no_options_flow",
-      "notes": "Selected by Skills Pipeline on 2026-09-14 18:02:57 (no options flow)"
+      "notes": "Selected by Skills Pipeline on 2026-09-15 01:34:07"
     }
   ]
 }

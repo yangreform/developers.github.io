@@ -18,8 +18,8 @@ import requests
 
 # 預設候選模型順序：經實測 gemini-3.6-flash 回應最為迅速穩定 (~3s)，次選 gemini-3.8-flash (~6s)，最後為 gemini-3.7-flash
 CANDIDATE_MODELS = [
-    "gemini-3.6-flash",
     "gemini-3.8-flash",
+    "gemini-3.6-flash",
     "gemini-3.7-flash",
 ]
 
