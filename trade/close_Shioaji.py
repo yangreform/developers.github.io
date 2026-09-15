@@ -3,14 +3,13 @@
 """
 close_Shioaji.py
 ==============================================================================
-永豐 Shioaji 選擇權 (OP) 全自動平倉程式
+永豐 Shioaji 期權全部位市價全自動平倉程式
 
 功能:
-  - 專門平倉 Shioaji 選擇權 (OP) 未平倉部位 (例如: TXO, TX1, TX2, TX4, TX5 等)。
+  - 自動清空 Shioaji 期貨與選擇權所有未平倉部位 (包含微台 TMF, 小台 MXF, 大台 TXF, 台指選擇權 TXO 等)。
   - 【嚴格安全限制】絕對不碰、不連線、不操作 IBKR (Interactive Brokers)！
-  - 僅平倉選擇權 (OP)，預設不平倉期貨部位 (例如: 微台 TMF, 小台 MXF, 大台 TXF)。
+  - 全部以【市價單 (MKT) / 一定範圍市價 (MKP)】強制撮合平倉，不保留任何期貨或選擇權部位。
   - 全自動執行，無任何阻塞式互動提問 (Zero Interactive Prompts)。
-  - 平倉時使用最佳對手價 (買方部位以 Bid 賣出、賣方部位以 Ask 買進) 確保即時撮合成交。
   - 平倉完成後自動推播彙總報告至手機 LINE。
   - 支援 --dry-run 模擬試算模式。
 ==============================================================================
@@ -30,7 +29,6 @@ if sys.platform == 'win32':
         pass
 
 import shioaji as sj
-from shioaji.contracts import Option
 from dotenv import load_dotenv, find_dotenv
 
 # 引入本機 LINE 通知模組
@@ -61,8 +59,8 @@ def load_config() -> dict:
     return config
 
 
-def init_shioaji(config: dict) -> Tuple[sj.Shioaji, Dict[str, Option]]:
-    """初始化並登入 Shioaji，快取選擇權合約"""
+def init_shioaji(config: dict) -> Tuple[sj.Shioaji, Dict[str, object]]:
+    """初始化並登入 Shioaji，快取期貨與選擇權合約"""
     if not config["api_key"] or not config["secret_key"]:
         raise RuntimeError("❌ 缺少 SHIOAJI_API_KEY 或 SHIOAJI_SECRET_KEY，請檢查 trade/.env 設定")
 
@@ -81,75 +79,84 @@ def init_shioaji(config: dict) -> Tuple[sj.Shioaji, Dict[str, Option]]:
         else:
             print(f"⚠️ 找不到憑證檔案: {ca_path}")
 
-    # 快取選擇權合約表
-    opt_cache: Dict[str, Option] = {}
+    # 快取期貨與選擇權合約表
+    contract_cache: Dict[str, object] = {}
+
+    # 1. 期貨類別 (微台, 小台, 大台, 電子, 金融等)
+    for cat in ['TMF', 'MXF', 'TXF', 'TE', 'TF', 'ZE', 'ZF']:
+        if hasattr(api.Contracts.Futures, cat):
+            for c in getattr(api.Contracts.Futures, cat):
+                contract_cache[c.code] = c
+
+    # 2. 選擇權類別 (週選, 月選, 黃金選, 電子選等)
     for cat in ['TX1', 'TX2', 'TX4', 'TX5', 'TXO', 'TGO', 'TEO', 'TFO']:
         if hasattr(api.Contracts.Options, cat):
             for c in getattr(api.Contracts.Options, cat):
-                opt_cache[c.code] = c
+                contract_cache[c.code] = c
 
-    return api, opt_cache
+    return api, contract_cache
 
 
 # ==============================================================================
-# 🔍 篩選選擇權 (OP) 未平倉部位
+# 🔍 取得所有未平倉部位 (期貨與選擇權全部納入，不予過濾保留)
 # ==============================================================================
-def get_open_op_positions(
+def get_all_open_positions(
     api: sj.Shioaji,
-    opt_cache: Dict[str, Option],
+    contract_cache: Dict[str, object],
     target_code: str = ""
-) -> List[Tuple[object, Option]]:
+) -> List[Tuple[object, object]]:
     """
-    僅篩選 Shioaji 選擇權 (OP) 未平倉部位。
-    排除期貨 (如 TMF, MXF, TXF)。
+    取得所有 Shioaji 期貨與選擇權未平倉部位 (不再過濾保留微台或任何期貨部位)。
+    【安全保證】只操作 Shioaji 帳戶，絕不連線或碰觸 IBKR！
     """
     if not api.futopt_account:
         print("⚠️ 未找到有效期貨/選擇權帳號")
         return []
 
     positions = api.list_positions(account=api.futopt_account)
-    op_positions = []
+    all_positions = []
 
     for p in positions:
-        # 如果指定了特定代號則過濾
+        # 若有指定特定代號則過濾
         if target_code and p.code != target_code:
             continue
 
-        c = opt_cache.get(p.code)
-        # 判斷是否為選擇權合約
-        is_op = (c is not None) or p.code.startswith(('TXO', 'TX1', 'TX2', 'TX4', 'TX5', 'TGO', 'TEO', 'TFO'))
-
-        if is_op:
+        c = contract_cache.get(p.code)
+        if not c:
+            # 嘗試動態查詢
+            if hasattr(api.Contracts.Futures, "get"):
+                c = api.Contracts.Futures.get(p.code)
+            if not c and hasattr(api.Contracts.Options, "get"):
+                c = api.Contracts.Options.get(p.code)
             if not c and hasattr(api.Contracts, "get"):
                 c = api.Contracts.get(p.code)
-            op_positions.append((p, c))
-        else:
-            print(f"ℹ️ [保留非選擇權部位] {p.code} ({p.direction} {p.quantity}口 @ {p.price}) - 不執行平倉")
 
-    return op_positions
+        all_positions.append((p, c))
+
+    return all_positions
 
 
 # ==============================================================================
-# 🚀 執行平倉
+# 🚀 執行全部市價平倉
 # ==============================================================================
-def close_op_positions(
+def close_all_positions_market(
     api: sj.Shioaji,
-    op_positions: List[Tuple[object, Option]],
+    positions: List[Tuple[object, object]],
     dry_run: bool = False
 ) -> List[dict]:
     """
-    依序平倉所有選擇權部位:
-    - 原持有多方 (Buy) -> 送出 賣出 (Sell) 平倉
-    - 原持有空方 (Sell) -> 送出 買進 (Buy) 平倉
-    - 價格使用撮合對手價 (Sell 用 Bid, Buy 用 Ask)
+    依序市價平倉所有部位 (期貨與選擇權):
+    - 原多方 (Buy) -> 送出 市價賣出平倉 (SELL MKT / MKP)
+    - 原空方 (Sell) -> 送出 市價買進平倉 (BUY MKT / MKP)
+    - 支援期交所夜盤時段自動轉為「一定範圍市價單 (MKP)」容錯機制
     """
     closed_records = []
-    if not op_positions:
-        print("✅ 目前無任何 Shioaji 選擇權 (OP) 未平倉部位需要平倉。")
+    if not positions:
+        print("✅ 目前 Shioaji 帳戶內無任何未平倉部位 (期貨與選擇權皆為零)。")
         return closed_records
 
-    # 批次取得所有要平倉合約的即時快照
-    valid_contracts = [c for _, c in op_positions if c is not None]
+    # 批次取得所有要平倉合約的即時快照供報告參考
+    valid_contracts = [c for _, c in positions if c is not None]
     snapshots = {}
     if valid_contracts:
         try:
@@ -158,58 +165,55 @@ def close_op_positions(
             print(f"⚠️ 取得即時報價快照失敗: {e}")
 
     print(f"\n=======================================================")
-    print(f"  {'🔍 【DRY-RUN 模擬平倉】' if dry_run else '🚀 【實盤平倉執行中】'} 共 {len(op_positions)} 筆選擇權部位")
+    print(f"  {'🔍 【DRY-RUN 模擬平倉】' if dry_run else '🚀 【實盤市價平倉執行中】'} 共 {len(positions)} 筆部位 (期貨 + 選擇權)")
     print(f"=======================================================")
 
-    for p, c in op_positions:
+    for p, c in positions:
         code = p.code
         cur_direction = p.direction
         qty = p.quantity
         entry_price = p.price
         pnl = getattr(p, "pnl", 0.0)
 
+        # 辨識商品類型
+        is_opt = (c is not None and getattr(c, "security_type", None) == sj.constant.SecurityType.Option) or code.startswith(('TXO', 'TX1', 'TX2', 'TX4', 'TX5'))
+        pos_type_str = "選擇權" if is_opt else "期貨"
+
         # 決定平倉方向
         if cur_direction == sj.constant.Action.Buy:
             close_action = sj.constant.Action.Sell
-            close_action_str = "賣出平倉 (SELL)"
+            close_action_str = "市價賣出 (SELL MKT)"
         else:
             close_action = sj.constant.Action.Buy
-            close_action_str = "買入平倉 (BUY)"
+            close_action_str = "市價買入 (BUY MKT)"
 
-        # 決定平倉限價
+        # 預估市價估值 (取即時行情供推播與 Log 顯示)
         snap = snapshots.get(code)
-        if close_action == sj.constant.Action.Sell:
-            # 賣出時使用買進價 (Bid) 搶即時成交
-            limit_price = snap.buy_price if (snap and snap.buy_price and snap.buy_price > 0) else (
-                snap.close if (snap and snap.close and snap.close > 0) else (
-                    getattr(p, "last_price", 0.0) or (c.reference if c else entry_price)
-                )
-            )
-        else:
-            # 買進時使用賣出價 (Ask) 搶即時成交
-            limit_price = snap.sell_price if (snap and snap.sell_price and snap.sell_price > 0) else (
-                snap.close if (snap and snap.close and snap.close > 0) else (
-                    getattr(p, "last_price", 0.0) or (c.reference if c else entry_price)
-                )
-            )
-
-        limit_price = float(limit_price)
+        ref_est_price = 0.0
+        if snap:
+            if close_action == sj.constant.Action.Sell:
+                ref_est_price = snap.buy_price or snap.close or getattr(p, "last_price", 0.0)
+            else:
+                ref_est_price = snap.sell_price or snap.close or getattr(p, "last_price", 0.0)
+        if not ref_est_price:
+            ref_est_price = getattr(p, "last_price", 0.0) or (c.reference if c else entry_price)
 
         record = {
             "code": code,
             "name": getattr(c, "name", code) if c else code,
+            "type": pos_type_str,
             "cur_direction": str(cur_direction),
             "close_action": close_action_str,
             "quantity": qty,
             "entry_price": entry_price,
-            "limit_price": limit_price,
+            "est_price": float(ref_est_price),
             "pnl": pnl,
             "status": "SIMULATED" if dry_run else "SUBMITTED",
             "trade_id": ""
         }
 
         if dry_run:
-            print(f"👉 [DRY-RUN] {close_action_str} {code} 數量: {qty} 限價: {limit_price} (成本: {entry_price}, 現價: {getattr(p, 'last_price', 'N/A')}, 預估損益: {pnl:+.0f})")
+            print(f"👉 [DRY-RUN] [{pos_type_str}] {close_action_str} {code} 數量: {qty} (進場: {entry_price}, 預估市價: {ref_est_price}, 損益: {pnl:+.0f})")
             closed_records.append(record)
             continue
 
@@ -220,13 +224,13 @@ def close_op_positions(
             closed_records.append(record)
             continue
 
-        # 建立平倉委託單 (優先使用 FuturesOCType.Cover 平倉)
+        # 建立市價平倉委託單 (優先使用 FuturesPriceType.MKT + IOC)
         order = api.Order(
-            price=limit_price,
+            price=0,
             quantity=qty,
             action=close_action,
-            price_type=sj.constant.FuturesPriceType.LMT,
-            order_type=sj.constant.OrderType.ROD,
+            price_type=sj.constant.FuturesPriceType.MKT,
+            order_type=sj.constant.OrderType.IOC,
             octype=sj.constant.FuturesOCType.Cover
         )
 
@@ -234,24 +238,51 @@ def close_op_positions(
             trade = api.place_order(c, order)
             trade_status = getattr(trade.status, "status", "UNKNOWN")
             trade_id = getattr(trade.status, "id", "")
-            print(f"✅ {close_action_str} {code} 數量: {qty} 限價: {limit_price} -> 委託已送出 (狀態: {trade_status}, 委託號: {trade_id})")
+            print(f"✅ [{pos_type_str}] {close_action_str} {code} 數量: {qty} -> 委託已送出 (狀態: {trade_status}, 委託號: {trade_id})")
             record["status"] = str(trade_status)
             record["trade_id"] = str(trade_id)
         except Exception as e:
-            # 若因 Cover 失敗則嘗試 Auto
             err_msg = str(e)
-            print(f"⚠️ 平倉委託 (Cover) 發生異常: {err_msg}，嘗試使用 Auto 委託...")
+            print(f"⚠️ [{code}] 市價平倉 (MKT IOC) 發生異常: {err_msg}，嘗試使用「一定範圍市價單 (MKP)」...")
+            # 容錯機制 1: 期交所夜盤不收市價單，自動轉一定範圍市價 (MKP)
             try:
-                order.octype = sj.constant.FuturesOCType.Auto
+                order.price_type = sj.constant.FuturesPriceType.MKP
+                order.order_type = sj.constant.OrderType.IOC
+                order.octype = sj.constant.FuturesOCType.Cover
                 trade = api.place_order(c, order)
                 trade_status = getattr(trade.status, "status", "UNKNOWN")
                 trade_id = getattr(trade.status, "id", "")
-                print(f"✅ [Auto 重試成功] {close_action_str} {code} -> 狀態: {trade_status}")
+                print(f"✅ [MKP 重試成功] {close_action_str} {code} -> 狀態: {trade_status}")
                 record["status"] = str(trade_status)
                 record["trade_id"] = str(trade_id)
             except Exception as e2:
-                print(f"❌ 平倉失敗 ({code}): {e2}")
-                record["status"] = f"ERROR: {e2}"
+                # 容錯機制 2: 若 Cover 拒單則嘗試 Auto
+                print(f"⚠️ [{code}] MKP Cover 異常: {e2}，嘗試 Auto octype...")
+                try:
+                    order.octype = sj.constant.FuturesOCType.Auto
+                    trade = api.place_order(c, order)
+                    trade_status = getattr(trade.status, "status", "UNKNOWN")
+                    trade_id = getattr(trade.status, "id", "")
+                    print(f"✅ [MKP Auto 成功] {close_action_str} {code} -> 狀態: {trade_status}")
+                    record["status"] = str(trade_status)
+                    record["trade_id"] = str(trade_id)
+                except Exception as e3:
+                    # 容錯機制 3: 若市價皆受阻，以強勢對手價限價搶撮合
+                    print(f"⚠️ [{code}] 市價委託受阻: {e3}，改以強勢限價 ({ref_est_price}) 平倉...")
+                    try:
+                        order.price = float(ref_est_price)
+                        order.price_type = sj.constant.FuturesPriceType.LMT
+                        order.order_type = sj.constant.OrderType.ROD
+                        order.octype = sj.constant.FuturesOCType.Auto
+                        trade = api.place_order(c, order)
+                        trade_status = getattr(trade.status, "status", "UNKNOWN")
+                        trade_id = getattr(trade.status, "id", "")
+                        print(f"✅ [強勢限價成功] {close_action_str} {code} 限價 {ref_est_price} -> 狀態: {trade_status}")
+                        record["status"] = str(trade_status)
+                        record["trade_id"] = str(trade_id)
+                    except Exception as e4:
+                        print(f"❌ 平倉失敗 ({code}): {e4}")
+                        record["status"] = f"ERROR: {e4}"
 
         closed_records.append(record)
         time.sleep(0.3)
@@ -263,31 +294,35 @@ def close_op_positions(
 # 📱 LINE 推播訊息格式化
 # ==============================================================================
 def build_close_notification(records: List[dict], dry_run: bool = False) -> str:
-    """格式化平倉報告"""
-    tag = "【DRY-RUN 模擬平倉】" if dry_run else "【永豐 Shioaji 平倉通知】"
+    """格式化全平倉報告"""
+    tag = "【DRY-RUN 模擬平倉】" if dry_run else "【永豐 Shioaji 市價平倉通知】"
     if not records:
-        return f"{tag} 選擇權 (OP) 平倉作業\n-----------------------------------------\n✅ 目前帳戶內無任何選擇權未平倉部位。"
+        return f"{tag} 全部位平倉作業\n-----------------------------------------\n✅ 目前帳戶內無任何未平倉部位 (期貨與選擇權皆為零)。"
 
     total_pnl = sum(r.get("pnl", 0.0) for r in records)
+    fut_count = sum(1 for r in records if r.get("type") == "期貨")
+    opt_count = sum(1 for r in records if r.get("type") == "選擇權")
+
     lines = [
-        f"{tag} 選擇權 (OP) 全數平倉",
+        f"{tag} 期權全部位市價平倉",
         f"-----------------------------------------",
-        f"📦 平倉部位總數: {len(records)} 筆",
-        f"🛡️ 操作範圍: 僅限 Shioaji 選擇權 (未更動任何 IBKR 與期貨部位)",
+        f"📦 平倉部位: 共 {len(records)} 筆 (期貨: {fut_count} 筆, 選擇權: {opt_count} 筆)",
+        f"⚡ 平倉模式: 全部市價強制平倉 (MKT / MKP)",
+        f"🛡️ 安全隔離: 僅限 Shioaji (絕不碰 IBKR 部位)",
         f"-----------------------------------------"
     ]
 
     for idx, r in enumerate(records, 1):
         lines.append(
-            f"{idx}. {r['code']} ({r['close_action']})\n"
-            f"   口數: {r['quantity']} | 平倉限價: {r['limit_price']:.1f}\n"
-            f"   進場成本: {r['entry_price']:.1f} | 預估損益: {r['pnl']:+.0f} 點\n"
+            f"{idx}. [{r['type']}] {r['code']} ({r['close_action']})\n"
+            f"   口數: {r['quantity']} | 預估成交價: {r['est_price']:.1f}\n"
+            f"   進場成本: {r['entry_price']:.1f} | 預估損益: {r['pnl']:+.0f}\n"
             f"   狀態: {r['status']}"
         )
 
     lines.append(f"-----------------------------------------")
-    lines.append(f"💰 總預估損益: {total_pnl:+.0f} 點 (約 NT$ {total_pnl * 50:,.0f})")
-    lines.append(f"⚡ 執行結果: {'全部模擬完成' if dry_run else '實盤平倉委託已全數發送'}")
+    lines.append(f"💰 總預估損益: {total_pnl:+.0f} 點")
+    lines.append(f"⚡ 執行結果: {'全部模擬完成' if dry_run else '實盤市價平倉委託已全數發送'}")
 
     return "\n".join(lines)
 
@@ -296,29 +331,29 @@ def build_close_notification(records: List[dict], dry_run: bool = False) -> str:
 # 🏁 主流程 (完全全自動，不阻塞詢問)
 # ==============================================================================
 def main():
-    parser = argparse.ArgumentParser(description="永豐 Shioaji 選擇權 (OP) 全自動平倉程式 (絕不動 IBKR)")
+    parser = argparse.ArgumentParser(description="永豐 Shioaji 期權全部位市價全自動平倉程式 (絕不動 IBKR)")
     parser.add_argument("--dry-run", action="store_true", help="模擬試算模式 (不實際送出委託)")
     parser.add_argument("--no-line", action="store_true", help="不發送 LINE 推播訊息")
-    parser.add_argument("--code", type=str, default="", help="指定平倉單一選擇權合約代號 (預設為全數平倉)")
+    parser.add_argument("--code", type=str, default="", help="指定平倉單一合約代號 (預設為全部市價平倉)")
 
     args = parser.parse_args()
 
     print("=================================================================")
-    print("  🧹 啟動 永豐 Shioaji 選擇權 (OP) 全自動平倉程式")
-    print("  🔒 【安全宣告】本程式只操作 Shioaji 選擇權，絕不連線或更動 IBKR！")
+    print("  🧹 啟動 永豐 Shioaji 期權全部位市價全自動平倉程式")
+    print("  🔒 【安全宣告】本程式只操作 Shioaji 期貨與選擇權，絕不連線或更動 IBKR！")
     print("=================================================================")
 
     config = load_config()
-    api, opt_cache = init_shioaji(config)
+    api, contract_cache = init_shioaji(config)
 
-    # 1. 取得並篩選 OP 部位
-    op_positions = get_open_op_positions(api, opt_cache, target_code=args.code.strip())
-    print(f"📊 偵測到 {len(op_positions)} 筆 Shioaji 選擇權未平倉部位。")
+    # 1. 取得所有未平倉部位 (包含微台、期貨、選擇權)
+    positions = get_all_open_positions(api, contract_cache, target_code=args.code.strip())
+    print(f"📊 偵測到 {len(positions)} 筆 Shioaji 未平倉部位 (包含期貨與選擇權)。")
 
-    # 2. 執行平倉
-    closed_records = close_op_positions(
+    # 2. 執行全部市價平倉
+    closed_records = close_all_positions_market(
         api=api,
-        op_positions=op_positions,
+        positions=positions,
         dry_run=args.dry_run
     )
 

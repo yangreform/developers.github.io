@@ -39,6 +39,7 @@ if sys.platform == 'win32':
     except Exception:
         pass
 
+import json
 import shioaji as sj
 from shioaji.contracts import Option, ComboBase, ComboContract
 from shioaji.order import Order, ComboOrder
@@ -55,6 +56,51 @@ except ImportError:
 # ==============================================================================
 # 🔐 環境變數與登入
 # ==============================================================================
+def env_int(name: str, default: int = 400) -> int:
+    """
+    即時讀取 trade/.env 中的整數設定 (純讀取，不寫回 .env)。
+    優先順序:
+      1. OP_HEDGE_CONFIG_JSON 內台指/TXO 區塊的 wing_width
+      2. trade/.env 中同名環境變數 (例如: wing_width 或 WING_WIDTH)
+      3. 預設值 default (400)
+    """
+    dotenv_path = find_dotenv()
+    if not dotenv_path:
+        dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(dotenv_path):
+        load_dotenv(dotenv_path, override=True)
+
+    raw_json = os.getenv("OP_HEDGE_CONFIG_JSON", "")
+    if raw_json:
+        try:
+            op_cfg = json.loads(raw_json)
+            # 優先搜尋台指/TXO/TMF/MXF 相關商品區塊
+            for key in ["台指(TXO)", "台指", "TXO", "小台(TXO)", "小台", "TMF", "MXF"]:
+                if key in op_cfg and isinstance(op_cfg[key], dict) and name in op_cfg[key]:
+                    return int(op_cfg[key][name])
+            # 或遍歷 symbols 含有 TXO/TX/TMF/MXF 的群組
+            for k, val in op_cfg.items():
+                if isinstance(val, dict):
+                    syms = val.get("symbols", [])
+                    if any(s in syms for s in ["TXO", "TX", "TMF", "MXF"]):
+                        if name in val:
+                            return int(val[name])
+            # 若最外層有該欄位
+            if name in op_cfg:
+                return int(op_cfg[name])
+        except Exception:
+            pass
+
+    val = os.getenv(name) or os.getenv(name.upper()) or os.getenv(name.lower())
+    if val is not None and str(val).strip():
+        try:
+            return int(float(str(val).strip()))
+        except (ValueError, TypeError):
+            pass
+
+    return default
+
+
 def load_config() -> dict:
     """載入 trade/.env 設定檔"""
     dotenv_path = find_dotenv()
@@ -472,7 +518,7 @@ def build_notification_message(
 # ==============================================================================
 def main():
     parser = argparse.ArgumentParser(description="永豐 Shioaji 選擇權雙向價差開倉程式")
-    parser.add_argument("--wing-width", type=float, default=200.0, help="翅膀寬度 (預設: 200 點)")
+    parser.add_argument("--wing-width", type=float, default=None, help="翅膀寬度 (若未指定則自 trade/.env 的 OP_HEDGE_CONFIG_JSON 即時讀取)")
     parser.add_argument("--strike-step", type=float, default=100.0, help="中心 ATM 履約價檔位取整 (預設: 100 點)")
     parser.add_argument("--center", type=float, default=None, help="手動指定中心 ATM 履約價 (例如: 45600)")
     parser.add_argument("--price", type=float, default=None, help="手動指定標的期貨參考價")
@@ -488,6 +534,15 @@ def main():
     print("  🚀 啟動 永豐 Shioaji 選擇權雙向價差開倉程式 (Bear Call + Bull Put)")
     print("=================================================================")
 
+    # 即時讀取 wing_width (不用寫入 .env)
+    if args.wing_width is not None and args.wing_width > 0:
+        wing_width = float(args.wing_width)
+        wing_source = "指令參數 --wing-width"
+    else:
+        wing_width = float(env_int("wing_width", 400))
+        wing_source = "trade/.env 的 OP_HEDGE_CONFIG_JSON 即時讀取"
+    print(f"📐 翅膀寬度 (wing_width): {wing_width:.0f} 點 (來源: {wing_source})")
+
     config = load_config()
     api, txo_by_date, txo_by_code = init_shioaji(config)
 
@@ -500,7 +555,7 @@ def main():
         api=api,
         txo_by_date=txo_by_date,
         ref_price=ref_price,
-        wing_width=args.wing_width,
+        wing_width=wing_width,
         strike_step=args.strike_step,
         manual_center=args.center,
         delivery_date=args.delivery_date
