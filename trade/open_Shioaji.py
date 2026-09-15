@@ -34,8 +34,8 @@ from typing import Dict, List, Optional, Tuple
 
 if sys.platform == 'win32':
     try:
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
     except Exception:
         pass
 
@@ -377,51 +377,172 @@ def calculate_spread_legs(
 # ==============================================================================
 # 🚀 執行下單
 # ==============================================================================
+def make_combo_base(contract: Option, action: sj.constant.Action) -> ComboBase:
+    """將 Option 合約轉為 ComboBase 物件"""
+    fields = list(ComboBase.model_fields.keys())
+    d = {k: getattr(contract, k) for k in fields if hasattr(contract, k)}
+    d['action'] = action
+    return ComboBase(**d)
+
+
 def execute_spread_orders(
     api: sj.Shioaji,
     legs: dict,
     quantity: int = 1,
     dry_run: bool = False,
-    mode: str = "single"
+    mode: str = "combo"
 ) -> List[dict]:
     """
-    依序下單:
-    單腿模式 (single):
-      1. 買入 Upper Wing Call (先買翅膀鎖定風險與保證金)
-      2. 買入 Lower Wing Put  (先買翅膀鎖定風險與保證金)
-      3. 賣出 Center Call
-      4. 賣出 Center Put
+    執行下單:
+    【預設】複式單模式 (mode="combo"):
+      直接向期交所送出兩張標準價差複式單 (Combo Order):
+      1. 買權空頭價差 (Bear Call Spread): 賣出 Center Call + 買入 Upper Call
+      2. 賣權多頭價差 (Bull Put Spread):  賣出 Center Put  + 買入 Lower Put
+      ★ 特點: 僅計收價差保證金 (翼寬 * 50元)，絕不要求單邊裸賣保證金，且兩腿必定同時成交，杜絕瘸腿風險！
+    
+    單腿模式 (mode="single"):
+      依序送出 4 口單腿委託 (買翅膀先，賣中心後)。
     """
     execution_results = []
     c_map = legs["contracts"]
 
     if dry_run:
         print("\n=======================================================")
-        print("  🔍 【DRY-RUN 模擬開倉】不送出真實委託至期交所")
+        print(f"  🔍 【DRY-RUN 模擬開倉】模式: {'COMBO 複式單' if mode == 'combo' else '單腿單'} (不送出真實委託)")
         print("=======================================================")
-        for key in ["c_wing", "p_wing", "c_center", "p_center"]:
-            info = c_map[key]
-            c = info["contract"]
-            print(f"👉 模擬委託: {info['action_desc']:<10} {c.code:<12} 履約價: {info['strike']:<7} {info['right']:<4} 數量: {quantity} 限價: {info['price']}")
+        if mode == "combo":
+            call_credit = max(0.1, round(legs["bear_call_credit"], 1))
+            put_credit = max(0.1, round(legs["bull_put_credit"], 1))
+            print(f"👉 模擬複式單 1 [Bear Call Spread]: 賣出 {c_map['c_center']['contract'].code} + 買入 {c_map['c_wing']['contract'].code} | 數量: {quantity} 限價: {call_credit} (IOC)")
+            print(f"👉 模擬複式單 2 [Bull Put Spread] : 賣出 {c_map['p_center']['contract'].code} + 買入 {c_map['p_wing']['contract'].code} | 數量: {quantity} 限價: {put_credit} (IOC)")
             execution_results.append({
-                "role": info["role"],
-                "code": c.code,
-                "strike": info["strike"],
-                "right": info["right"],
-                "action": info["action_desc"],
+                "strategy": "Bear Call Spread (複式單)",
+                "legs": f"Sell {c_map['c_center']['contract'].code} ({legs['center_strike']:.0f}C) + Buy {c_map['c_wing']['contract'].code} ({legs['call_wing_strike']:.0f}C)",
                 "quantity": quantity,
-                "price": info["price"],
+                "price": call_credit,
                 "status": "SIMULATED",
-                "trade_id": "DRY_RUN_000"
+                "trade_id": "DRY_COMBO_CALL"
             })
+            execution_results.append({
+                "strategy": "Bull Put Spread (複式單)",
+                "legs": f"Sell {c_map['p_center']['contract'].code} ({legs['center_strike']:.0f}P) + Buy {c_map['p_wing']['contract'].code} ({legs['put_wing_strike']:.0f}P)",
+                "quantity": quantity,
+                "price": put_credit,
+                "status": "SIMULATED",
+                "trade_id": "DRY_COMBO_PUT"
+            })
+        else:
+            for key in ["c_wing", "p_wing", "c_center", "p_center"]:
+                info = c_map[key]
+                c = info["contract"]
+                print(f"👉 模擬單腿委託: {info['action_desc']:<10} {c.code:<12} 履約價: {info['strike']:<7} {info['right']:<4} 數量: {quantity} 限價: {info['price']}")
+                execution_results.append({
+                    "strategy": info["role"],
+                    "legs": f"{info['action_desc']} {c.code}",
+                    "quantity": quantity,
+                    "price": info["price"],
+                    "status": "SIMULATED",
+                    "trade_id": "DRY_SINGLE"
+                })
         return execution_results
 
-    # 實盤下單
+    # ================= 實盤下單 =================
+    if mode == "combo":
+        print("\n=======================================================")
+        print("  🚀 【實盤 COMBO 複式單開倉中】向期交所送出 2 張標準價差單...")
+        print("  💡 複式單僅收價差保證金 (翼寬*50元)，免裸賣保證金，且兩腿同時成交！")
+        print("=======================================================")
+
+        # 1. Bear Call Spread
+        leg_call_sell = make_combo_base(c_map["c_center"]["contract"], sj.constant.Action.Sell)
+        leg_call_buy  = make_combo_base(c_map["c_wing"]["contract"], sj.constant.Action.Buy)
+        combo_call = ComboContract(legs=[leg_call_sell, leg_call_buy])
+        call_credit = max(0.1, round(legs["bear_call_credit"], 1))
+
+        order_call = api.ComboOrder(
+            price=call_credit,
+            quantity=quantity,
+            action=sj.constant.Action.Sell, # 收取權利金價差單
+            price_type=sj.constant.FuturesPriceType.LMT,
+            order_type=sj.constant.OrderType.IOC, # 期交所複式單限定 IOC / FOK
+            octype=sj.constant.FuturesOCType.New
+        )
+
+        try:
+            print(f"👉 送出 [Bear Call Spread 複式單]: 賣出 {leg_call_sell.code} + 買進 {leg_call_buy.code} 數量: {quantity} 價差限價: {call_credit} (IOC)...")
+            trade_call = api.place_comboorder(combo_call, order_call)
+            status_str = getattr(trade_call.status, "status", "SUBMITTED")
+            trade_id = getattr(trade_call.status, "id", "")
+            print(f"✅ [Bear Call 複式單] 委託已送出 (狀態: {status_str}, 委託號: {trade_id})")
+            execution_results.append({
+                "strategy": "Bear Call Spread (複式單)",
+                "legs": f"Sell {leg_call_sell.code} + Buy {leg_call_buy.code}",
+                "quantity": quantity,
+                "price": call_credit,
+                "status": str(status_str),
+                "trade_id": str(trade_id)
+            })
+        except Exception as e:
+            print(f"❌ [Bear Call 複式單] 下單失敗: {e}")
+            execution_results.append({
+                "strategy": "Bear Call Spread (複式單)",
+                "legs": f"Sell {leg_call_sell.code} + Buy {leg_call_buy.code}",
+                "quantity": quantity,
+                "price": call_credit,
+                "status": f"ERROR: {e}",
+                "trade_id": ""
+            })
+
+        time.sleep(0.5)
+
+        # 2. Bull Put Spread
+        leg_put_sell = make_combo_base(c_map["p_center"]["contract"], sj.constant.Action.Sell)
+        leg_put_buy  = make_combo_base(c_map["p_wing"]["contract"], sj.constant.Action.Buy)
+        combo_put = ComboContract(legs=[leg_put_sell, leg_put_buy])
+        put_credit = max(0.1, round(legs["bull_put_credit"], 1))
+
+        order_put = api.ComboOrder(
+            price=put_credit,
+            quantity=quantity,
+            action=sj.constant.Action.Sell, # 收取權利金價差單
+            price_type=sj.constant.FuturesPriceType.LMT,
+            order_type=sj.constant.OrderType.IOC, # 期交所複式單限定 IOC / FOK
+            octype=sj.constant.FuturesOCType.New
+        )
+
+        try:
+            print(f"👉 送出 [Bull Put Spread 複式單] : 賣出 {leg_put_sell.code} + 買進 {leg_put_buy.code} 數量: {quantity} 價差限價: {put_credit} (IOC)...")
+            trade_put = api.place_comboorder(combo_put, order_put)
+            status_str = getattr(trade_put.status, "status", "SUBMITTED")
+            trade_id = getattr(trade_put.status, "id", "")
+            print(f"✅ [Bull Put 複式單] 委託已送出 (狀態: {status_str}, 委託號: {trade_id})")
+            execution_results.append({
+                "strategy": "Bull Put Spread (複式單)",
+                "legs": f"Sell {leg_put_sell.code} + Buy {leg_put_buy.code}",
+                "quantity": quantity,
+                "price": put_credit,
+                "status": str(status_str),
+                "trade_id": str(trade_id)
+            })
+        except Exception as e:
+            print(f"❌ [Bull Put 複式單] 下單失敗: {e}")
+            execution_results.append({
+                "strategy": "Bull Put Spread (複式單)",
+                "legs": f"Sell {leg_put_sell.code} + Buy {leg_put_buy.code}",
+                "quantity": quantity,
+                "price": put_credit,
+                "status": f"ERROR: {e}",
+                "trade_id": ""
+            })
+
+        return execution_results
+
+    # 單腿依序下單 (若使用者指定 --mode single)
     print("\n=======================================================")
-    print("  🚀 【實盤開倉中】開始送出 4 口委託至永豐證券...")
+    print("  🚀 【實盤單腿開倉中】依序送出 4 口單腿委託...")
+    print("  ⚠️ 注意: 單腿模式可能會因賣方被視為裸賣而要求較高保證金！")
     print("=======================================================")
 
-    # 嚴格順序: 買方先執行，再執行賣方
     execution_order = ["c_wing", "p_wing", "c_center", "p_center"]
 
     for key in execution_order:
@@ -436,18 +557,15 @@ def execute_spread_orders(
             action=action,
             price_type=sj.constant.FuturesPriceType.LMT,
             order_type=sj.constant.OrderType.ROD,
-            octype=sj.constant.FuturesOCType.New  # 開新倉
+            octype=sj.constant.FuturesOCType.New
         )
 
         try:
             trade = api.place_order(c, order)
             print(f"✅ [{info['role']}] {info['action_desc']} {c.code} 數量: {quantity} 限價: {price} -> 委託已送出 (狀態: {trade.status.status})")
             execution_results.append({
-                "role": info["role"],
-                "code": c.code,
-                "strike": info["strike"],
-                "right": info["right"],
-                "action": info["action_desc"],
+                "strategy": info["role"],
+                "legs": f"{info['action_desc']} {c.code}",
                 "quantity": quantity,
                 "price": price,
                 "status": str(trade.status.status),
@@ -456,11 +574,8 @@ def execute_spread_orders(
         except Exception as e:
             print(f"❌ [{info['role']}] 下單失敗 ({c.code}): {e}")
             execution_results.append({
-                "role": info["role"],
-                "code": c.code,
-                "strike": info["strike"],
-                "right": info["right"],
-                "action": info["action_desc"],
+                "strategy": info["role"],
+                "legs": f"{info['action_desc']} {c.code}",
                 "quantity": quantity,
                 "price": price,
                 "status": f"ERROR: {e}",
@@ -526,7 +641,7 @@ def main():
     parser.add_argument("-q", "--quantity", type=int, default=1, help="每腿口數 (預設: 1 口)")
     parser.add_argument("--dry-run", action="store_true", help="模擬試算模式 (不實際送出委託)")
     parser.add_argument("--no-line", action="store_true", help="不發送 LINE 推播訊息")
-    parser.add_argument("--mode", type=str, default="single", choices=["single", "combo"], help="下單模式: single (依序單腿) 或 combo (複式單)")
+    parser.add_argument("--mode", type=str, default="combo", choices=["combo", "single"], help="下單模式: combo (預設，期交所標準複式單，僅需價差保證金且兩腿必同時成交) 或 single (單腿單)")
 
     args = parser.parse_args()
 
@@ -602,3 +717,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    time.sleep(60*60*20)
