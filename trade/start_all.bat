@@ -16,8 +16,7 @@ echo =======================================================
 echo   Check Time: %date% %time%
 echo =======================================================
 
-:: if "%MM%"=="34" (
-if "%MM%"=="00" (
+if "%MM%"=="34" (
     if "!last_killed_hour!" neq "%HH%" (
         set "last_killed_hour=%HH%"
         echo [!] Scheduled restart time %HH%:%MM% reached.
@@ -27,7 +26,7 @@ if "%MM%"=="00" (
         timeout /t 3 /nobreak >nul
     )
 
-    if "%HH%"=="00" (
+    if "%HH%"=="15" (
 	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "open_Shioaji.py" >nul
 	if !errorlevel! equ 0 (
 	    echo [OK] open_Shioaji.py is running.

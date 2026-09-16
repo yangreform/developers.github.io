@@ -19,6 +19,23 @@
       },
       "status": "recommended",
       "notes": "Selected by Skills Pipeline on 2026-09-15 01:34:07"
+    },
+    {
+      "symbol": "UBER",
+      "recommended_at": "2026-09-16 08:47:44",
+      "company_name": "UBER Technologies",
+      "insider_net_buy": 10005953.0,
+      "selected_call": {
+        "symbol": "UBER",
+        "strike": 75.0,
+        "exp_date": "20261120",
+        "ref_price": 4.15,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-09-16 08:46:56"
     }
   ]
 }
