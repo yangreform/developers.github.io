@@ -88,8 +88,10 @@ def init_shioaji(config: dict) -> Tuple[sj.Shioaji, Dict[str, object]]:
             for c in getattr(api.Contracts.Futures, cat):
                 contract_cache[c.code] = c
 
-    # 2. 選擇權類別 (週選, 月選, 黃金選, 電子選等)
-    for cat in ['TX1', 'TX2', 'TX4', 'TX5', 'TXO', 'TGO', 'TEO', 'TFO']:
+    # 2. 選擇權類別 (週選, 月選, 週五選 TXU/TXV/TXX/TXY/TXZ, 黃金選, 電子選等，以及所有 TX* 類別)
+    opt_cats = ['TX1', 'TX2', 'TX3', 'TX4', 'TX5', 'TXO', 'TXU', 'TXV', 'TXX', 'TXY', 'TXZ', 'TGO', 'TEO', 'TFO']
+    all_opt_cats = sorted(list(set(opt_cats + [attr for attr in dir(api.Contracts.Options) if attr.startswith("TX")])))
+    for cat in all_opt_cats:
         if hasattr(api.Contracts.Options, cat):
             for c in getattr(api.Contracts.Options, cat):
                 contract_cache[c.code] = c

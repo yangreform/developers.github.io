@@ -2343,7 +2343,9 @@ def get_txo_strangles():
         
         if not TXO_OPTIONS_BY_DATE:
             by_date = {}
-            for cat in ['TX1', 'TX2', 'TX4', 'TX5', 'TXO']:
+            target_cats = ['TX1', 'TX2', 'TX3', 'TX4', 'TX5', 'TXO', 'TXU', 'TXV', 'TXX', 'TXY', 'TXZ']
+            all_tx_cats = sorted(list(set(target_cats + [a for a in dir(api.Contracts.Options) if a.startswith('TX')])))
+            for cat in all_tx_cats:
                 if hasattr(api.Contracts.Options, cat):
                     for opt in getattr(api.Contracts.Options, cat):
                         if opt.delivery_date not in by_date:
@@ -2387,7 +2389,9 @@ def trade_txo_strangle():
         import shioaji as sj
         call_contract = None
         put_contract = None
-        for cat in ['TX1', 'TX2', 'TX4', 'TX5', 'TXO']:
+        target_cats = ['TX1', 'TX2', 'TX3', 'TX4', 'TX5', 'TXO', 'TXU', 'TXV', 'TXX', 'TXY', 'TXZ']
+        all_tx_cats = sorted(list(set(target_cats + [a for a in dir(api.Contracts.Options) if a.startswith('TX')])))
+        for cat in all_tx_cats:
             if hasattr(api.Contracts.Options, cat):
                 for c in getattr(api.Contracts.Options, cat):
                     if c.code == call_code: call_contract = c
@@ -3088,7 +3092,9 @@ def init_shioaji():
 
     try:
         by_date = {}
-        for cat in ['TX1', 'TX2', 'TX4', 'TX5', 'TXO']:
+        target_cats = ['TX1', 'TX2', 'TX3', 'TX4', 'TX5', 'TXO', 'TXU', 'TXV', 'TXX', 'TXY', 'TXZ']
+        all_tx_cats = sorted(list(set(target_cats + [a for a in dir(api.Contracts.Options) if a.startswith('TX')])))
+        for cat in all_tx_cats:
             if hasattr(api.Contracts.Options, cat):
                 for c in getattr(api.Contracts.Options, cat):
                     d = c.delivery_date

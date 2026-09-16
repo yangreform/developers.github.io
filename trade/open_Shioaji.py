@@ -140,10 +140,12 @@ def init_shioaji(config: dict) -> Tuple[sj.Shioaji, Dict[str, List[Option]], Dic
     else:
         print("⚠️ 未指定 SHIOAJI_CA_PATH，若進行實盤下單可能會被拒絕")
 
-    # 快取 TXO 選擇權合約
+    # 快取台指選擇權合約 (涵蓋週三到期: TX1, TX2, TX3, TX4, TX5, TXO; 週五到期: TXU, TXV, TXX, TXY, TXZ 及所有 TX 開頭類別)
     txo_by_date: Dict[str, List[Option]] = {}
     txo_by_code: Dict[str, Option] = {}
-    for cat in ['TX1', 'TX2', 'TX4', 'TX5', 'TXO']:
+    target_cats = ['TX1', 'TX2', 'TX3', 'TX4', 'TX5', 'TXO', 'TXU', 'TXV', 'TXX', 'TXY', 'TXZ']
+    all_tx_cats = sorted(list(set(target_cats + [attr for attr in dir(api.Contracts.Options) if attr.startswith("TX")])))
+    for cat in all_tx_cats:
         if hasattr(api.Contracts.Options, cat):
             for c in getattr(api.Contracts.Options, cat):
                 d = c.delivery_date
@@ -162,19 +164,23 @@ def get_underlying_price(api: sj.Shioaji, manual_price: Optional[float] = None) 
     """
     取得最新台指期貨價格作為標的參考價。
     優先順序: 手動指定 > 微台 (TMF) > 小台 (MXF) > 大台 (TXF)
+    若今天為期貨到期結算日且已過 13:30，自動選取次近月活躍期貨。
     """
     if manual_price and manual_price > 0:
         return "手動指定", float(manual_price)
 
     today_str = datetime.date.today().strftime("%Y/%m/%d")
+    now_time = datetime.datetime.now().time()
+    is_after_settlement = (now_time >= datetime.time(13, 30))
     fut_candidates = []
 
-    # 搜尋近月期貨
+    # 搜尋近月期貨 (排除今日已過 13:30 結算之合約)
     for cat in ['TMF', 'MXF', 'TXF']:
         if hasattr(api.Contracts.Futures, cat):
             for c in getattr(api.Contracts.Futures, cat):
-                if c.delivery_date >= today_str:
-                    fut_candidates.append(c)
+                if c.delivery_date < today_str or (c.delivery_date == today_str and is_after_settlement):
+                    continue
+                fut_candidates.append(c)
 
     fut_candidates.sort(key=lambda x: (x.delivery_date, x.category != 'TMF'))
     if not fut_candidates:
@@ -194,13 +200,12 @@ def get_underlying_price(api: sj.Shioaji, manual_price: Optional[float] = None) 
 
 
 def select_delivery_date(txo_by_date: Dict[str, List[Option]], target_date: Optional[str] = None) -> Tuple[str, int]:
-    """選擇目標選擇權到期日與計算 DTE"""
+    """
+    選擇目標選擇權到期日與計算 DTE。
+    【自動選擇規則】：排除今天已結算/到期之合約 (要求 DTE > 0)，並選取 DTE 最小 (最鄰近未來交易日) 的到期日。
+    涵蓋週三到期 (TX1, TX2, TX4, TX5, TXO) 與週五到期 (TXU, TXV, TXX, TXY, TXZ)。
+    """
     today = datetime.date.today()
-    today_str = today.strftime("%Y/%m/%d")
-
-    available_dates = sorted([d for d in txo_by_date.keys() if d >= today_str])
-    if not available_dates:
-        raise RuntimeError("❌ 沒有找到未到期的選擇權合約到期日")
 
     if target_date:
         cleaned = target_date.replace("-", "/").replace(".", "/")
@@ -208,17 +213,32 @@ def select_delivery_date(txo_by_date: Dict[str, List[Option]], target_date: Opti
             cleaned = f"{cleaned[:4]}/{cleaned[4:6]}/{cleaned[6:]}"
         if cleaned in txo_by_date:
             selected = cleaned
+            try:
+                exp_dt = datetime.datetime.strptime(selected, "%Y/%m/%d").date()
+                dte = (exp_dt - today).days
+            except Exception:
+                dte = 0
+            return selected, dte
         else:
-            raise ValueError(f"❌ 指定的到期日 {target_date} 不在可用列表: {available_dates}")
-    else:
-        selected = available_dates[0]
+            raise ValueError(f"❌ 指定的到期日 {target_date} 不在可用列表: {sorted(list(txo_by_date.keys()))}")
 
-    try:
-        exp_dt = datetime.datetime.strptime(selected, "%Y/%m/%d").date()
-        dte = (exp_dt - today).days
-    except Exception:
-        dte = 0
+    # 自動篩選 DTE > 0 且 DTE 最小的到期日 (包含星期五到期的 TXU, TXV, TXX, TXY, TXZ 與週三 TX1, TX2, TX4 等)
+    candidates = []
+    for d in txo_by_date.keys():
+        try:
+            exp_dt = datetime.datetime.strptime(d, "%Y/%m/%d").date()
+            dte = (exp_dt - today).days
+            if dte > 0:
+                candidates.append((d, dte))
+        except Exception:
+            continue
 
+    if not candidates:
+        raise RuntimeError("❌ 沒有找到 DTE > 0 的未到期選擇權合約")
+
+    # 排序取 DTE 最小者
+    candidates.sort(key=lambda x: (x[1], x[0]))
+    selected, dte = candidates[0]
     return selected, dte
 
 
