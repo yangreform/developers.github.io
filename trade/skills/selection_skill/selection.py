@@ -35,17 +35,16 @@ for p in [BASE_DIR, PROJECT_ROOT]:
         sys.path.insert(0, p)
 
 try:
-    from barchart_analysis import load_gemini_api_key
-except ImportError:
-    load_gemini_api_key = None
-
-try:
-    from trade.skills.gemini_helper import call_gemini_for_skill
-except ImportError:
+    from ..gemini_helper import call_gemini_for_skill, load_gemini_api_key
+except Exception:
     try:
-        from skills.gemini_helper import call_gemini_for_skill
-    except ImportError:
-        call_gemini_for_skill = None
+        from trade.skills.gemini_helper import call_gemini_for_skill, load_gemini_api_key
+    except Exception:
+        try:
+            from skills.gemini_helper import call_gemini_for_skill, load_gemini_api_key
+        except Exception:
+            call_gemini_for_skill = None
+            load_gemini_api_key = None
 
 
 class InsiderSelectionSkill:

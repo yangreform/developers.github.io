@@ -67,10 +67,16 @@ except ImportError as e:
     init_driver = None
 
 try:
-    from barchart_analysis import load_gemini_api_key
-except ImportError as e:
-    print(f"[WARN] 無法自 barchart_analysis 載入函式: {e}")
-    load_gemini_api_key = None
+    from trade.skills.gemini_helper import load_gemini_api_key
+except Exception:
+    try:
+        from skills.gemini_helper import load_gemini_api_key
+    except Exception:
+        try:
+            from barchart_analysis import load_gemini_api_key
+        except Exception as e:
+            print(f"[WARN] 無法載入 load_gemini_api_key: {e}")
+            load_gemini_api_key = None
 
 try:
     from barchart_placeOrder import create_fast_ib_connection, load_env_settings
@@ -448,7 +454,8 @@ def run_insider_pipeline(
         # 3. 步驟 2: Selection Skill 內部人籌碼分析與 AI 選股
         print("\n🎯 【步驟 2】呼叫 Selection Skill 進行數據清洗、防重過濾與 AI 選股")
         print("-" * 70)
-        selection_skill = InsiderSelectionSkill(env_path=ENV_FILE)
+        api_key = load_gemini_api_key(ENV_FILE) if load_gemini_api_key else None
+        selection_skill = InsiderSelectionSkill(api_key=api_key, env_path=ENV_FILE)
 
         if not selected_symbol:
             selection_result = selection_skill.select_best_symbol(
@@ -474,7 +481,7 @@ def run_insider_pipeline(
                 if c not in candidates_to_try and c not in memory.get_excluded_symbols():
                     candidates_to_try.append(c)
 
-        flow_skill = OptionsFlowSkill(env_path=ENV_FILE)
+        flow_skill = OptionsFlowSkill(api_key=api_key, env_path=ENV_FILE)
         active_symbol = selected_symbol
         contract_info = None
         call_report = None
