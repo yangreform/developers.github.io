@@ -129,7 +129,10 @@ def parse_report_suggestions(report_text):
         # Fallback split
         sections = re.split(r'【(?:投資建議|投资建议)[一二三123]', report_text)
 
-    for i, s in enumerate(sections[1:], 1):
+    for i, s_raw in enumerate(sections[1:], 1):
+        # 截斷只取該建議的範圍，避免延續到下一章節（如 --- 之後的風控建議）
+        s = re.split(r'\n\s*---\s*\n|\n\s*###\s+', s_raw)[0]
+
         # 標的代號
         sym_match = re.search(r'推薦標的代號[^\w]*([A-Za-z0-9]+)', s)
         symbol = sym_match.group(1).strip().upper() if sym_match else None
@@ -154,49 +157,65 @@ def parse_report_suggestions(report_text):
 
             for line in s.split("\n"):
                 line_clean = line.strip()
-                if any(k in line_clean for k in ["賣出下翼", "Leg 1 Short", "Short Strike", "Short Put"]):
-                    after = line_clean.split("：")[-1] if "：" in line_clean else line_clean.split(":")[-1]
-                    m = re.search(r'(?:Strike\s*)?\$?(\d+\.?\d*)', after.replace("*", "").strip(), re.IGNORECASE)
-                    if m and float(m.group(1)) > 0:
-                        short_put = float(m.group(1))
-                    else:
-                        m2 = re.search(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', line_clean, re.IGNORECASE)
-                        if m2:
-                            short_put = float(m2.group(1))
+                if not line_clean:
+                    continue
+                # 先過濾掉 Leg 1 / Leg 2 等編號干擾，避免被誤認為履約價
+                clean_line_no_leg = re.sub(r'Leg\s*\d+', '', line_clean, flags=re.IGNORECASE)
 
-                elif any(k in line_clean for k in ["買入保護", "Leg 2 Long", "Long Strike", "Long Put"]):
-                    after = line_clean.split("：")[-1] if "：" in line_clean else line_clean.split(":")[-1]
-                    m = re.search(r'(?:Strike\s*)?\$?(\d+\.?\d*)', after.replace("*", "").strip(), re.IGNORECASE)
-                    if m and float(m.group(1)) > 0:
-                        long_put = float(m.group(1))
+                if short_put is None and any(k in clean_line_no_leg for k in ["賣出下翼", "Short Strike", "Short Put", "賣出 Leg", "賣出短腳"]):
+                    after = clean_line_no_leg.split("：")[-1] if "：" in clean_line_no_leg else clean_line_no_leg.split(":")[-1]
+                    m_dollar = re.search(r'\$\s*(\d+\.?\d*)', after)
+                    if m_dollar:
+                        short_put = float(m_dollar.group(1))
                     else:
-                        m2 = re.search(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', line_clean, re.IGNORECASE)
-                        if m2:
-                            long_put = float(m2.group(1))
+                        m = re.search(r'\$?(\d+\.?\d*)\s*(?:Put)?', after.replace("*", "").strip(), re.IGNORECASE)
+                        if m and float(m.group(1)) > 0:
+                            short_put = float(m.group(1))
+                        else:
+                            m2 = re.search(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', clean_line_no_leg, re.IGNORECASE)
+                            if m2:
+                                short_put = float(m2.group(1))
 
-                elif any(k in line_clean for k in ["淨權利金收入", "Net Credit", "淨權利金", "淨收入權利金", "淨信用"]) and ref_credit is None:
-                    after = line_clean.split("：")[-1] if "：" in line_clean else line_clean.split(":")[-1]
+                elif long_put is None and any(k in clean_line_no_leg for k in ["買入保護", "Long Strike", "Long Put", "買入 Leg", "買入長腳"]):
+                    after = clean_line_no_leg.split("：")[-1] if "：" in clean_line_no_leg else clean_line_no_leg.split(":")[-1]
+                    m_dollar = re.search(r'\$\s*(\d+\.?\d*)', after)
+                    if m_dollar:
+                        long_put = float(m_dollar.group(1))
+                    else:
+                        m = re.search(r'\$?(\d+\.?\d*)\s*(?:Put)?', after.replace("*", "").strip(), re.IGNORECASE)
+                        if m and float(m.group(1)) > 0:
+                            long_put = float(m.group(1))
+                        else:
+                            m2 = re.search(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', clean_line_no_leg, re.IGNORECASE)
+                            if m2:
+                                long_put = float(m2.group(1))
+
+                elif ref_credit is None and any(k in clean_line_no_leg for k in ["淨權利金收入", "Net Credit", "淨權利金", "淨收入權利金", "淨信用"]):
+                    after = clean_line_no_leg.split("：")[-1] if "：" in clean_line_no_leg else clean_line_no_leg.split(":")[-1]
                     m = re.search(r'\$?(\d+\.?\d*)', after.replace("*", "").strip())
                     if m and float(m.group(1)) > 0:
                         ref_credit = float(m.group(1))
 
             # 備援 1: 單行描述 (例如: "賣出 727.00 Put / 買入 710.00 Put")
             if not short_put or not long_put:
-                bp_inline = re.search(r'賣出[^\d]*(\d+\.?\d*)\s*(?:塊|點)?\s*(?:Strike\s*)?Put.*?買入[^\d]*(\d+\.?\d*)\s*(?:塊|點)?\s*(?:Strike\s*)?Put', s, re.IGNORECASE)
+                s_no_leg = re.sub(r'Leg\s*\d+', '', s, flags=re.IGNORECASE)
+                bp_inline = re.search(r'賣出[^\d]*(\d+\.?\d*)\s*(?:塊|點)?\s*(?:Strike\s*)?Put.*?買入[^\d]*(\d+\.?\d*)\s*(?:塊|點)?\s*(?:Strike\s*)?Put', s_no_leg, re.IGNORECASE)
                 if bp_inline:
                     short_put = float(bp_inline.group(1))
                     long_put = float(bp_inline.group(2))
 
             # 備援 2: 自報告總覽摘要行提取
             if not short_put or not long_put:
-                bp_summary = re.search(r'Bull\s*Put.*?賣出\s*\*?\$?(\d+\.?\d*)\s*Put.*?買入\s*\*?\$?(\d+\.?\d*)\s*Put', report_text, re.IGNORECASE)
+                rep_no_leg = re.sub(r'Leg\s*\d+', '', report_text, flags=re.IGNORECASE)
+                bp_summary = re.search(r'Bull\s*Put.*?賣出\s*\*?\$?(\d+\.?\d*)\s*Put.*?買入\s*\*?\$?(\d+\.?\d*)\s*Put', rep_no_leg, re.IGNORECASE)
                 if bp_summary:
                     short_put = float(bp_summary.group(1))
                     long_put = float(bp_summary.group(2))
 
             # 備援 3: 自該段文字所有 Strike 數值中排序取前兩大
             if not short_put or not long_put:
-                strikes_found = [float(x) for x in re.findall(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', s, re.IGNORECASE) if float(x) > 0]
+                s_no_leg = re.sub(r'Leg\s*\d+', '', s, flags=re.IGNORECASE)
+                strikes_found = [float(x) for x in re.findall(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', s_no_leg, re.IGNORECASE) if float(x) > 0]
                 if len(strikes_found) >= 2:
                     s1, s2 = strikes_found[0], strikes_found[1]
                     short_put = max(s1, s2)
@@ -314,7 +333,8 @@ def parse_from_summary_fallback(report_text, existing_suggestions=None):
                 m_sym = re.search(r'：\s*[\*`]*([A-Z]{1,5})[\*`]*', line_clean)
             sym = m_sym.group(1).strip() if m_sym else None
 
-            m_strikes = re.findall(r'(?:賣出|Sell|買入|Buy|Strike)[^\d]*(\d+\.?\d*)', line_clean, re.IGNORECASE)
+            line_no_leg = re.sub(r'Leg\s*\d+', '', line_clean, flags=re.IGNORECASE)
+            m_strikes = re.findall(r'(?:賣出|Sell|買入|Buy|Strike)[^\d]*(\d+\.?\d*)', line_no_leg, re.IGNORECASE)
             s_nums = [float(x) for x in m_strikes if float(x) > 0]
             if len(s_nums) >= 2:
                 short_p = max(s_nums[0], s_nums[1])
