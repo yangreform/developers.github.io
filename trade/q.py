@@ -991,16 +991,21 @@ async function confirmCloseGroup(groupName, btn) {
     const pnlVal = Number(p.pnl) || 0;
     const pnlSign = pnlVal > 0 ? '+' : '';
     const mkt = (p.market_price !== undefined && p.market_price !== null) ? fmt(p.market_price, p.decimals ?? 2) : '-';
-    return `  ${idx + 1}. ${p.symbol}\n     • 目前持有: ${pos} 口\n     • 平倉動作: ${closeAction} ${qty} 口 (Adaptive Patient)\n     • 市價: ${mkt} | 未平倉損益: ${pnlSign}${pnlVal.toFixed(2)}`;
-  }).join('\n\n');
+    return `  ${idx + 1}. ${p.symbol}
+     • 目前持有: ${pos} 口
+     • 平倉動作: ${closeAction} ${qty} 口 (Adaptive Patient)
+     • 市價: ${mkt} | 未平倉損益: ${pnlSign}${pnlVal.toFixed(2)}`;
+  }).join(String.fromCharCode(10, 10));
 
-  const confirmMsg = `🚨【確定要平倉【${groupName}】的所有部位嗎？】\n\n` +
-                     `即將全數以 Adaptive Patient 市價平倉以下 ${g.positions.length} 筆部位：\n` +
-                     `==================================================\n` +
-                     lines + `\n` +
-                     `==================================================\n\n` +
-                     `⚠️ 注意：按下確定後將立即向 IBKR 送出真實委託！\n` +
-                     `確定送出嗎？`;
+  const confirmMsg = `🚨【確定要平倉【${groupName}】的所有部位嗎？】
+
+即將全數以 Adaptive Patient 市價平倉以下 ${g.positions.length} 筆部位：
+==================================================
+` + lines + `
+==================================================
+
+⚠️ 注意：按下確定後將立即向 IBKR 送出真實委託！
+確定送出嗎？`;
 
   if (!confirm(confirmMsg)) return;
 
@@ -1031,7 +1036,10 @@ async function confirmCloseGroup(groupName, btn) {
     btn.innerHTML = origHtml;
 
     if (data.status === "ok") {
-      alert(`✅【${groupName}】平倉完成！\n\n` + (data.message || '') + '\n\n' + (data.details || []).join('\n'));
+      const detailsStr = (data.details && data.details.length) ? (String.fromCharCode(10, 10) + data.details.join(String.fromCharCode(10))) : '';
+      alert(`✅【${groupName}】平倉完成！
+
+` + (data.message || '') + detailsStr);
       refresh();
     } else {
       alert(`❌【${groupName}】平倉失敗: ` + (data.message || "未知錯誤"));
