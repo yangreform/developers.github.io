@@ -28,6 +28,7 @@ open_Shioaji.py
 import os
 import sys
 import time
+import math
 import argparse
 import datetime
 from typing import Dict, List, Optional, Tuple
@@ -99,6 +100,127 @@ def env_int(name: str, default: int = 400) -> int:
             pass
 
     return default
+
+
+def env_float(name: str, default: float = 0.0) -> float:
+    """
+    即時讀取 trade/.env 中的浮點數設定 (純讀取，不寫回 .env)。
+    優先順序:
+      1. OP_HEDGE_CONFIG_JSON 內台指/TXO 區塊的欄位 (例如 price_diff)
+      2. trade/.env 中同名環境變數 (例如: price_diff 或 PRICE_DIFF)
+      3. 預設值 default (0.0)
+    """
+    dotenv_path = find_dotenv()
+    if not dotenv_path:
+        dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(dotenv_path):
+        load_dotenv(dotenv_path, override=True)
+
+    raw_json = os.getenv("OP_HEDGE_CONFIG_JSON", "")
+    if raw_json:
+        try:
+            op_cfg = json.loads(raw_json)
+            # 優先搜尋台指/TXO/TMF/MXF 相關商品區塊
+            for key in ["台指(TXO)", "台指(TMF)", "台指", "TXO", "小台(TXO)", "小台", "TMF", "MXF"]:
+                if key in op_cfg and isinstance(op_cfg[key], dict) and name in op_cfg[key]:
+                    return float(op_cfg[key][name])
+            # 或遍歷 symbols 含有 TXO/TX/TMF/MXF 的群組
+            for k, val in op_cfg.items():
+                if isinstance(val, dict):
+                    syms = val.get("symbols", [])
+                    if any(s in syms for s in ["TXO", "TX", "TMF", "MXF"]):
+                        if name in val:
+                            return float(val[name])
+            # 若最外層有該欄位
+            if name in op_cfg:
+                return float(op_cfg[name])
+        except Exception:
+            pass
+
+    val = os.getenv(name) or os.getenv(name.upper()) or os.getenv(name.lower())
+    if val is not None and str(val).strip():
+        try:
+            return float(str(val).strip())
+        except (ValueError, TypeError):
+            pass
+
+    return default
+
+
+# ==============================================================================
+# 📐 Black-76 選擇權 Greeks 計算 (支援 DTE 3 週選擇權與基差點位修正)
+# ==============================================================================
+def calculate_option_delta(
+    f: float,
+    k: float,
+    t: float,
+    r: float = 0.01,
+    sigma: float = 0.20,
+    option_type: str = "C"
+) -> float:
+    """
+    計算選擇權 Black-76 模型 Delta (純標準庫 math，無需 scipy)。
+    f: 標的期貨參考價 (含 price_diff 修正)
+    k: 履約價
+    t: 年化到期時間 (dte / 365.0)
+    sigma: 隱含波動率
+    option_type: 'C' 或 'P'
+    """
+    if t <= 0 or f <= 0 or k <= 0:
+        return 0.0
+    sigma = max(0.01, sigma)
+    d1 = (math.log(f / k) + 0.5 * sigma**2 * t) / (sigma * math.sqrt(t))
+    norm_cdf_d1 = 0.5 * (1.0 + math.erf(d1 / math.sqrt(2.0)))
+    df = math.exp(-r * t)
+    if option_type.upper() == "C":
+        return float(df * norm_cdf_d1)
+    else:
+        return float(df * (norm_cdf_d1 - 1.0))
+
+
+def implied_volatility_black76(
+    f: float,
+    k: float,
+    t: float,
+    option_price: float,
+    option_type: str = "C",
+    r: float = 0.01,
+    default_iv: float = 0.20
+) -> float:
+    """
+    使用二分逼近法求 Black-76 隱含波動率。
+    """
+    if t <= 0 or f <= 0 or k <= 0 or option_price <= 0:
+        return default_iv
+
+    def b76_price(sig: float) -> float:
+        d1 = (math.log(f / k) + 0.5 * sig**2 * t) / (sig * math.sqrt(t))
+        d2 = d1 - sig * math.sqrt(t)
+        cdf1 = 0.5 * (1.0 + math.erf(d1 / math.sqrt(2.0)))
+        cdf2 = 0.5 * (1.0 + math.erf(d2 / math.sqrt(2.0)))
+        if option_type.upper() == "C":
+            return math.exp(-r * t) * (f * cdf1 - k * cdf2)
+        else:
+            return math.exp(-r * t) * (k * (1.0 - cdf2) - f * (1.0 - cdf1))
+
+    low, high = 0.01, 5.0
+    p_low = b76_price(low)
+    p_high = b76_price(high)
+    if option_price <= p_low:
+        return low
+    if option_price >= p_high:
+        return high
+
+    for _ in range(32):
+        mid = (low + high) / 2.0
+        p = b76_price(mid)
+        if abs(p - option_price) < 0.05:
+            return mid
+        if p < option_price:
+            low = mid
+        else:
+            high = mid
+    return mid
 
 
 def load_config() -> dict:
@@ -263,15 +385,17 @@ def calculate_spread_legs(
     api: sj.Shioaji,
     txo_by_date: Dict[str, List[Option]],
     ref_price: float,
+    raw_ref_price: Optional[float] = None,
+    price_diff: float = 0.0,
     wing_width: float = 200.0,
     strike_step: float = 100.0,
     manual_center: Optional[float] = None,
     delivery_date: Optional[str] = None
 ) -> dict:
     """
-    計算中心 ATM、上翼 Call、下翼 Put，並取得 4 口合約及即時報價
+    計算中心 ATM、上翼 Call、下翼 Put，並取得 4 口合約及即時報價與 Black-76 Greeks
     """
-    # 1. 決定中心 ATM 與翅膀
+    # 1. 決定中心 ATM 與翅膀 (使用含 price_diff 修正後之 ref_price)
     if manual_center and manual_center > 0:
         center_strike = float(manual_center)
     else:
@@ -334,6 +458,27 @@ def calculate_spread_legs(
     total_credit     = bear_call_credit + bull_put_credit
     max_risk_points  = max(0.0, wing_width - total_credit)
 
+    # 6. 計算各腿 Black-76 Greeks (以修正後參考價 ref_price 為 F，年化到期時間 T = max(dte, 0.5) / 365.0)
+    T = max(float(dte), 0.5) / 365.0
+    c_wing_iv = implied_volatility_black76(f=ref_price, k=call_wing_strike, t=T, option_price=c_wing_price, option_type="C")
+    c_wing_d  = calculate_option_delta(f=ref_price, k=call_wing_strike, t=T, r=0.01, sigma=c_wing_iv, option_type="C")
+
+    c_center_iv = implied_volatility_black76(f=ref_price, k=center_strike, t=T, option_price=c_center_price, option_type="C")
+    c_center_d  = calculate_option_delta(f=ref_price, k=center_strike, t=T, r=0.01, sigma=c_center_iv, option_type="C")
+
+    p_center_iv = implied_volatility_black76(f=ref_price, k=center_strike, t=T, option_price=p_center_price, option_type="P")
+    p_center_d  = calculate_option_delta(f=ref_price, k=center_strike, t=T, r=0.01, sigma=p_center_iv, option_type="P")
+
+    p_wing_iv = implied_volatility_black76(f=ref_price, k=put_wing_strike, t=T, option_price=p_wing_price, option_type="P")
+    p_wing_d  = calculate_option_delta(f=ref_price, k=put_wing_strike, t=T, r=0.01, sigma=p_wing_iv, option_type="P")
+
+    # 價差 Net Delta (賣方部位 Delta 變號)
+    # Bear Call = Sell ATM Call + Buy Upper Wing Call
+    bear_call_delta = -c_center_d + c_wing_d
+    # Bull Put = Sell ATM Put + Buy Lower Wing Put (Put Delta 本身為負，賣出 -(-Delta) 為正)
+    bull_put_delta  = -p_center_d + p_wing_d
+    total_net_delta = bear_call_delta + bull_put_delta
+
     legs_info = {
         "center_strike": center_strike,
         "call_wing_strike": call_wing_strike,
@@ -342,6 +487,8 @@ def calculate_spread_legs(
         "delivery_date": selected_date,
         "dte": dte,
         "ref_price": ref_price,
+        "raw_ref_price": raw_ref_price if raw_ref_price is not None else ref_price,
+        "price_diff": price_diff,
         "contracts": {
             "c_wing": {
                 "contract": c_wing,
@@ -351,6 +498,8 @@ def calculate_spread_legs(
                 "right": "Call",
                 "role": "Upper Wing Call",
                 "price": c_wing_price,
+                "iv": c_wing_iv,
+                "delta": c_wing_d,
                 "snap": snapshots.get(c_wing.code)
             },
             "c_center": {
@@ -361,6 +510,8 @@ def calculate_spread_legs(
                 "right": "Call",
                 "role": "Center Call",
                 "price": c_center_price,
+                "iv": c_center_iv,
+                "delta": c_center_d,
                 "snap": snapshots.get(c_center.code)
             },
             "p_center": {
@@ -371,6 +522,8 @@ def calculate_spread_legs(
                 "right": "Put",
                 "role": "Center Put",
                 "price": p_center_price,
+                "iv": p_center_iv,
+                "delta": p_center_d,
                 "snap": snapshots.get(p_center.code)
             },
             "p_wing": {
@@ -381,6 +534,8 @@ def calculate_spread_legs(
                 "right": "Put",
                 "role": "Lower Wing Put",
                 "price": p_wing_price,
+                "iv": p_wing_iv,
+                "delta": p_wing_d,
                 "snap": snapshots.get(p_wing.code)
             },
         },
@@ -390,6 +545,9 @@ def calculate_spread_legs(
         "total_credit_twd": total_credit * 50.0,
         "max_risk_points": max_risk_points,
         "max_risk_twd": max_risk_points * 50.0,
+        "bear_call_delta": bear_call_delta,
+        "bull_put_delta": bull_put_delta,
+        "total_net_delta": total_net_delta,
     }
     return legs_info
 
@@ -770,7 +928,9 @@ def build_notification_message(
     msg = (
         f"{tag} 選擇權雙向價差建倉\n"
         f"-----------------------------------------\n"
-        f"🎯 標的: {und_name} (參考價: {legs['ref_price']:.1f})\n"
+        f"🎯 標的: {und_name}\n"
+        f"   期貨現價: {legs.get('raw_ref_price', legs['ref_price']):.1f} | 點位修正: {legs.get('price_diff', 0.0):+.1f} 點\n"
+        f"   修正後參考價: {legs['ref_price']:.1f}\n"
         f"📅 到期日: {legs['delivery_date']} (DTE: {legs['dte']} 天)\n"
         f"📊 口數: 每腿 {quantity} 口 (共 4 口)\n"
         f"\n"
@@ -779,16 +939,17 @@ def build_notification_message(
         f"Lower Wing Put: {legs['put_wing_strike']:.0f} (-{legs['wing_width']:.0f})\n"
         f"-----------------------------------------\n"
         f"📉 1. 買權空頭價差 (Bear Call Spread):\n"
-        f"  - 賣出 (Sell) Call {legs['center_strike']:.0f} ({c_map['c_center']['contract'].code}) @ {c_map['c_center']['price']:.1f}\n"
-        f"  - 買入 (Buy)  Call {legs['call_wing_strike']:.0f} ({c_map['c_wing']['contract'].code}) @ {c_map['c_wing']['price']:.1f}\n"
-        f"  預估淨收入: {legs['bear_call_credit']:+.1f} 點\n"
+        f"  - 賣出 (Sell) Call {legs['center_strike']:.0f} ({c_map['c_center']['contract'].code}) @ {c_map['c_center']['price']:.1f} (Δ:{c_map['c_center'].get('delta', 0.0):+.2f})\n"
+        f"  - 買入 (Buy)  Call {legs['call_wing_strike']:.0f} ({c_map['c_wing']['contract'].code}) @ {c_map['c_wing']['price']:.1f} (Δ:{c_map['c_wing'].get('delta', 0.0):+.2f})\n"
+        f"  預估淨收入: {legs['bear_call_credit']:+.1f} 點 | Net Delta: {legs.get('bear_call_delta', 0.0):+.2f}\n"
         f"\n"
         f"📈 2. 賣權多頭價差 (Bull Put Spread):\n"
-        f"  - 賣出 (Sell) Put {legs['center_strike']:.0f} ({c_map['p_center']['contract'].code}) @ {c_map['p_center']['price']:.1f}\n"
-        f"  - 買入 (Buy)  Put {legs['put_wing_strike']:.0f} ({c_map['p_wing']['contract'].code}) @ {c_map['p_wing']['price']:.1f}\n"
-        f"  預估淨收入: {legs['bull_put_credit']:+.1f} 點\n"
+        f"  - 賣出 (Sell) Put {legs['center_strike']:.0f} ({c_map['p_center']['contract'].code}) @ {c_map['p_center']['price']:.1f} (Δ:{c_map['p_center'].get('delta', 0.0):+.2f})\n"
+        f"  - 買入 (Buy)  Put {legs['put_wing_strike']:.0f} ({c_map['p_wing']['contract'].code}) @ {c_map['p_wing']['price']:.1f} (Δ:{c_map['p_wing'].get('delta', 0.0):+.2f})\n"
+        f"  預估淨收入: {legs['bull_put_credit']:+.1f} 點 | Net Delta: {legs.get('bull_put_delta', 0.0):+.2f}\n"
         f"-----------------------------------------\n"
         f"💰 總淨權利金: {legs['total_credit']:+.1f} 點 (約 NT$ {legs['total_credit_twd'] * quantity:,.0f})\n"
+        f"📐 總 Net Delta: {legs.get('total_net_delta', 0.0):+.2f}\n"
         f"🛡️ 單邊最大風險: {legs['max_risk_points']:.1f} 點 (約 NT$ {legs['max_risk_twd'] * quantity:,.0f})\n"
         f"⚡ 委託狀態: {'全部模擬完成' if dry_run else '實盤委託已送出'}"
     )
@@ -801,6 +962,7 @@ def build_notification_message(
 def main():
     parser = argparse.ArgumentParser(description="永豐 Shioaji 選擇權雙向價差開倉程式")
     parser.add_argument("--wing-width", type=float, default=None, help="翅膀寬度 (若未指定則自 trade/.env 的 OP_HEDGE_CONFIG_JSON 即時讀取)")
+    parser.add_argument("--price-diff", type=float, default=None, help="點位修正 (若未指定則自 trade/.env 的 OP_HEDGE_CONFIG_JSON 即時讀取)")
     parser.add_argument("--strike-step", type=float, default=100.0, help="中心 ATM 履約價檔位取整 (預設: 100 點)")
     parser.add_argument("--center", type=float, default=None, help="手動指定中心 ATM 履約價 (例如: 45600)")
     parser.add_argument("--price", type=float, default=None, help="手動指定標的期貨參考價")
@@ -817,6 +979,15 @@ def main():
     print("  🚀 啟動 永豐 Shioaji 選擇權雙向價差開倉程式 (Bear Call + Bull Put)")
     print("=================================================================")
 
+    # 即時讀取 price_diff (DTE 25 TMF 期貨 與 DTE 3 週選擇權之基差修正)
+    if args.price_diff is not None:
+        price_diff = float(args.price_diff)
+        diff_source = "指令參數 --price-diff"
+    else:
+        price_diff = float(env_float("price_diff", 0.0))
+        diff_source = "trade/.env 的 OP_HEDGE_CONFIG_JSON 即時讀取"
+    print(f"📊 點位修正 (price_diff): {price_diff:+.1f} 點 (來源: {diff_source})")
+
     # 即時讀取 wing_width (不用寫入 .env)
     if args.wing_width is not None and args.wing_width > 0:
         wing_width = float(args.wing_width)
@@ -831,27 +1002,39 @@ def main():
 
     # 取得標的市價
     und_name, ref_price = get_underlying_price(api, manual_price=args.price)
-    print(f"📊 標的參考: {und_name} | 現價: {ref_price:.2f}")
+    adj_ref_price = ref_price + price_diff
+    print(f"📊 標的參考: {und_name} | 期貨現價: {ref_price:.2f} | 點位修正: {price_diff:+.1f} | 修正後參考價: {adj_ref_price:.2f}")
 
-    # 計算價差架構
+    # 計算價差架構 (以修正後參考價 adj_ref_price 計算價平 center_strike 與 Black-76 Greeks)
     legs = calculate_spread_legs(
         api=api,
         txo_by_date=txo_by_date,
-        ref_price=ref_price,
+        ref_price=adj_ref_price,
+        raw_ref_price=ref_price,
+        price_diff=price_diff,
         wing_width=wing_width,
         strike_step=args.strike_step,
         manual_center=args.center,
         delivery_date=args.delivery_date
     )
 
+    c_c = legs['contracts']['c_center']
+    c_w = legs['contracts']['c_wing']
+    p_c = legs['contracts']['p_center']
+    p_w = legs['contracts']['p_wing']
+
     print("\n------------------- [ 價差架構詳情 ] -------------------")
+    print(f"標的期貨現價: {ref_price:.2f} | 點位修正: {price_diff:+.1f} | 修正後參考價: {adj_ref_price:.2f}")
     print(f"Center ATM: {legs['center_strike']:.0f}")
     print(f"Upper Wing Call: {legs['call_wing_strike']:.0f} (+{legs['wing_width']:.0f})")
     print(f"Lower Wing Put: {legs['put_wing_strike']:.0f} (-{legs['wing_width']:.0f})")
     print(f"到期日: {legs['delivery_date']} (DTE: {legs['dte']} 天)")
-    print(f"預估買權價差淨收入: {legs['bear_call_credit']:+.1f} 點")
-    print(f"預估賣權價差淨收入: {legs['bull_put_credit']:+.1f} 點")
+    print(f"• Bear Call: Sell {c_c['strike']:.0f}C @ {c_c['price']:.1f} (IV: {c_c['iv']*100:.1f}%, Δ: {c_c['delta']:+.2f}) + Buy {c_w['strike']:.0f}C @ {c_w['price']:.1f} (IV: {c_w['iv']*100:.1f}%, Δ: {c_w['delta']:+.2f})")
+    print(f"  -> 預估買權淨收入: {legs['bear_call_credit']:+.1f} 點 | Net Delta: {legs['bear_call_delta']:+.2f}")
+    print(f"• Bull Put:  Sell {p_c['strike']:.0f}P @ {p_c['price']:.1f} (IV: {p_c['iv']*100:.1f}%, Δ: {p_c['delta']:+.2f}) + Buy {p_w['strike']:.0f}P @ {p_w['price']:.1f} (IV: {p_w['iv']*100:.1f}%, Δ: {p_w['delta']:+.2f})")
+    print(f"  -> 預估賣權淨收入: {legs['bull_put_credit']:+.1f} 點 | Net Delta: {legs['bull_put_delta']:+.2f}")
     print(f"總淨權利金收入: {legs['total_credit']:+.1f} 點 (約 NT$ {legs['total_credit_twd'] * args.quantity:,.0f})")
+    print(f"組合總 Net Delta: {legs['total_net_delta']:+.2f}")
     print(f"單邊最大潛在風險: {legs['max_risk_points']:.1f} 點 (約 NT$ {legs['max_risk_twd'] * args.quantity:,.0f})")
     print("---------------------------------------------------------")
 
@@ -886,4 +1069,9 @@ def main():
 
 if __name__ == "__main__":
     main()
-    time.sleep(60*60*20)
+    # 僅在手動雙擊且非 dry-run 模式下保持終端機視窗，避免自動化背景呼叫被掛起
+    if sys.stdin and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not ("--dry-run" in sys.argv):
+        try:
+            time.sleep(60 * 60 * 20)
+        except KeyboardInterrupt:
+            pass

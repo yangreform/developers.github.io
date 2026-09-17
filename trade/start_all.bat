@@ -16,6 +16,9 @@ echo =======================================================
 echo   Check Time: %date% %time%
 echo =======================================================
 
+:: 取得當前星期幾的數字
+for /f "tokens=2 delims==." %%a in ('wmic path win32_localtime get dayofweek /value') do set DOW=%%a
+
 if "%MM%"=="34" (
     if "!last_killed_hour!" neq "%HH%" (
         set "last_killed_hour=%HH%"
@@ -24,15 +27,6 @@ if "%MM%"=="34" (
         wmic process where "name='py.exe' and commandline like '%%q.py%%'" call terminate >nul 2>&1
         echo [%time%] Processes terminated. Watchdog will restart them now...
         timeout /t 3 /nobreak >nul
-    )
-
-    if "%HH%"=="15" (
-	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "open_Shioaji.py" >nul
-	if !errorlevel! equ 0 (
-	    echo [OK] open_Shioaji.py is running.
-	) else (
-	    start "open_Shioaji" /max py .\open_Shioaji.py
-	)
     )
 
     if "%HH%"=="01" (
@@ -61,6 +55,67 @@ if "%MM%"=="34" (
 	    start "option" /max py .\option.py
 	)
     )
+
+
+    echo =======================================================
+    if %DOW% == 3 (
+    	if "%HH%"=="09" (
+    	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "close_Shioaji.py" >nul
+    	    if !errorlevel! equ 0 (
+    	        echo [OK] close_Shioaji.py is running.
+    	    ) else (
+    	        start "close_Shioaji" /max py .\close_Shioaji.py
+    	    )
+    	)
+    	if "%HH%"=="15" (
+    	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "open_Shioaji.py" >nul
+    	    if !errorlevel! equ 0 (
+    	        echo [OK] open_Shioaji.py is running.
+    	    ) else (
+    	        start "open_Shioaji" /max py .\open_Shioaji.py
+    	    )
+    	)
+    )
+
+    if %DOW% == 5 (
+    	if "%HH%"=="09" (
+    	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "close_Shioaji.py" >nul
+    	    if !errorlevel! equ 0 (
+    	        echo [OK] close_Shioaji.py is running.
+    	    ) else (
+    	        start "close_Shioaji" /max py .\close_Shioaji.py
+    	    )
+    	)
+    	if "%HH%"=="15" (
+    	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "open_Shioaji.py" >nul
+    	    if !errorlevel! equ 0 (
+    	        echo [OK] open_Shioaji.py is running.
+    	    ) else (
+    	        start "open_Shioaji" /max py .\open_Shioaji.py
+    	    )
+    	)
+    )
+    if %DOW% == 6 (
+    	if "%HH%"=="04" (
+    	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "close_Shioaji.py" >nul
+    	    if !errorlevel! equ 0 (
+    	        echo [OK] close_Shioaji.py is running.
+    	    ) else (
+    	        start "close_Shioaji" /max py .\close_Shioaji.py
+    	    )
+    	)
+    )
+    if %DOW% == 1 (
+    	if "%HH%"=="09" (
+    	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "open_Shioaji.py" >nul
+    	    if !errorlevel! equ 0 (
+    	        echo [OK] open_Shioaji.py is running.
+    	    ) else (
+    	        start "open_Shioaji" /max py .\open_Shioaji.py
+    	    )
+    	)
+    )
+
 
 )
 

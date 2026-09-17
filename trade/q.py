@@ -30,12 +30,13 @@ from vxm_config import load_vxm_config, save_vxm_config
 # ==============================================================================
 # 🔐 Load .env
 # ==============================================================================
-load_dotenv()
-
 # 手機面板改的參數要寫回這個檔案，這樣重開 q.py 才不會消失
-DOTENV_PATH = find_dotenv()
-if not DOTENV_PATH:
-    DOTENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+DOTENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if not os.path.exists(DOTENV_PATH):
+    found = find_dotenv()
+    if found:
+        DOTENV_PATH = found
+load_dotenv(DOTENV_PATH, override=True)
 
 
 def persist_env_var(key: str, value) -> bool:
@@ -118,6 +119,130 @@ def load_hedge_config() -> dict:
 
 HEDGE_CONFIG = load_hedge_config()
 last_hedge_times = {k: 0 for k in HEDGE_CONFIG.keys()}
+
+
+# ==============================================================================
+# 🇹🇼 台指 TMF / TXO 設定與基差修正 (OP_HEDGE_CONFIG_JSON 即時讀寫)
+# ==============================================================================
+def get_tmf_op_config() -> dict:
+    """從 .env 即時讀取 OP_HEDGE_CONFIG_JSON 中台指(TXO)/TMF 的設定"""
+    dotenv_path = find_dotenv()
+    if not dotenv_path:
+        dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(dotenv_path):
+        load_dotenv(dotenv_path, override=True)
+
+    raw = os.getenv("OP_HEDGE_CONFIG_JSON", "")
+    default_cfg = {
+        "price_diff": 0.0,
+        "wing_width": 400,
+        "dte_start": 1,
+        "dte_end": 50,
+        "bid_up": 600,
+        "iron": "short",
+        "symbols": ["TXO", "TX", "TMF", "MXF"]
+    }
+    if not raw:
+        return default_cfg
+    try:
+        data = json.loads(raw)
+        for key in ["台指(TXO)", "台指(TMF)", "台指", "TXO", "TMF"]:
+            if key in data and isinstance(data[key], dict):
+                cfg = dict(default_cfg)
+                cfg.update(data[key])
+                return cfg
+        for k, v in data.items():
+            if isinstance(v, dict) and any(s in v.get("symbols", []) for s in ["TXO", "TX", "TMF", "MXF"]):
+                cfg = dict(default_cfg)
+                cfg.update(v)
+                return cfg
+    except Exception as e:
+        print(f"⚠️ 解析 OP_HEDGE_CONFIG_JSON 失敗: {e}")
+    return default_cfg
+
+
+def get_tmf_price_diff() -> float:
+    """取得台指選擇權點位修正 (price_diff)"""
+    cfg = get_tmf_op_config()
+    try:
+        return float(cfg.get("price_diff", 0.0))
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def save_tmf_op_config(price_diff: float = None, wing_width: int = None) -> tuple[bool, str, dict]:
+    """更新 OP_HEDGE_CONFIG_JSON 中的 price_diff 與 wing_width 並寫回 trade/.env"""
+    dotenv_path = find_dotenv()
+    if not dotenv_path:
+        dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+
+    raw = os.getenv("OP_HEDGE_CONFIG_JSON", "")
+    cfg_data = {}
+    if raw:
+        try:
+            cfg_data = json.loads(raw)
+        except Exception:
+            cfg_data = {}
+
+    target_key = "台指(TXO)"
+    for k in ["台指(TXO)", "台指(TMF)", "台指", "TXO", "TMF"]:
+        if k in cfg_data:
+            target_key = k
+            break
+
+    if target_key not in cfg_data:
+        cfg_data[target_key] = {
+            "symbols": ["TXO", "TX", "TMF", "MXF"],
+            "dte_start": 1,
+            "dte_end": 50,
+            "wing_width": 400,
+            "bid_up": 600,
+            "iron": "short",
+            "price_diff": 0.0
+        }
+
+    if price_diff is not None:
+        try:
+            cfg_data[target_key]["price_diff"] = float(price_diff)
+        except (ValueError, TypeError):
+            pass
+    if wing_width is not None and int(wing_width) > 0:
+        try:
+            cfg_data[target_key]["wing_width"] = int(wing_width)
+        except (ValueError, TypeError):
+            pass
+
+    new_raw = json.dumps(cfg_data, ensure_ascii=False)
+    os.environ["OP_HEDGE_CONFIG_JSON"] = new_raw
+
+    # 寫回 .env 檔案
+    written = False
+    if os.path.exists(dotenv_path):
+        try:
+            lines = []
+            with open(dotenv_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            found = False
+            new_lines = []
+            for line in lines:
+                if line.strip().startswith("OP_HEDGE_CONFIG_JSON="):
+                    new_lines.append(f"OP_HEDGE_CONFIG_JSON='{new_raw}'\n")
+                    found = True
+                else:
+                    new_lines.append(line)
+            if not found:
+                new_lines.append(f"OP_HEDGE_CONFIG_JSON='{new_raw}'\n")
+            with open(dotenv_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+            written = True
+        except Exception as e:
+            print(f"⚠️ 直接寫入 .env 失敗: {e}")
+
+    if not written:
+        persist_env_var("OP_HEDGE_CONFIG_JSON", f"'{new_raw}'")
+
+    return True, "成功更新設定", cfg_data[target_key]
+
 
 SEND_WEBHOOK = env_bool("SEND_WEBHOOK", False)
 
@@ -333,7 +458,7 @@ DASHBOARD_HTML = """
 
 <div class="tabs">
     <button class="tablinks active" onclick="openTab(event, 'overview')">Delta Hedge</button>
-    <button class="tablinks" onclick="openTab(event, 'barchart')">Barchart</button>
+    <button class="tablinks" onclick="openTab(event, 'tmf_tab')">台指TMF</button>
     <button class="tablinks" onclick="openTab(event, 'ai_report')">AI 投資建議</button>
 </div>
 
@@ -416,12 +541,99 @@ DASHBOARD_HTML = """
   <div class="toast" id="toast"></div>
 </div>
 
-<div id="barchart" class="tabcontent">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h2 style="margin:0;">Barchart 選擇權策略掃描 (所有 CSV 表格)</h2>
-        <button class="action-btn" onclick="loadBarchartData()">重新整理全部檔案</button>
+<div id="tmf_tab" class="tabcontent">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+    <h2 style="margin:0; display:flex; align-items:center; gap:8px;">
+      <span>🇹🇼 台指選擇權 (TMF / TXO) 雙向價差與對沖控制</span>
+      <span class="badge" style="background-color:#1f6feb; font-size:12px;">Shioaji 永豐 API</span>
+    </h2>
+    <button class="action-btn" onclick="loadTMFConfig()">🔄 重新整理設定</button>
+  </div>
+
+  <!-- TMF 參數即時讀寫卡片 -->
+  <div class="card" style="border-left: 4px solid #58a6ff; margin-bottom:16px;">
+    <h3 style="margin-top:0; margin-bottom:12px; color:#58a6ff; font-size:15px; display:flex; align-items:center; gap:6px;">
+      <span>⚙️ 策略參數即時設定 (即時讀寫 trade/.env 的 OP_HEDGE_CONFIG_JSON)</span>
+    </h3>
+    
+    <!-- 標的指標即時預覽 -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-bottom:16px;">
+      <div style="background:#0d1117; padding:10px; border-radius:6px; border:1px solid #21262d;">
+        <div class="muted" style="font-size:11px;">TMF 期貨現價 (遠月 DTE 25)</div>
+        <div style="font-size:16px; font-weight:bold; color:#7ee787;" id="tmf_display_price">載入中...</div>
+      </div>
+      <div style="background:#0d1117; padding:10px; border-radius:6px; border:1px solid #21262d;">
+        <div class="muted" style="font-size:11px;">點位修正 (price_diff)</div>
+        <div style="font-size:16px; font-weight:bold; color:#58a6ff;" id="tmf_display_diff">0.0</div>
+      </div>
+      <div style="background:#0d1117; padding:10px; border-radius:6px; border:1px solid #21262d;">
+        <div class="muted" style="font-size:11px;">週選擇權參考價 (現價 + 點位差)</div>
+        <div style="font-size:16px; font-weight:bold; color:#d29922;" id="tmf_display_eff_price">-</div>
+      </div>
+      <div style="background:#0d1117; padding:10px; border-radius:6px; border:1px solid #21262d;">
+        <div class="muted" style="font-size:11px;">預估價平 ATM (Step 100)</div>
+        <div style="font-size:16px; font-weight:bold; color:#f0883e;" id="tmf_display_atm">-</div>
+      </div>
     </div>
-    <div id="barchart_content" class="loading">載入中...</div>
+
+    <!-- 設定輸入表單 -->
+    <div style="border-top:1px solid #21262d; padding-top:14px;">
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:14px;">
+        <div>
+          <label class="muted" style="font-size:12px; display:block; margin-bottom:4px; font-weight:600; color:#c9d1d9;">
+            🎯 點位修正 (price_diff, 點數):
+          </label>
+          <input type="number" id="tmf_cfg_price_diff" step="1" oninput="updateTMFLiveCalc()" style="width:100%; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:8px 10px; border-radius:6px; font-size:14px;" value="0">
+          <span class="muted" style="font-size:11px; display:block; margin-top:3px;">
+            💡 修正 TMF 活躍期貨 (DTE~25) 與週選 (DTE~3) 基差不同步問題，讓價平與 Delta 計算正確。
+          </span>
+        </div>
+        <div>
+          <label class="muted" style="font-size:12px; display:block; margin-bottom:4px; font-weight:600; color:#c9d1d9;">
+            📐 價差翼寬 (wing_width, 點數):
+          </label>
+          <input type="number" id="tmf_cfg_wing_width" step="50" oninput="updateTMFLiveCalc()" style="width:100%; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:8px 10px; border-radius:6px; font-size:14px;" value="400">
+          <span class="muted" style="font-size:11px; display:block; margin-top:3px;">
+            💡 Bear Call / Bull Put 翅膀距離 (例如 400 點 = 賣 46800 買 47200/46400)。
+          </span>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button class="action-btn" id="btn_save_tmf_cfg" onclick="saveTMFConfig(this)" style="padding:8px 20px; font-size:13px; background-color:#238636;">
+          💾 儲存設定至 .env (OP_HEDGE_CONFIG_JSON)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模擬下單執行區塊 -->
+  <div class="card" style="border-left: 4px solid #238636;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+      <h3 style="margin:0; color:#238636; font-size:15px; display:flex; align-items:center; gap:6px;">
+        <span>🚀 open_Shioaji.py 雙向價差模擬下單 (--dry-run)</span>
+      </h3>
+      <button class="action-btn" id="btn_run_open_shioaji" style="background-color:#1f6feb; padding:8px 18px; font-size:13px; display:flex; align-items:center; gap:6px;" onclick="runOpenShioajiDryRun()">
+        <span>⚡</span> <span>執行模擬下單並顯示結果</span>
+      </button>
+    </div>
+    <div class="muted" style="font-size:11px; margin-bottom:12px;">
+      點擊上方按鈕將在背景執行 <code>trade/open_Shioaji.py --dry-run --no-line</code>，使用當前 <code>price_diff</code> 與 <code>wing_width</code> 試算雙向價差報價、Delta 與保證金，不送出真實委託。
+    </div>
+
+    <!-- 執行狀態指示 -->
+    <div id="tmf_action_status" style="display:none; padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:13px; border:1px solid transparent;"></div>
+
+    <!-- 終端機模擬控制台視窗 -->
+    <div style="background:#090d13; border:1px solid #30363d; border-radius:6px; overflow:hidden;">
+      <div style="background:#161b22; padding:6px 12px; border-bottom:1px solid #30363d; display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#8b949e;">
+        <span>🖥️ 終端機模擬日誌 (Console Output)</span>
+        <div style="display:flex; gap:8px;">
+          <button class="action-btn" onclick="clearTMFConsole()" style="padding:2px 8px; font-size:10px; background:#21262d;">清空日誌</button>
+        </div>
+      </div>
+      <pre id="tmf_console_output" style="margin:0; padding:12px; max-height:450px; overflow-y:auto; font-family:Consolas, Monaco, 'Courier New', monospace; font-size:12px; line-height:1.45; color:#7ee787; white-space:pre-wrap; word-break:break-all;">點擊上方「執行模擬下單並顯示結果」按鈕開始試算...</pre>
+    </div>
+  </div>
 </div>
 
 <div id="ai_report" class="tabcontent">
@@ -668,11 +880,138 @@ function openTab(evt, tabName) {
     document.getElementById(tabName).style.display = "block";
     if(evt) evt.currentTarget.className += " active";
     
-    if(tabName === 'barchart') {
+    if(tabName === 'tmf_tab') {
+        loadTMFConfig();
+    } else if(tabName === 'barchart') {
         loadBarchartData();
     } else if(tabName === 'ai_report') {
         loadAIReportList();
     }
+}
+
+// ==========================================
+// 台指 TMF Tab Functions
+// ==========================================
+let LATEST_TMF_RAW_PRICE = null;
+
+async function loadTMFConfig() {
+    try {
+        const resp = await fetch('/api/tmf/config?t=' + Date.now());
+        const data = await resp.json();
+        if (data.status === 'ok') {
+            document.getElementById('tmf_cfg_price_diff').value = (data.price_diff !== undefined && data.price_diff !== null) ? data.price_diff : 0;
+            document.getElementById('tmf_cfg_wing_width').value = (data.wing_width !== undefined && data.wing_width !== null) ? data.wing_width : 400;
+            if (data.tmf_price !== null && data.tmf_price !== undefined && data.tmf_price > 0) {
+                LATEST_TMF_RAW_PRICE = parseFloat(data.tmf_price);
+                document.getElementById('tmf_display_price').textContent = LATEST_TMF_RAW_PRICE.toFixed(2);
+            } else {
+                document.getElementById('tmf_display_price').textContent = '待連線報價';
+            }
+            updateTMFLiveCalc();
+        }
+    } catch (e) {
+        console.error("載入 TMF 設定失敗:", e);
+    }
+}
+
+function updateTMFLiveCalc() {
+    const diffInput = parseFloat(document.getElementById('tmf_cfg_price_diff').value) || 0.0;
+    document.getElementById('tmf_display_diff').textContent = (diffInput >= 0 ? '+' : '') + diffInput.toFixed(1);
+    
+    if (LATEST_TMF_RAW_PRICE !== null && !isNaN(LATEST_TMF_RAW_PRICE) && LATEST_TMF_RAW_PRICE > 0) {
+        const effPrice = LATEST_TMF_RAW_PRICE + diffInput;
+        const atm = Math.round(effPrice / 100.0) * 100;
+        document.getElementById('tmf_display_eff_price').textContent = effPrice.toFixed(2);
+        document.getElementById('tmf_display_atm').textContent = atm.toFixed(0);
+    } else {
+        document.getElementById('tmf_display_eff_price').textContent = '-';
+        document.getElementById('tmf_display_atm').textContent = '-';
+    }
+}
+
+async function saveTMFConfig(btn) {
+    const origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span>💾</span> <span>儲存中...</span>';
+    
+    const priceDiff = parseFloat(document.getElementById('tmf_cfg_price_diff').value) || 0.0;
+    const wingWidth = parseInt(document.getElementById('tmf_cfg_wing_width').value, 10) || 400;
+    
+    try {
+        const resp = await fetch('/api/tmf/save_config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                price_diff: priceDiff,
+                wing_width: wingWidth
+            })
+        });
+        const res = await resp.json();
+        btn.disabled = false;
+        btn.innerHTML = origText;
+        if (res.status === 'ok') {
+            showToast("✅ 台指 TMF 設定已成功儲存至 .env！");
+            loadTMFConfig();
+        } else {
+            alert("❌ 儲存失敗: " + (res.message || "未知錯誤"));
+        }
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+        alert("❌ 儲存連線失敗: " + e);
+    }
+}
+
+async function runOpenShioajiDryRun() {
+    const btn = document.getElementById('btn_run_open_shioaji');
+    const statusBox = document.getElementById('tmf_action_status');
+    const consoleBox = document.getElementById('tmf_console_output');
+    
+    btn.disabled = true;
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<span>⏳</span> <span>模擬下單執行中 (約 3~6 秒)...</span>';
+    
+    statusBox.style.display = 'block';
+    statusBox.style.background = '#161b22';
+    statusBox.style.color = '#58a6ff';
+    statusBox.style.borderColor = '#1f6feb';
+    statusBox.innerHTML = '⏳ 正在背景執行 <code>trade/open_Shioaji.py --dry-run --no-line</code>，計算雙向價差報價與 Delta，請稍候...';
+    
+    consoleBox.textContent = `[${new Date().toLocaleTimeString()}] 🚀 正在啟動 open_Shioaji.py 模擬試算...\n`;
+    
+    try {
+        const resp = await fetch('/api/tmf/run_open_shioaji', { method: 'POST' });
+        const res = await resp.json();
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        
+        if (res.status === 'ok') {
+            statusBox.style.background = '#13231b';
+            statusBox.style.color = '#3fb950';
+            statusBox.style.borderColor = '#238636';
+            statusBox.innerHTML = `✅ 模擬下單執行完成！(${new Date().toLocaleTimeString()})`;
+            consoleBox.textContent = res.output || "（無輸出日誌）";
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+        } else {
+            statusBox.style.background = '#27171a';
+            statusBox.style.color = '#f85149';
+            statusBox.style.borderColor = '#da3633';
+            statusBox.innerHTML = `❌ 執行失敗: ${res.message || '未知錯誤'}`;
+            consoleBox.textContent = (res.output || res.message || "（無輸出）");
+        }
+    } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        statusBox.style.background = '#27171a';
+        statusBox.style.color = '#f85149';
+        statusBox.style.borderColor = '#da3633';
+        statusBox.innerHTML = `❌ 連線或執行異常: ${err}`;
+        consoleBox.textContent += `\n❌ 錯誤: ${err}`;
+    }
+}
+
+function clearTMFConsole() {
+    document.getElementById('tmf_console_output').textContent = '日誌已清空。點擊「執行模擬下單並顯示結果」開始試算...';
 }
 
 // ==========================================
@@ -2339,7 +2678,9 @@ def get_txo_strangles():
         if not underlying or underlying <= 0:
             return jsonify({'status': 'error', 'message': '無法取得 TMF 即時行情'})
 
-        atm_strike = round(underlying / 50.0) * 50
+        tmf_diff = get_tmf_price_diff()
+        eff_underlying = underlying + tmf_diff
+        atm_strike = round(eff_underlying / 50.0) * 50
         
         if not TXO_OPTIONS_BY_DATE:
             by_date = {}
@@ -2373,7 +2714,7 @@ def get_txo_strangles():
                     'put_symbol': getattr(p_opt, 'symbol', ''),
                     'symbol': f"TXO {d} ATM {atm_strike} (Call+Put 雙賣)"
                 })
-        return jsonify({'status': 'ok', 'underlying_price': underlying, 'atm_strike': atm_strike, 'data': results})
+        return jsonify({'status': 'ok', 'underlying_price': underlying, 'price_diff': tmf_diff, 'effective_price': eff_underlying, 'atm_strike': atm_strike, 'data': results})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
@@ -2413,6 +2754,109 @@ def trade_txo_strangle():
         return jsonify({'status': 'ok', 'message': f'TXO 雙賣市價下單成功！\nCall: {call_code}\nPut: {put_code}'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'下單失敗: {e}'})
+
+
+# ==============================================================================
+# 🇹🇼 台指 TMF 監控與雙向價差開倉 API
+# ==============================================================================
+TMF_SIM_LOCK = threading.Lock()
+
+@dash_app.route('/api/tmf/config', methods=['GET'])
+def api_get_tmf_config():
+    global api, LATEST_TMF_PRICE
+    cfg = get_tmf_op_config()
+    price_diff = float(cfg.get("price_diff", 0.0))
+    wing_width = int(cfg.get("wing_width", 400))
+    
+    tmf_price = None
+    if LATEST_TMF_PRICE and LATEST_TMF_PRICE > 0:
+        tmf_price = float(LATEST_TMF_PRICE)
+    elif api is not None and hasattr(api, 'Contracts') and hasattr(api.Contracts, 'Futures') and hasattr(api.Contracts.Futures, 'TMF'):
+        try:
+            target_code = list(api.Contracts.Futures.TMF.keys())[0]
+            c = api.Contracts.Futures.TMF[target_code]
+            snap = api.snapshots([c])
+            if snap and len(snap) > 0 and snap[0].close > 0:
+                tmf_price = float(snap[0].close)
+        except Exception:
+            pass
+
+    eff_price = (tmf_price + price_diff) if tmf_price is not None else None
+    atm = (round(eff_price / 100.0) * 100) if eff_price is not None else None
+
+    return jsonify({
+        'status': 'ok',
+        'price_diff': price_diff,
+        'wing_width': wing_width,
+        'tmf_price': tmf_price,
+        'effective_price': eff_price,
+        'atm_strike': atm,
+        'config': cfg
+    })
+
+
+@dash_app.route('/api/tmf/save_config', methods=['POST'])
+def api_save_tmf_config():
+    payload = request.get_json(silent=True) or {}
+    if not check_dashboard_auth(payload):
+        return jsonify({"status": "error", "message": "密碼錯誤，拒絕儲存設定"}), 401
+    
+    price_diff = payload.get("price_diff")
+    wing_width = payload.get("wing_width")
+    ok, msg, updated_cfg = save_tmf_op_config(price_diff=price_diff, wing_width=wing_width)
+    if ok:
+        return jsonify({
+            "status": "ok",
+            "message": "台指 TMF 設定已成功儲存至 trade/.env",
+            "config": updated_cfg
+        })
+    else:
+        return jsonify({"status": "error", "message": msg}), 500
+
+
+@dash_app.route('/api/tmf/run_open_shioaji', methods=['POST'])
+def api_run_open_shioaji():
+    import subprocess, sys
+    if not TMF_SIM_LOCK.acquire(blocking=False):
+        return jsonify({"status": "error", "message": "目前已有 open_Shioaji 模擬工作正在執行中，請稍候。"})
+
+    try:
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "open_Shioaji.py")
+        if not os.path.exists(script_path):
+            return jsonify({"status": "error", "message": f"找不到腳本: {script_path}"})
+
+        # 調用 open_Shioaji.py 進行模擬試算
+        proc = subprocess.run(
+            [sys.executable, "-u", script_path, "--dry-run", "--no-line"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            encoding="utf-8",
+            errors="replace"
+        )
+        full_output = (proc.stdout or "")
+        if proc.stderr:
+            full_output += ("\n[STDERR]\n" + proc.stderr)
+
+        if proc.returncode == 0:
+            return jsonify({
+                "status": "ok",
+                "message": "open_Shioaji.py 模擬試算完成！",
+                "output": full_output
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": f"執行失敗 (代碼 {proc.returncode})",
+                "output": full_output
+            })
+    except subprocess.TimeoutExpired:
+        return jsonify({"status": "error", "message": "open_Shioaji 執行逾時 (超過 60 秒)"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+    finally:
+        TMF_SIM_LOCK.release()
 
 def start_dashboard_server():
     """在背景執行緒啟動 Flask 監控面板，不影響主邏輯。"""
@@ -3562,8 +4006,10 @@ def main():
                                     T = dte / 365.0
                                     if last_price > 0:
                                         try:
+                                            tmf_diff = get_tmf_price_diff()
+                                            eff_f = underlying_price + tmf_diff
                                             delta, theta, gamma = calculate_futures_option_greeks(
-                                                F=underlying_price,
+                                                F=eff_f,
                                                 K=strike,
                                                 T=T,
                                                 r=0.01,
