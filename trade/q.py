@@ -201,16 +201,22 @@ def save_tmf_op_config(price_diff: float = None, wing_width: int = None) -> tupl
             "price_diff": 0.0
         }
 
-    if price_diff is not None:
-        try:
-            cfg_data[target_key]["price_diff"] = float(price_diff)
-        except (ValueError, TypeError):
-            pass
-    if wing_width is not None and int(wing_width) > 0:
-        try:
-            cfg_data[target_key]["wing_width"] = int(wing_width)
-        except (ValueError, TypeError):
-            pass
+    matched_keys = [k for k in ["台指(TXO)", "台指(TMF)", "台指", "TXO", "TMF"] if k in cfg_data]
+    if not matched_keys:
+        matched_keys = [target_key]
+
+    for k in matched_keys:
+        if isinstance(cfg_data.get(k), dict):
+            if price_diff is not None:
+                try:
+                    cfg_data[k]["price_diff"] = float(price_diff)
+                except (ValueError, TypeError):
+                    pass
+            if wing_width is not None and int(wing_width) > 0:
+                try:
+                    cfg_data[k]["wing_width"] = int(wing_width)
+                except (ValueError, TypeError):
+                    pass
 
     new_raw = json.dumps(cfg_data, ensure_ascii=False)
     os.environ["OP_HEDGE_CONFIG_JSON"] = new_raw
@@ -806,12 +812,39 @@ function renderGroup(g) {
     });
   }
   const totalPnl = (g.total_pnl !== undefined && g.total_pnl !== null) ? g.total_pnl : (g.positions ? g.positions.reduce((acc, p) => acc + (Number(p.pnl) || 0), 0) : 0);
+
+  let tmfDiffBanner = '';
+  let tmfDiffForm = '';
+  if (g.name === '台指(TMF)') {
+    const rawP = (g.raw_underlying && g.raw_underlying > 0) ? fmt(g.raw_underlying, 1) : '-';
+    const effP = (g.eff_underlying && g.eff_underlying > 0) ? fmt(g.eff_underlying, 1) : '-';
+    const pDiff = (g.price_diff !== undefined && g.price_diff !== null) ? g.price_diff : 0;
+    const pDiffStr = (pDiff >= 0 ? '+' : '') + fmt(pDiff, 1);
+
+    tmfDiffBanner = `
+      <div style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: 6px; padding: 6px 10px; margin: 8px 0; font-size: 13px;">
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+          <span>期貨現價: <strong>${rawP}</strong></span>
+          <span>點位修正: <strong style="color:#38bdf8;">${pDiffStr}</strong></span>
+          <span>修正後標的 F: <strong style="color:#4ade80;">${effP}</strong></span>
+        </div>
+      </div>`;
+
+    tmfDiffForm = `
+      <div class="form-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.15); display:flex; align-items:center; gap:6px;">
+        <span style="font-size:12px; color:#94a3b8; white-space:nowrap;">點位修正:</span>
+        <input type="number" step="1" id="tmf_card_price_diff" value="${pDiff}" placeholder="修正點位 (price_diff)" style="flex:1;">
+        <button class="action-btn" style="background:#0284c7; white-space:nowrap;" onclick="saveTMFCardPriceDiff()">修改點位修正</button>
+      </div>`;
+  }
+
   return `
   <div class="card">
     <div class="group-title">
       <h2>${g.name}</h2>
       <span class="badge">${g.hedge_sym}</span>
     </div>
+    ${tmfDiffBanner}
     ${g.closed ? '<div class="muted">部位已平倉</div>' : ''}
     ${g.mute
       ? `<div class="row"><span class="muted">資料不足，暫停計算</span></div>`
@@ -823,7 +856,43 @@ function renderGroup(g) {
       <input type="number" step="0.1" id="l_${g.name}" placeholder="下限 (目前 ${fmt(g.lower_threshold,2)})">
       <button class="action-btn" onclick="submitThreshold('${g.name}')">送出</button>
     </div>
+    ${tmfDiffForm}
   </div>`;
+}
+
+async function saveTMFCardPriceDiff() {
+  const el = document.getElementById("tmf_card_price_diff");
+  if (!el) return;
+  const val = parseFloat(el.value);
+  if (isNaN(val)) {
+    showToast("請輸入有效的修正點位數值");
+    return;
+  }
+  let pw = localStorage.getItem(PASSWORD_KEY) || "";
+  try {
+    const resp = await fetch("/api/tmf/save_config", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ price_diff: val, password: pw })
+    });
+    if (resp.status === 401) {
+      pw = prompt("請輸入管理密碼:") || "";
+      localStorage.setItem(PASSWORD_KEY, pw);
+      return saveTMFCardPriceDiff();
+    }
+    const data = await resp.json();
+    if (data.status === "ok") {
+      showToast("✅ 台指點位修正已儲存: " + (val >= 0 ? "+" : "") + val);
+      refresh();
+      if (typeof loadTMFConfig === "function") {
+        loadTMFConfig();
+      }
+    } else {
+      showToast("❌ 儲存失敗: " + (data.message || "未知錯誤"));
+    }
+  } catch (e) {
+    showToast("❌ 連線錯誤: " + e.message);
+  }
 }
 
 async function refresh() {
@@ -849,11 +918,22 @@ async function refresh() {
     }
     document.getElementById("account").innerHTML = accHtml;
 
+    const activeEl = document.activeElement;
+    const activeId = activeEl ? activeEl.id : null;
+    const activeVal = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') ? activeEl.value : null;
+
     let groupsHtml = "";
     for (const g of (data.groups || [])) {
       groupsHtml += renderGroup(g);
     }
     document.getElementById("groups").innerHTML = groupsHtml || '<div class="card">目前無群組資料</div>';
+
+    if (activeId && activeVal !== null && document.getElementById(activeId)) {
+      const restoredEl = document.getElementById(activeId);
+      restoredEl.value = activeVal;
+      restoredEl.focus();
+    }
+
     if (data.vxm) {
       updateVXMUI(data.vxm);
     } else {
@@ -936,22 +1016,32 @@ async function saveTMFConfig(btn) {
     
     const priceDiff = parseFloat(document.getElementById('tmf_cfg_price_diff').value) || 0.0;
     const wingWidth = parseInt(document.getElementById('tmf_cfg_wing_width').value, 10) || 400;
-    
+    let pw = localStorage.getItem(PASSWORD_KEY) || "";
+
     try {
         const resp = await fetch('/api/tmf/save_config', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 price_diff: priceDiff,
-                wing_width: wingWidth
+                wing_width: wingWidth,
+                password: pw
             })
         });
+        if (resp.status === 401) {
+            btn.disabled = false;
+            btn.innerHTML = origText;
+            pw = prompt("請輸入管理密碼:") || "";
+            localStorage.setItem(PASSWORD_KEY, pw);
+            return saveTMFConfig(btn);
+        }
         const res = await resp.json();
         btn.disabled = false;
         btn.innerHTML = origText;
         if (res.status === 'ok') {
             showToast("✅ 台指 TMF 設定已成功儲存至 .env！");
             loadTMFConfig();
+            refresh();
         } else {
             alert("❌ 儲存失敗: " + (res.message || "未知錯誤"));
         }
@@ -3961,11 +4051,30 @@ def main():
                         dashboard_shioaji["equity"] = int(margin.equity_amount)
                         dashboard_shioaji["available"] = int(margin.available_margin)
 
-                    target_code = get_futures_code("TMF")
-                    contract = api.Contracts.Futures.TMF[target_code]
-                    snapshots_stk = api.snapshots([contract])
-                    underlying_price = snapshots_stk[0].close
-                    global LATEST_TMF_PRICE; LATEST_TMF_PRICE = float(underlying_price)
+                    global LATEST_TMF_PRICE
+                    underlying_price = 0.0
+                    try:
+                        target_code = get_futures_code("TMF")
+                        contract = None
+                        if hasattr(api, 'Contracts') and hasattr(api.Contracts, 'Futures') and hasattr(api.Contracts.Futures, 'TMF'):
+                            contract = api.Contracts.Futures.TMF.get(target_code)
+                            if not contract and api.Contracts.Futures.TMF:
+                                contract = list(api.Contracts.Futures.TMF.values())[0]
+                        if contract:
+                            snapshots_stk = api.snapshots([contract])
+                            if snapshots_stk and len(snapshots_stk) > 0:
+                                s = snapshots_stk[0]
+                                underlying_price = float(s.close or s.reference or s.buy_price or s.sell_price or 0.0)
+                    except Exception as tmf_snap_err:
+                        print(f"⚠️ 讀取 TMF 即時報價異常: {tmf_snap_err}")
+
+                    if underlying_price <= 0 and 'LATEST_TMF_PRICE' in globals() and LATEST_TMF_PRICE:
+                        underlying_price = float(LATEST_TMF_PRICE)
+                    if underlying_price > 0:
+                        LATEST_TMF_PRICE = float(underlying_price)
+
+                    tmf_diff = get_tmf_price_diff()
+                    eff_f = (underlying_price + tmf_diff) if underlying_price > 0 else 0.0
                     positions = api.list_positions(api.futopt_account)
 
                     total_portfolio_delta_tmf = 0.0
@@ -4000,20 +4109,39 @@ def main():
                                 position_delta_tmf = delta * qty * ratio
                                 total_portfolio_delta_tmf += position_delta_tmf
                             else:
+                                if (last_price is None or float(last_price) <= 0):
+                                    try:
+                                        target_cats = ['TX1', 'TX2', 'TX3', 'TX4', 'TX5', 'TXO', 'TXU', 'TXV', 'TXX', 'TXY', 'TXZ']
+                                        all_tx_cats = sorted(list(set(target_cats + [a for a in dir(api.Contracts.Options) if a.startswith('TX')])))
+                                        opt_c = None
+                                        for cat in all_tx_cats:
+                                            if hasattr(api.Contracts.Options, cat):
+                                                for c in getattr(api.Contracts.Options, cat):
+                                                    if c.code == p.code:
+                                                        opt_c = c
+                                                        break
+                                            if opt_c:
+                                                break
+                                        if opt_c:
+                                            snap_o = api.snapshots([opt_c])
+                                            if snap_o and len(snap_o) > 0:
+                                                so = snap_o[0]
+                                                last_price = float(so.close or so.reference or so.buy_price or so.sell_price or 0.0)
+                                    except Exception:
+                                        pass
+
                                 opt_info = parse_tx_opt_code(p.code)
                                 if opt_info:
                                     strike, cp, dte = opt_info
-                                    T = dte / 365.0
-                                    if last_price > 0:
+                                    T = max(float(dte), 0.5) / 365.0
+                                    if last_price and float(last_price) > 0 and eff_f > 0:
                                         try:
-                                            tmf_diff = get_tmf_price_diff()
-                                            eff_f = underlying_price + tmf_diff
                                             delta, theta, gamma = calculate_futures_option_greeks(
                                                 F=eff_f,
                                                 K=strike,
                                                 T=T,
                                                 r=0.01,
-                                                option_price=last_price,
+                                                option_price=float(last_price),
                                                 option_type=cp,
                                             )
                                             ratio = 5.0
@@ -4061,7 +4189,8 @@ def main():
                         else:
                             tmf_ref_points = (max(abs(u_th), abs(l_th)) / max(abs(total_portfolio_gamma_tmf), 0.01)) * 100.0
                             print(
-                                f"🎯 [台指(TMF)] 單邊門檻估計={tmf_ref_points:.0f}點 "
+                                f"🎯 [台指(TMF)] (點位修正={tmf_diff:+.1f}點, 標的現價={underlying_price:.1f}, 修正後F={eff_f:.1f}) "
+                                f"單邊門檻估計={tmf_ref_points:.0f}點 "
                                 f"🎯上限={u_th:.2f}，下限={l_th:.2f} "
                                 f"🎯當前 TMF Δ={total_portfolio_delta_tmf:.2f} θ={total_portfolio_theta_tmf:.0f}"
                             )
@@ -4091,6 +4220,9 @@ def main():
                             "ref_points": tmf_ref_points,
                             "mute": tmf_mute_flag,
                             "closed": is_tw_closed,
+                            "price_diff": tmf_diff,
+                            "raw_underlying": underlying_price,
+                            "eff_underlying": eff_f,
                             "positions": [
                                 {
                                     "symbol": d["code"],
@@ -4124,10 +4256,37 @@ def main():
                                 "ref_points": None,
                                 "mute": False,
                                 "closed": True,
+                                "price_diff": tmf_diff,
+                                "raw_underlying": underlying_price,
+                                "eff_underlying": eff_f,
                                 "positions": [],
                             })
                 except Exception as e:
                     print(f"⚠️ 永豐/台指區段略過: {e}")
+
+            if not any(g.get("name") == "台指(TMF)" for g in dashboard_groups):
+                tmf_config = HEDGE_CONFIG.get('台指(TMF)', {})
+                if tmf_config:
+                    tmf_diff = get_tmf_price_diff()
+                    tmf_p = globals().get('LATEST_TMF_PRICE', 0.0) or 0.0
+                    eff_p = (tmf_p + tmf_diff) if tmf_p > 0 else 0.0
+                    dashboard_groups.append({
+                        "name": "台指(TMF)",
+                        "hedge_sym": tmf_config.get('hedge_sym', 'TMF'),
+                        "total_delta": 0.0,
+                        "total_gamma": 0.0,
+                        "total_theta": 0.0,
+                        "total_pnl": 0.0,
+                        "upper_threshold": tmf_config.get('upper_threshold', 1.0),
+                        "lower_threshold": tmf_config.get('lower_threshold', -0.5),
+                        "ref_points": None,
+                        "mute": (api is None),
+                        "closed": (api is None),
+                        "price_diff": tmf_diff,
+                        "raw_underlying": tmf_p,
+                        "eff_underlying": eff_p,
+                        "positions": [],
+                    })
 
             # --- 彙整並更新手機面板快照 ---
             total_all_theta = 0.0
