@@ -78,6 +78,7 @@ IB_HOST = env_str("IB_HOST", "127.0.0.1")
 IB_CLIENT_ID = env_int("IB_CLIENT_ID", random.randint(1, 9999))
 TARGET_ACCOUNT = env_str("IB_TARGET_ACCOUNT", required=True)
 REFRESH_SECONDS = env_int("REFRESH_SECONDS", 300)
+RESTART_INTERVAL = env_int("RESTART_INTERVAL", 3600)
 IB_GREEKS_WAIT_SECONDS = env_float("IB_GREEKS_WAIT_SECONDS", 1.5)
 MIN_FUTURE_DTE = env_int("MIN_FUTURE_DTE", 2)  # 期貨新開倉/對沖最小剩餘到期天數 (預設 2 天，避開 Error 201 實物交割臨期限制)
 
@@ -933,11 +934,28 @@ function renderGroup(g) {
       </div>`;
   }
 
+  let closeBtnHtml = '';
+  if (g.name !== '台指(TMF)') {
+    const hasPositions = g.positions && g.positions.length > 0;
+    if (hasPositions) {
+      closeBtnHtml = `<button class="danger-btn" data-group="${encodeURIComponent(g.name)}" onclick="confirmCloseGroup(decodeURIComponent(this.dataset.group), this)" style="padding: 3px 10px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer;" title="平倉 ${g.name} 的所有部位 (Adaptive Patient)">
+        <span>🧹</span><span>平倉 (${g.positions.length})</span>
+      </button>`;
+    } else {
+      closeBtnHtml = `<button class="danger-btn" disabled style="padding: 3px 10px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; opacity: 0.35; cursor: not-allowed; border-radius: 4px;" title="目前無未平倉部位">
+        <span>🧹</span><span>平倉</span>
+      </button>`;
+    }
+  }
+
   return `
   <div class="card">
     <div class="group-title">
       <h2>${g.name}</h2>
-      <span class="badge">${g.hedge_sym}</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="badge">${g.hedge_sym}</span>
+        ${closeBtnHtml}
+      </div>
     </div>
     ${tmfDiffBanner}
     ${g.closed ? '<div class="muted">部位已平倉</div>' : ''}
@@ -953,6 +971,76 @@ function renderGroup(g) {
     </div>
     ${tmfDiffForm}
   </div>`;
+}
+
+async function confirmCloseGroup(groupName, btn) {
+  if (!window.CURRENT_SNAPSHOT || !window.CURRENT_SNAPSHOT.groups) {
+    showToast("資料載入中，請稍候再試");
+    return;
+  }
+  const g = window.CURRENT_SNAPSHOT.groups.find(x => x.name === groupName);
+  if (!g || !g.positions || g.positions.length === 0) {
+    alert(`【${groupName}】目前無任何未平倉部位。`);
+    return;
+  }
+
+  const lines = g.positions.map((p, idx) => {
+    const pos = Number(p.position);
+    const closeAction = pos < 0 ? 'BUY (買入平倉)' : 'SELL (賣出平倉)';
+    const qty = Math.abs(pos);
+    const pnlVal = Number(p.pnl) || 0;
+    const pnlSign = pnlVal > 0 ? '+' : '';
+    const mkt = (p.market_price !== undefined && p.market_price !== null) ? fmt(p.market_price, p.decimals ?? 2) : '-';
+    return `  ${idx + 1}. ${p.symbol}\n     • 目前持有: ${pos} 口\n     • 平倉動作: ${closeAction} ${qty} 口 (Adaptive Patient)\n     • 市價: ${mkt} | 未平倉損益: ${pnlSign}${pnlVal.toFixed(2)}`;
+  }).join('\n\n');
+
+  const confirmMsg = `🚨【確定要平倉【${groupName}】的所有部位嗎？】\n\n` +
+                     `即將全數以 Adaptive Patient 市價平倉以下 ${g.positions.length} 筆部位：\n` +
+                     `==================================================\n` +
+                     lines + `\n` +
+                     `==================================================\n\n` +
+                     `⚠️ 注意：按下確定後將立即向 IBKR 送出真實委託！\n` +
+                     `確定送出嗎？`;
+
+  if (!confirm(confirmMsg)) return;
+
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> <span>平倉中...</span>';
+  showToast(`⏳ 正在對【${groupName}】全數部位送出 Adaptive Patient 平倉委託...`);
+
+  let pw = localStorage.getItem(PASSWORD_KEY) || "";
+
+  try {
+    const resp = await fetch("/api/group/close", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ group: groupName, password: pw })
+    });
+
+    if (resp.status === 401) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+      pw = prompt("請輸入管理密碼:") || "";
+      localStorage.setItem(PASSWORD_KEY, pw);
+      return confirmCloseGroup(groupName, btn);
+    }
+
+    const data = await resp.json();
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+
+    if (data.status === "ok") {
+      alert(`✅【${groupName}】平倉完成！\n\n` + (data.message || '') + '\n\n' + (data.details || []).join('\n'));
+      refresh();
+    } else {
+      alert(`❌【${groupName}】平倉失敗: ` + (data.message || "未知錯誤"));
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+    alert(`❌【${groupName}】平倉連線失敗: ` + e.message);
+  }
 }
 
 async function saveTMFCardPriceDiff() {
@@ -994,6 +1082,7 @@ async function refresh() {
   try {
     const resp = await fetch("/api/snapshot");
     const data = await resp.json();
+    window.CURRENT_SNAPSHOT = data;
     document.getElementById("updated").textContent = "最後更新: " + (data.updated_at || "-");
 
     const toggleEl = document.getElementById("webhookToggle");
@@ -2441,6 +2530,112 @@ def close_dash_position():
             local_ib.disconnect()
         except Exception:
             pass
+
+
+@dash_app.route('/api/group/close', methods=['POST'])
+def api_group_close():
+    payload = request.get_json(silent=True) or {}
+    if not check_dashboard_auth(payload):
+        return jsonify({"status": "error", "message": "密碼驗證失敗，拒絕執行平倉操作"}), 401
+
+    group_name = str(payload.get("group", "")).strip()
+    if not group_name:
+        return jsonify({"status": "error", "message": "缺少分組名稱 (group)"}), 400
+
+    if group_name == '台指(TMF)':
+        return jsonify({"status": "error", "message": "台指(TMF) 為永豐期交所標的，請至「台指TMF」分頁操作專屬平倉"}), 400
+
+    snap = get_snapshot()
+    groups = snap.get("groups", [])
+    target_group = next((g for g in groups if g.get("name") == group_name), None)
+
+    if not target_group:
+        return jsonify({"status": "error", "message": f"找不到分組: {group_name}"}), 404
+
+    positions_to_close = target_group.get("positions", [])
+    if not positions_to_close:
+        return jsonify({"status": "error", "message": f"【{group_name}】目前無任何未平倉部位"}), 400
+
+    import random
+    from ib_insync import IB, Contract, MarketOrder, TagValue
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    local_ib = IB()
+    local_ib.reqPositionsAsync = lambda: asyncio.sleep(0)
+    local_ib.reqAccountUpdatesAsync = lambda acct: asyncio.sleep(0)
+    local_ib.reqAccountUpdatesMultiAsync = lambda acct: asyncio.sleep(0)
+    local_ib.reqOpenOrdersAsync = lambda: asyncio.sleep(0)
+    local_ib.reqCompletedOrdersAsync = lambda apiOnly: asyncio.sleep(0)
+    local_ib.reqExecutionsAsync = lambda: asyncio.sleep(0)
+
+    try:
+        local_ib.connect(IB_HOST, IB_PORT, clientId=random.randint(8100, 8990), timeout=10)
+
+        real_portfolio = {p.contract.conId: p for p in local_ib.portfolio()}
+
+        orders_sent = []
+        for p_item in positions_to_close:
+            con_id = p_item.get("conId")
+            pos_qty = float(p_item.get("position", 0.0))
+
+            # 以 IBKR 即時持倉為準
+            if con_id and con_id in real_portfolio:
+                live_pos = real_portfolio[con_id].position
+                if live_pos != 0:
+                    pos_qty = float(live_pos)
+                else:
+                    continue  # 已平倉，略過
+
+            if pos_qty == 0:
+                continue
+
+            action = 'BUY' if pos_qty < 0 else 'SELL'
+            qty = abs(pos_qty)
+
+            if con_id:
+                contract = Contract(conId=int(con_id))
+            else:
+                contract = Contract(symbol=p_item.get("symbol", ""))
+
+            local_ib.qualifyContracts(contract)
+
+            order = MarketOrder(action, qty)
+            order.tif = 'DAY'
+            order.algoStrategy = 'Adaptive'
+            order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+            if TARGET_ACCOUNT:
+                order.account = TARGET_ACCOUNT
+
+            local_ib.placeOrder(contract, order)
+            disp_name = contract.localSymbol or p_item.get("symbol") or str(con_id)
+            orders_sent.append(f"{disp_name}: {action} {qty} 口 (Adaptive Patient)")
+
+        if not orders_sent:
+            return jsonify({"status": "ok", "message": f"【{group_name}】部位已處於平倉狀態，無須送單", "details": []})
+
+        local_ib.sleep(1)
+
+        summary_text = f"🧹【看板分組一鍵平倉】\n分組: {group_name}\n已送出 {len(orders_sent)} 筆 Adaptive Patient 平倉單:\n" + "\n".join(orders_sent)
+        try:
+            send_trade_notification('GROUP_CLOSE', summary_text, {'group': group_name, 'orders': orders_sent})
+        except Exception:
+            pass
+
+        return jsonify({
+            "status": "ok",
+            "message": f"【{group_name}】已成功送出 {len(orders_sent)} 筆 Adaptive Patient 平倉委託！",
+            "details": orders_sent
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"IBKR 平倉連線或送單失敗: {str(e)}"}), 500
+    finally:
+        try:
+            local_ib.disconnect()
+        except Exception:
+            pass
+
 
 @dash_app.route('/api/option/barchart_tables', methods=['GET'])
 def get_barchart_tables():
@@ -3890,7 +4085,11 @@ def main():
 
             if not ib.isConnected():
                 print(f"--- 正在連線 IB TWS ({IB_HOST}:{IB_PORT})... ---")
-                ib.connect(IB_HOST, IB_PORT, clientId=IB_CLIENT_ID, timeout=15)
+                try:
+                    ib.connect(IB_HOST, IB_PORT, clientId=IB_CLIENT_ID, timeout=15)
+                except Exception as c_err:
+                    print(f"⚠️ clientId {IB_CLIENT_ID} 連線失敗 ({c_err})，嘗試以隨機 clientId 重試...")
+                    ib.connect(IB_HOST, IB_PORT, clientId=random.randint(1002, 9999), timeout=15)
                 ib.reqMarketDataType(4)
 
                 '''
@@ -4182,6 +4381,9 @@ def main():
                             "gamma": float(item['disp_gamma']),
                             "expiry": item.get('expiry', ''),
                             "dte": item.get('dte'),
+                            "conId": item.get('conId', getattr(item.get('contract'), 'conId', 0)),
+                            "secType": item.get('secType', ''),
+                            "localSymbol": item.get('localSymbol', ''),
                         })
 
                     ref_points = None
