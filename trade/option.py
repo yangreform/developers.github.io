@@ -11,6 +11,10 @@ import requests
 from ib_insync import *
 
 from notifier import send_push_message, send_trade_notification
+import sys
+if "--no-line" in sys.argv:
+    send_push_message = lambda *a, **kw: None
+    send_trade_notification = lambda *a, **kw: None
 
 # ==============================================================================
 # 0. 讀取 .env 設定 (支援每次呼叫即時動態讀取)
@@ -858,6 +862,8 @@ def execute_butterfly(legs):
     # 即時查詢 trade/.env 中的 OP_SEND_WEBHOOK 開關與目標帳號
     env_cfg = load_env_config()
     send_live = str(env_cfg.get('OP_SEND_WEBHOOK', 'false')).strip().lower() in ('true', '1')
+    if "--dry-run" in sys.argv:
+        send_live = False
     target_acct = env_cfg.get('IB_TARGET_ACCOUNT', '').strip()
     if target_acct:
         order.account = target_acct
@@ -1057,7 +1063,16 @@ def run_strategy_cycle():
 
 
 if __name__ == '__main__':
+    import argparse
     import sys
+
+    parser = argparse.ArgumentParser(description="Butterfly 跨期權自動建倉與對沖執行腳本")
+    parser.add_argument("--dry-run", action="store_true", help="以模擬模式執行下單（不實際送單至 IBKR）")
+    parser.add_argument("--no-line", action="store_true", help="不發送 LINE 通知")
+    args = parser.parse_args()
+
+    if args.dry_run:
+        print("💡 [DRY-RUN 模擬模式啟動] OP_SEND_WEBHOOK=False，不實際向 IBKR 送單。")
 
     try:
         connect_ib()
@@ -1070,7 +1085,11 @@ if __name__ == '__main__':
                 ib.disconnect()
             except Exception:
                 pass
-            
+
     print("最後:", datetime.datetime.now().strftime('%H:%M:%S'))
-    time.sleep(60*60*20)
+    if not args.dry_run and sys.stdin and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
+        try:
+            time.sleep(60 * 60 * 20)
+        except KeyboardInterrupt:
+            pass
 

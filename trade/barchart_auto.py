@@ -299,7 +299,10 @@ def analyze_and_report_with_retry(downloaded=None, max_retries=3):
 # ==============================================================================
 # 4. 主程式排程入口
 # ==============================================================================
-def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_archive=False, skip_order=False, dry_run=False):
+def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_archive=False, skip_order=False, dry_run=False, no_line=False):
+    global send_push_message
+    if no_line:
+        send_push_message = None
     """
     完整執行自動化 4 步驟流程：
       1. 歸檔舊檔 (archive_existing_csvs)
@@ -358,6 +361,7 @@ if __name__ == "__main__":
     parser.add_argument("--skip-archive", action="store_true", help="跳過舊檔案歸檔步驟")
     parser.add_argument("--skip-order", action="store_true", help="跳過向 IBKR 下單步驟")
     parser.add_argument("--dry-run", action="store_true", help="以模擬模式執行下單（預查現價與計算附屬單，不實際送單至 IBKR）")
+    parser.add_argument("--no-line", action="store_true", help="不發送 LINE 通知")
     parser.add_argument("--retries", type=int, default=3, help="Gemini 取得報告之最大重試次數 (預設: 3 次)")
     args = parser.parse_args()
 
@@ -367,6 +371,12 @@ if __name__ == "__main__":
         skip_download=args.skip_download,
         skip_archive=args.skip_archive,
         skip_order=args.skip_order,
-        dry_run=args.dry_run
+        dry_run=args.dry_run,
+        no_line=args.no_line
     )
-    time.sleep(60*60*20)
+    import sys
+    if not args.dry_run and sys.stdin and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
+        try:
+            time.sleep(60*60*20)
+        except KeyboardInterrupt:
+            pass

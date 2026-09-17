@@ -373,5 +373,10 @@ def main():
 
 
 if __name__ == "__main__":
+    import sys
     main()
-    time.sleep(60*60*20)
+    if sys.stdin and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not ("--dry-run" in sys.argv):
+        try:
+            time.sleep(60 * 60 * 20)
+        except KeyboardInterrupt:
+            pass

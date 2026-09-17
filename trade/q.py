@@ -612,18 +612,113 @@ DASHBOARD_HTML = """
     </div>
   </div>
 
-  <!-- 模擬下單執行區塊 -->
-  <div class="card" style="border-left: 4px solid #238636;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
-      <h3 style="margin:0; color:#238636; font-size:15px; display:flex; align-items:center; gap:6px;">
-        <span>🚀 open_Shioaji.py 雙向價差模擬下單 (--dry-run)</span>
+  <!-- 常用腳本快速控制台 (分組排列) -->
+  <div class="card" style="border-left: 4px solid #1f6feb; margin-bottom: 16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+      <h3 style="margin:0; color:#58a6ff; font-size:15px; display:flex; align-items:center; gap:6px;">
+        <span>⚡ 常用策略與下單腳本快速執行 (分組排列)</span>
       </h3>
-      <button class="action-btn" id="btn_run_open_shioaji" style="background-color:#1f6feb; padding:8px 18px; font-size:13px; display:flex; align-items:center; gap:6px;" onclick="runOpenShioajiDryRun()">
-        <span>⚡</span> <span>執行模擬下單並顯示結果</span>
-      </button>
+      <span class="muted" style="font-size:12px;">支援 🧪 模擬測試 (Dry-Run) 與 🚀 實盤送單 (Live)</span>
     </div>
-    <div class="muted" style="font-size:11px; margin-bottom:12px;">
-      點擊上方按鈕將在背景執行 <code>trade/open_Shioaji.py --dry-run --no-line</code>，使用當前 <code>price_diff</code> 與 <code>wing_width</code> 試算雙向價差報價、Delta 與保證金，不送出真實委託。
+
+    <!-- 5 組腳本清單 -->
+    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+
+      <!-- 1. insider.py -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:#0d1117; padding:10px 14px; border-radius:6px; border:1px solid #21262d;">
+        <div style="min-width:240px;">
+          <div style="font-weight:600; color:#c9d1d9; font-size:13px; display:flex; align-items:center; gap:6px;">
+            <span>🕵️ 內部人交易選股與期權大單</span>
+            <span style="font-size:11px; color:#8b949e; font-family:monospace;">(insider.py)</span>
+          </div>
+          <div class="muted" style="font-size:11px; margin-top:2px;">Barchart 內部人籌碼下載 + Gemini AI 分析 + IBKR 建議單</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="action-btn" style="background-color:#1f6feb; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'insider', 'dry_run')">
+            <span>🧪 模擬 (Dry-Run)</span>
+          </button>
+          <button class="action-btn" style="background-color:#238636; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'insider', 'live')">
+            <span>🚀 實盤送單 (Live)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. barchart_auto.py -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:#0d1117; padding:10px 14px; border-radius:6px; border:1px solid #21262d;">
+        <div style="min-width:240px;">
+          <div style="font-weight:600; color:#c9d1d9; font-size:13px; display:flex; align-items:center; gap:6px;">
+            <span>📊 Barchart 自動化期權流水線</span>
+            <span style="font-size:11px; color:#8b949e; font-family:monospace;">(barchart_auto.py)</span>
+          </div>
+          <div class="muted" style="font-size:11px; margin-top:2px;">3 份 CSV 下載 + Gemini 異常期權分析 + IBKR 自動送單</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="action-btn" style="background-color:#1f6feb; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'barchart_auto', 'dry_run')">
+            <span>🧪 模擬 (Dry-Run)</span>
+          </button>
+          <button class="action-btn" style="background-color:#238636; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'barchart_auto', 'live')">
+            <span>🚀 實盤送單 (Live)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. option.py -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:#0d1117; padding:10px 14px; border-radius:6px; border:1px solid #21262d;">
+        <div style="min-width:240px;">
+          <div style="font-weight:600; color:#c9d1d9; font-size:13px; display:flex; align-items:center; gap:6px;">
+            <span>🦋 Butterfly 跨期權自動建倉</span>
+            <span style="font-size:11px; color:#8b949e; font-family:monospace;">(option.py)</span>
+          </div>
+          <div class="muted" style="font-size:11px; margin-top:2px;">ES/NQ/CL/NG/GC 等商品蝶式組合單 (Iron Butterfly) 掃描與建倉</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="action-btn" style="background-color:#1f6feb; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'option', 'dry_run')">
+            <span>🧪 模擬 (Dry-Run)</span>
+          </button>
+          <button class="action-btn" style="background-color:#238636; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'option', 'live')">
+            <span>🚀 實盤送單 (Live)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 4. open_Shioaji.py -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:#0d1117; padding:10px 14px; border-radius:6px; border:1px solid #21262d;">
+        <div style="min-width:240px;">
+          <div style="font-weight:600; color:#c9d1d9; font-size:13px; display:flex; align-items:center; gap:6px;">
+            <span>🇹🇼 台指選擇權雙向價差開倉</span>
+            <span style="font-size:11px; color:#8b949e; font-family:monospace;">(open_Shioaji.py)</span>
+          </div>
+          <div class="muted" style="font-size:11px; margin-top:2px;">依據點位修正 (price_diff) 與翼寬 (wing_width) 送出 Bear Call + Bull Put 複式單</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="action-btn" style="background-color:#1f6feb; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'open_shioaji', 'dry_run')">
+            <span>🧪 模擬開倉 (Dry-Run)</span>
+          </button>
+          <button class="action-btn" style="background-color:#d29922; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'open_shioaji', 'live')">
+            <span>🚀 實盤開倉 (Live)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 5. close_Shioaji.py -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:#0d1117; padding:10px 14px; border-radius:6px; border:1px solid #21262d;">
+        <div style="min-width:240px;">
+          <div style="font-weight:600; color:#c9d1d9; font-size:13px; display:flex; align-items:center; gap:6px;">
+            <span>🧹 台指期權全部位市價全平</span>
+            <span style="font-size:11px; color:#8b949e; font-family:monospace;">(close_Shioaji.py)</span>
+          </div>
+          <div class="muted" style="font-size:11px; margin-top:2px;">永豐證券 Shioaji 旗下所有未平倉台指期貨與選擇權市價 IOC 全數平倉</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="action-btn" style="background-color:#1f6feb; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'close_shioaji', 'dry_run')">
+            <span>🧪 模擬平倉 (Dry-Run)</span>
+          </button>
+          <button class="action-btn" style="background-color:#da3633; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'close_shioaji', 'live')">
+            <span>🛑 實盤平倉 (Live)</span>
+          </button>
+        </div>
+      </div>
+
     </div>
 
     <!-- 執行狀態指示 -->
@@ -637,7 +732,7 @@ DASHBOARD_HTML = """
           <button class="action-btn" onclick="clearTMFConsole()" style="padding:2px 8px; font-size:10px; background:#21262d;">清空日誌</button>
         </div>
       </div>
-      <pre id="tmf_console_output" style="margin:0; padding:12px; max-height:450px; overflow-y:auto; font-family:Consolas, Monaco, 'Courier New', monospace; font-size:12px; line-height:1.45; color:#7ee787; white-space:pre-wrap; word-break:break-all;">點擊上方「執行模擬下單並顯示結果」按鈕開始試算...</pre>
+      <pre id="tmf_console_output" style="margin:0; padding:12px; max-height:450px; overflow-y:auto; font-family:Consolas, Monaco, 'Courier New', monospace; font-size:12px; line-height:1.45; color:#7ee787; white-space:pre-wrap; word-break:break-all;">請點擊上方各組按鈕執行「模擬 (Dry-Run)」或「實盤 (Live)」...</pre>
     </div>
   </div>
 </div>
@@ -1052,36 +1147,74 @@ async function saveTMFConfig(btn) {
     }
 }
 
-async function runOpenShioajiDryRun() {
-    const btn = document.getElementById('btn_run_open_shioaji');
+async function runTMFScript(btn, scriptKey, mode) {
+    const isLive = (mode === 'live');
+    const scriptNames = {
+        'insider': '內部人交易選股 (insider.py)',
+        'barchart_auto': 'Barchart 自動化期權 (barchart_auto.py)',
+        'option': 'Butterfly 跨期權策略 (option.py)',
+        'open_shioaji': '台指選擇權開倉 (open_Shioaji.py)',
+        'close_shioaji': '台指期權全部平倉 (close_Shioaji.py)'
+    };
+    const sName = scriptNames[scriptKey] || scriptKey;
+
+    if (isLive) {
+        const warnText = (scriptKey === 'close_shioaji')
+            ? '🚨【平倉警告】即將市價全數平倉 Shioaji 台指選擇權與期貨部位！確定執行嗎？'
+            : `⚠️【實盤送單確認】即將真實執行【${sName}】下單委託！確定要送出真實委託嗎？`;
+        if (!confirm(warnText)) {
+            return;
+        }
+    }
+
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> <span>執行中...</span>';
+
     const statusBox = document.getElementById('tmf_action_status');
     const consoleBox = document.getElementById('tmf_console_output');
-    
-    btn.disabled = true;
-    const origHtml = btn.innerHTML;
-    btn.innerHTML = '<span>⏳</span> <span>模擬下單執行中 (約 3~6 秒)...</span>';
-    
+
     statusBox.style.display = 'block';
     statusBox.style.background = '#161b22';
     statusBox.style.color = '#58a6ff';
     statusBox.style.borderColor = '#1f6feb';
-    statusBox.innerHTML = '⏳ 正在背景執行 <code>trade/open_Shioaji.py --dry-run --no-line</code>，計算雙向價差報價與 Delta，請稍候...';
-    
-    consoleBox.textContent = `[${new Date().toLocaleTimeString()}] 🚀 正在啟動 open_Shioaji.py 模擬試算...\n`;
-    
+    statusBox.innerHTML = `⏳ 正在背景執行 <code>${sName}</code> [${isLive ? '實盤/正式' : '模擬/Dry-Run'}]，請稍候...`;
+
+    consoleBox.textContent = `[${new Date().toLocaleTimeString()}] 🚀 正在啟動 ${sName} (${isLive ? '實盤' : '模擬'})...\n`;
+
+    let pw = localStorage.getItem(PASSWORD_KEY) || "";
+
     try {
-        const resp = await fetch('/api/tmf/run_open_shioaji', { method: 'POST' });
+        const resp = await fetch('/api/tmf/run_script', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                script: scriptKey,
+                mode: mode,
+                password: pw
+            })
+        });
+
+        if (resp.status === 401) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            pw = prompt("請輸入管理密碼:") || "";
+            localStorage.setItem(PASSWORD_KEY, pw);
+            return runTMFScript(btn, scriptKey, mode);
+        }
+
         const res = await resp.json();
         btn.disabled = false;
         btn.innerHTML = origHtml;
-        
+
         if (res.status === 'ok') {
             statusBox.style.background = '#13231b';
             statusBox.style.color = '#3fb950';
             statusBox.style.borderColor = '#238636';
-            statusBox.innerHTML = `✅ 模擬下單執行完成！(${new Date().toLocaleTimeString()})`;
+            statusBox.innerHTML = `✅ ${sName} [${isLive ? '實盤' : '模擬'}] 執行完成！(${new Date().toLocaleTimeString()})`;
             consoleBox.textContent = res.output || "（無輸出日誌）";
             consoleBox.scrollTop = consoleBox.scrollHeight;
+            refresh();
         } else {
             statusBox.style.background = '#27171a';
             statusBox.style.color = '#f85149';
@@ -1100,8 +1233,13 @@ async function runOpenShioajiDryRun() {
     }
 }
 
+function runOpenShioajiDryRun() {
+    const btn = document.getElementById('btn_run_open_shioaji') || { innerHTML: '', disabled: false };
+    return runTMFScript(btn, 'open_shioaji', 'dry_run');
+}
+
 function clearTMFConsole() {
-    document.getElementById('tmf_console_output').textContent = '日誌已清空。點擊「執行模擬下單並顯示結果」開始試算...';
+    document.getElementById('tmf_console_output').textContent = '日誌已清空。請點擊上方各組按鈕執行「模擬 (Dry-Run)」或「實盤 (Live)」...';
 }
 
 // ==========================================
@@ -2904,24 +3042,79 @@ def api_save_tmf_config():
         return jsonify({"status": "error", "message": msg}), 500
 
 
-@dash_app.route('/api/tmf/run_open_shioaji', methods=['POST'])
-def api_run_open_shioaji():
-    import subprocess, sys
+SCRIPT_MAP = {
+    "insider": {
+        "filename": "insider.py",
+        "name": "內部人交易選股 (insider.py)",
+        "dry_args": ["--dry-run", "--no-line"],
+        "live_args": [],
+        "timeout": 120
+    },
+    "barchart_auto": {
+        "filename": "barchart_auto.py",
+        "name": "Barchart 自動化期權 (barchart_auto.py)",
+        "dry_args": ["--dry-run", "--no-line"],
+        "live_args": [],
+        "timeout": 120
+    },
+    "option": {
+        "filename": "option.py",
+        "name": "Butterfly 跨期權策略 (option.py)",
+        "dry_args": ["--dry-run", "--no-line"],
+        "live_args": [],
+        "timeout": 90
+    },
+    "open_shioaji": {
+        "filename": "open_Shioaji.py",
+        "name": "台指選擇權開倉 (open_Shioaji.py)",
+        "dry_args": ["--dry-run", "--no-line"],
+        "live_args": [],
+        "timeout": 60
+    },
+    "close_shioaji": {
+        "filename": "close_Shioaji.py",
+        "name": "台指期權全部平倉 (close_Shioaji.py)",
+        "dry_args": ["--dry-run", "--no-line"],
+        "live_args": [],
+        "timeout": 60
+    },
+}
+
+@dash_app.route('/api/tmf/run_script', methods=['POST'])
+def api_run_script():
+    payload = request.get_json(silent=True) or {}
+    script_key = str(payload.get("script", "")).strip().lower()
+    mode = str(payload.get("mode", "dry_run")).strip().lower()
+
+    if mode == "live" and not check_dashboard_auth(payload):
+        return jsonify({"status": "error", "message": "密碼驗證失敗，拒絕執行實盤操作"}), 401
+
+    if script_key not in SCRIPT_MAP:
+        return jsonify({"status": "error", "message": f"未支援的腳本標籤: {script_key}"}), 400
+
+    cfg = SCRIPT_MAP[script_key]
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), cfg["filename"])
+    if not os.path.exists(script_path):
+        return jsonify({"status": "error", "message": f"找不到腳本檔案: {script_path}"}), 404
+
     if not TMF_SIM_LOCK.acquire(blocking=False):
-        return jsonify({"status": "error", "message": "目前已有 open_Shioaji 模擬工作正在執行中，請稍候。"})
+        return jsonify({"status": "error", "message": "目前已有背景腳本正在執行中，請稍候再試。"})
 
     try:
-        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "open_Shioaji.py")
-        if not os.path.exists(script_path):
-            return jsonify({"status": "error", "message": f"找不到腳本: {script_path}"})
+        import subprocess, sys
+        cmd = [sys.executable, "-u", script_path]
+        if mode == "dry_run":
+            cmd.extend(cfg["dry_args"])
+        else:
+            cmd.extend(cfg["live_args"])
 
-        # 調用 open_Shioaji.py 進行模擬試算
+        timeout_sec = cfg.get("timeout", 90)
         proc = subprocess.run(
-            [sys.executable, "-u", script_path, "--dry-run", "--no-line"],
+            cmd,
             cwd=os.path.dirname(os.path.abspath(__file__)),
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=timeout_sec,
             encoding="utf-8",
             errors="replace"
         )
@@ -2929,24 +3122,34 @@ def api_run_open_shioaji():
         if proc.stderr:
             full_output += ("\n[STDERR]\n" + proc.stderr)
 
+        mode_name = "模擬 (Dry-Run)" if mode == "dry_run" else "實盤 (Live)"
         if proc.returncode == 0:
             return jsonify({
                 "status": "ok",
-                "message": "open_Shioaji.py 模擬試算完成！",
+                "message": f"{cfg['name']} [{mode_name}] 執行完成！",
                 "output": full_output
             })
         else:
             return jsonify({
                 "status": "error",
-                "message": f"執行失敗 (代碼 {proc.returncode})",
+                "message": f"{cfg['name']} [{mode_name}] 執行失敗 (代碼 {proc.returncode})",
                 "output": full_output
             })
     except subprocess.TimeoutExpired:
-        return jsonify({"status": "error", "message": "open_Shioaji 執行逾時 (超過 60 秒)"})
+        return jsonify({"status": "error", "message": f"{cfg['name']} 執行逾時 (超過 {timeout_sec} 秒)"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
     finally:
         TMF_SIM_LOCK.release()
+
+
+@dash_app.route('/api/tmf/run_open_shioaji', methods=['POST'])
+def api_run_open_shioaji():
+    # 保留舊端點相容性
+    payload = request.get_json(silent=True) or {}
+    payload["script"] = "open_shioaji"
+    payload["mode"] = "dry_run"
+    return api_run_script()
 
 def start_dashboard_server():
     """在背景執行緒啟動 Flask 監控面板，不影響主邏輯。"""

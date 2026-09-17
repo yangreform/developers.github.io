@@ -399,7 +399,11 @@ def run_insider_pipeline(
     symbol_override=None,
     cooldown_days=14,
     retries=3,
+    no_line=False,
 ):
+    global send_push_message
+    if no_line:
+        send_push_message = None
     """
     以模組化 Agentic Skills 流程執行內部人選股、大單解讀與期權下單：
       Step 0: 初始化 Memory Skill，讀取歷史標的與排除名單
@@ -605,6 +609,7 @@ if __name__ == "__main__":
     parser.add_argument("--symbol", type=str, default=None, help="手動指定分析標的（覆蓋 Gemini 自內部人選出之標的）")
     parser.add_argument("--cooldown-days", type=int, default=14, help="標的冷卻天數（在此天數內不重複推薦同一標的，預設: 14天）")
     parser.add_argument("--retries", type=int, default=3, help="Gemini 請求最大重試次數")
+    parser.add_argument("--no-line", action="store_true", help="不發送 LINE 通知")
     parser.add_argument("--no-sleep", action="store_true", help="執行完畢後直接退出，不常駐 sleep")
     args = parser.parse_args()
 
@@ -616,9 +621,11 @@ if __name__ == "__main__":
         symbol_override=args.symbol,
         cooldown_days=args.cooldown_days,
         retries=args.retries,
+        no_line=args.no_line,
     )
 
-    if not args.no_sleep:
+    import sys
+    if not args.no_sleep and not args.dry_run and sys.stdin and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
         try:
             time.sleep(60 * 60 * 20)
         except KeyboardInterrupt:
