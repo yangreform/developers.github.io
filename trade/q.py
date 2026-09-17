@@ -991,20 +991,23 @@ async function confirmCloseGroup(groupName, btn) {
     const pnlVal = Number(p.pnl) || 0;
     const pnlSign = pnlVal > 0 ? '+' : '';
     const mkt = (p.market_price !== undefined && p.market_price !== null) ? fmt(p.market_price, p.decimals ?? 2) : '-';
+    const isFop = p.secType === 'FOP' || (p.symbol && p.symbol.includes(' ') && (p.symbol.includes(' C') || p.symbol.includes(' P')));
+    const algoText = isFop ? '市價 Market' : 'Adaptive Patient';
     return `  ${idx + 1}. ${p.symbol}
      • 目前持有: ${pos} 口
-     • 平倉動作: ${closeAction} ${qty} 口 (Adaptive Patient)
+     • 平倉動作: ${closeAction} ${qty} 口 (${algoText})
      • 市價: ${mkt} | 未平倉損益: ${pnlSign}${pnlVal.toFixed(2)}`;
   }).join(String.fromCharCode(10, 10));
 
   const confirmMsg = `🚨【確定要平倉【${groupName}】的所有部位嗎？】
 
-即將全數以 Adaptive Patient 市價平倉以下 ${g.positions.length} 筆部位：
+即將全數平倉以下 ${g.positions.length} 筆部位：
 ==================================================
 ` + lines + `
 ==================================================
 
-⚠️ 注意：按下確定後將立即向 IBKR 送出真實委託！
+⚠️ 注意：期貨/個股以 Adaptive Patient 平倉，期貨選擇權以市價單 (Market) 平倉。
+按下確定後將立即向 IBKR 送出真實委託！
 確定送出嗎？`;
 
   if (!confirm(confirmMsg)) return;
@@ -1012,7 +1015,7 @@ async function confirmCloseGroup(groupName, btn) {
   const origHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<span>⏳</span> <span>平倉中...</span>';
-  showToast(`⏳ 正在對【${groupName}】全數部位送出 Adaptive Patient 平倉委託...`);
+  showToast(`⏳ 正在對【${groupName}】全數部位送出平倉委託...`);
 
   let pw = localStorage.getItem(PASSWORD_KEY) || "";
 
@@ -2517,15 +2520,22 @@ def close_dash_position():
         local_ib.qualifyContracts(contract)
         
         order = MarketOrder(action, float(qty))
-        order.tif = 'DAY'
-        order.algoStrategy = 'Adaptive'
-        order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+        if contract.secType == 'FOP':
+            order.tif = 'GTC'
+            order.outsideRth = True
+            strategy_desc = "市價單 Market"
+        else:
+            order.tif = 'DAY'
+            order.algoStrategy = 'Adaptive'
+            order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+            strategy_desc = "Adaptive Patient"
+
         if TARGET_ACCOUNT:
             order.account = TARGET_ACCOUNT
         
-        local_ib.placeOrder(contract, order)
+        trade = local_ib.placeOrder(contract, order)
         local_ib.sleep(1)
-        res_msg = f'已送出平倉單: {action} {qty} (conId: {conId})'
+        res_msg = f'已送出平倉單: {action} {qty} 口 {contract.localSymbol or conId} ({strategy_desc})'
         try:
             send_trade_notification('OPTION', res_msg, {'action': action, 'qty': qty, 'conId': conId})
         except Exception:
@@ -2581,9 +2591,14 @@ def api_group_close():
     try:
         local_ib.connect(IB_HOST, IB_PORT, clientId=random.randint(8100, 8990), timeout=10)
 
+        recent_ib_errors = []
+        def on_ib_error(reqId, errorCode, errorString, contract):
+            recent_ib_errors.append((reqId, errorCode, errorString, contract))
+        local_ib.errorEvent += on_ib_error
+
         real_portfolio = {p.contract.conId: p for p in local_ib.portfolio()}
 
-        orders_sent = []
+        trades_submitted = []
         for p_item in positions_to_close:
             con_id = p_item.get("conId")
             pos_qty = float(p_item.get("position", 0.0))
@@ -2610,30 +2625,67 @@ def api_group_close():
             local_ib.qualifyContracts(contract)
 
             order = MarketOrder(action, qty)
-            order.tif = 'DAY'
-            order.algoStrategy = 'Adaptive'
-            order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+            if contract.secType == 'FOP':
+                # CME/COMEX/NYMEX/CBOT 期貨選擇權不支援 Adaptive 演算法 (會報 Error 442)，使用普通市價/保護市價
+                order.tif = 'GTC'
+                order.outsideRth = True
+                strategy_desc = "市價單 Market"
+            else:
+                order.tif = 'DAY'
+                order.algoStrategy = 'Adaptive'
+                order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+                strategy_desc = "Adaptive Patient"
+
             if TARGET_ACCOUNT:
                 order.account = TARGET_ACCOUNT
 
-            local_ib.placeOrder(contract, order)
+            trade = local_ib.placeOrder(contract, order)
             disp_name = contract.localSymbol or p_item.get("symbol") or str(con_id)
-            orders_sent.append(f"{disp_name}: {action} {qty} 口 (Adaptive Patient)")
+            trades_submitted.append({
+                'contract': contract,
+                'order': order,
+                'trade': trade,
+                'disp_name': disp_name,
+                'action': action,
+                'qty': qty,
+                'strategy_desc': strategy_desc
+            })
 
-        if not orders_sent:
+        if not trades_submitted:
             return jsonify({"status": "ok", "message": f"【{group_name}】部位已處於平倉狀態，無須送單", "details": []})
 
-        local_ib.sleep(1)
+        # 等待委託狀態回報
+        local_ib.sleep(2)
 
-        summary_text = f"🧹【看板分組一鍵平倉】\n分組: {group_name}\n已送出 {len(orders_sent)} 筆 Adaptive Patient 平倉單:\n" + "\n".join(orders_sent)
+        orders_sent = []
+        has_failure = False
+        for item in trades_submitted:
+            trade = item['trade']
+            disp_name = item['disp_name']
+            action = item['action']
+            qty = item['qty']
+            strat = item['strategy_desc']
+
+            order_id = trade.order.orderId
+            specific_errors = [e for e in recent_ib_errors if e[0] == order_id and e[1] not in (10349, 399)]
+
+            status = trade.orderStatus.status
+            if status in ('Cancelled', 'Inactive') or specific_errors:
+                has_failure = True
+                err_detail = specific_errors[-1][2] if specific_errors else (trade.orderStatus.whyHeld or status)
+                orders_sent.append(f"❌ {disp_name}: 平倉失敗 ({status} - {err_detail})")
+            else:
+                orders_sent.append(f"✅ {disp_name}: {action} {qty} 口 ({strat})")
+
+        summary_text = f"🧹【看板分組一鍵平倉】\n分組: {group_name}\n" + "\n".join(orders_sent)
         try:
             send_trade_notification('GROUP_CLOSE', summary_text, {'group': group_name, 'orders': orders_sent})
         except Exception:
             pass
 
         return jsonify({
-            "status": "ok",
-            "message": f"【{group_name}】已成功送出 {len(orders_sent)} 筆 Adaptive Patient 平倉委託！",
+            "status": "ok" if not has_failure else "warning",
+            "message": f"【{group_name}】平倉單已送出（{'全數成功' if not has_failure else '部分委託有異常，請見明細'}）",
             "details": orders_sent
         })
     except Exception as e:
