@@ -12,6 +12,15 @@ from ib_insync import *
 
 from notifier import send_push_message, send_trade_notification
 import sys
+
+# 確保 Windows 主控台與子行程正確輸出 UTF-8 字符，避免 UnicodeEncodeError
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
+    except Exception:
+        pass
+
 if "--no-line" in sys.argv:
     send_push_message = lambda *a, **kw: None
     send_trade_notification = lambda *a, **kw: None

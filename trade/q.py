@@ -1180,7 +1180,8 @@ async function runTMFScript(btn, scriptKey, mode) {
     statusBox.style.borderColor = '#1f6feb';
     statusBox.innerHTML = `⏳ 正在背景執行 <code>${sName}</code> [${isLive ? '實盤/正式' : '模擬/Dry-Run'}]，請稍候...`;
 
-    consoleBox.textContent = `[${new Date().toLocaleTimeString()}] 🚀 正在啟動 ${sName} (${isLive ? '實盤' : '模擬'})...\n`;
+    consoleBox.textContent = `[${new Date().toLocaleTimeString()}] 🚀 正在啟動 ${sName} (${isLive ? '實盤' : '模擬'})...\n請稍候片刻，執行完成後將在此即時顯示完整輸出報告。`;
+    statusBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     let pw = localStorage.getItem(PASSWORD_KEY) || "";
 
@@ -1207,20 +1208,37 @@ async function runTMFScript(btn, scriptKey, mode) {
         btn.disabled = false;
         btn.innerHTML = origHtml;
 
+        const modeBadge = isLive ? '🚀 實盤 (Live)' : '🧪 模擬 (Dry-Run)';
+        const nowStr = new Date().toLocaleTimeString();
+
         if (res.status === 'ok') {
             statusBox.style.background = '#13231b';
             statusBox.style.color = '#3fb950';
             statusBox.style.borderColor = '#238636';
-            statusBox.innerHTML = `✅ ${sName} [${isLive ? '實盤' : '模擬'}] 執行完成！(${new Date().toLocaleTimeString()})`;
-            consoleBox.textContent = res.output || "（無輸出日誌）";
+            statusBox.innerHTML = `✅ ${sName} [${modeBadge}] 執行完成！(${nowStr})`;
+
+            const banner = `======================================================================\n` +
+                           `📌 執行腳本: ${sName}\n` +
+                           `⚙️ 執行模式: ${modeBadge}\n` +
+                           `⏱️ 完成時間: ${nowStr}\n` +
+                           `======================================================================\n\n`;
+            consoleBox.textContent = banner + (res.output || "（無輸出日誌）");
             consoleBox.scrollTop = consoleBox.scrollHeight;
+            consoleBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             refresh();
         } else {
             statusBox.style.background = '#27171a';
             statusBox.style.color = '#f85149';
             statusBox.style.borderColor = '#da3633';
             statusBox.innerHTML = `❌ 執行失敗: ${res.message || '未知錯誤'}`;
-            consoleBox.textContent = (res.output || res.message || "（無輸出）");
+
+            const banner = `======================================================================\n` +
+                           `❌ 執行失敗: ${sName} [${modeBadge}]\n` +
+                           `⏱️ 發生時間: ${nowStr}\n` +
+                           `⚠️ 原因說明: ${res.message || '未知錯誤'}\n` +
+                           `======================================================================\n\n`;
+            consoleBox.textContent = banner + (res.output || res.message || "（無輸出）");
+            consoleBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     } catch (err) {
         btn.disabled = false;
@@ -1229,7 +1247,14 @@ async function runTMFScript(btn, scriptKey, mode) {
         statusBox.style.color = '#f85149';
         statusBox.style.borderColor = '#da3633';
         statusBox.innerHTML = `❌ 連線或執行異常: ${err}`;
-        consoleBox.textContent += `\n❌ 錯誤: ${err}`;
+
+        const banner = `======================================================================\n` +
+                       `❌ 網路或伺服器異常: ${sName}\n` +
+                       `⏱️ 發生時間: ${new Date().toLocaleTimeString()}\n` +
+                       `⚠️ 異常訊息: ${err}\n` +
+                       `======================================================================\n\n`;
+        consoleBox.textContent = banner;
+        consoleBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
@@ -3109,6 +3134,9 @@ def api_run_script():
             cmd.extend(cfg["live_args"])
 
         timeout_sec = cfg.get("timeout", 90)
+        proc_env = os.environ.copy()
+        proc_env["PYTHONIOENCODING"] = "utf-8"
+        proc_env["PYTHONUTF8"] = "1"
         proc = subprocess.run(
             cmd,
             cwd=os.path.dirname(os.path.abspath(__file__)),
@@ -3116,7 +3144,8 @@ def api_run_script():
             text=True,
             timeout=timeout_sec,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            env=proc_env
         )
         full_output = (proc.stdout or "")
         if proc.stderr:
