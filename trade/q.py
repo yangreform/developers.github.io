@@ -682,7 +682,26 @@ DASHBOARD_HTML = """
         </div>
       </div>
 
-      <!-- 4. open_Shioaji.py -->
+      <!-- 4. DTE0.py -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:#0d1117; padding:10px 14px; border-radius:6px; border:1px solid #21262d;">
+        <div style="min-width:240px;">
+          <div style="font-weight:600; color:#c9d1d9; font-size:13px; display:flex; align-items:center; gap:6px;">
+            <span>🎯 0DTE 指數期權建倉 (SPX/NDX)</span>
+            <span style="font-size:11px; color:#8b949e; font-family:monospace;">(DTE0.py)</span>
+          </div>
+          <div class="muted" style="font-size:11px; margin-top:2px;">SPX / NDX 指數 0DTE 蝶式組合單 (Bid Limit + bid_up 上限保護)</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="action-btn" style="background-color:#1f6feb; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'dte0', 'dry_run')">
+            <span>🧪 模擬 (Dry-Run)</span>
+          </button>
+          <button class="action-btn" style="background-color:#238636; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'dte0', 'live')">
+            <span>🚀 實盤送單 (Live)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 5. open_Shioaji.py -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:#0d1117; padding:10px 14px; border-radius:6px; border:1px solid #21262d;">
         <div style="min-width:240px;">
           <div style="font-weight:600; color:#c9d1d9; font-size:13px; display:flex; align-items:center; gap:6px;">
@@ -1253,6 +1272,7 @@ async function runTMFScript(btn, scriptKey, mode) {
         'insider': '內部人交易選股 (insider.py)',
         'barchart_auto': 'Barchart 自動化期權 (barchart_auto.py)',
         'option': 'Butterfly 跨期權策略 (option.py)',
+        'dte0': '0DTE 指數期權建倉 (DTE0.py)',
         'open_shioaji': '台指選擇權開倉 (open_Shioaji.py)',
         'close_shioaji': '台指期權全部平倉 (close_Shioaji.py)'
     };
@@ -3340,6 +3360,13 @@ SCRIPT_MAP = {
     "option": {
         "filename": "option.py",
         "name": "Butterfly 跨期權策略 (option.py)",
+        "dry_args": ["--dry-run", "--no-line"],
+        "live_args": [],
+        "timeout": 90
+    },
+    "dte0": {
+        "filename": "DTE0.py",
+        "name": "0DTE 指數期權策略 (DTE0.py)",
         "dry_args": ["--dry-run", "--no-line"],
         "live_args": [],
         "timeout": 90

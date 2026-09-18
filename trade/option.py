@@ -122,12 +122,9 @@ FUTURE_SYMBOL_MAP = {
     'RTY': 'RTY', 'RTO': 'RTY', 'M2K': 'RTY', 'RT': 'RTY',
     'NG': 'NG', 'LN': 'NG', 'ON': 'NG', 'MNG': 'NG',
     'CL': 'CL', 'LO': 'CL', 'MCL': 'CL',
-    # 新增指數類期權 (SPX, NDX)
-    'SPX': 'SPX', 'SPXW': 'SPX',
-    'NDX': 'NDX', 'NDXP': 'NDX',
 }
 
-# 優先/標準選擇權交易類別映射表 (SPX 優先 SPXW, NDX 優先 NDXP 以鎖定 0DTE/每日合約)
+# 優先/標準選擇權交易類別映射表 (專門處理期貨選擇權)
 PREFERRED_TRADING_CLASS_MAP = {
     'CL': 'LO',
     'NG': 'LN',
@@ -139,8 +136,6 @@ PREFERRED_TRADING_CLASS_MAP = {
     'RTY': 'RTO',
     'EUR': 'EUU',
     'JPY': 'JPU',
-    'SPX': 'SPXW',
-    'NDX': 'NDXP',
 }
 
 # 預設動態翼寬設定 (若 .env 中的個別商品未指定 wing_width 則採用此表)
@@ -148,8 +143,6 @@ WING_WIDTH_MAP = {
     'ZC': 40,
     'NQ': 200,
     'ES': 200,
-    'SPX': 50,
-    'NDX': 200,
     'JPY': 0.0020,
     'EUR': 0.04,
     'HG': 0.20,
@@ -164,8 +157,6 @@ DEFAULT_BID_UP_MAP = {
     'ZC': 20.0,
     'NQ': 600.0,
     'ES': 180.0,
-    'SPX': 10.0,
-    'NDX': 40.0,
     'JPY': 0.0010,
     'EUR': 0.02,
     'HG': 0.10,
@@ -180,8 +171,6 @@ MIN_TICK_MAP = {
     'ES': 0.25,
     'NQ': 0.25,
     'RTY': 0.1,
-    'SPX': 0.05,
-    'NDX': 0.10,
     'ZC': 0.125,
     'HG': 0.0005,
     'GC': 0.1,
@@ -190,8 +179,6 @@ MIN_TICK_MAP = {
     'NG': 0.001,
     'CL': 0.01,
 }
-
-INDEX_SYMBOLS = {'SPX', 'NDX'}
 
 ib = IB()
 
@@ -409,29 +396,7 @@ def resolve_group_symbols(group_name, symbols):
     if not underlying_sym:
         return None, None, []
 
-    # 1. 處理指數類商品 (SPX, NDX)
-    if underlying_sym in INDEX_SYMBOLS:
-        exchange = 'CBOE' if underlying_sym == 'SPX' else 'NASDAQ'
-        underlying_contract = Index(underlying_sym, exchange, currency='USD')
-        try:
-            ib.qualifyContracts(underlying_contract)
-        except Exception:
-            underlying_contract = Index(underlying_sym, 'SMART', currency='USD')
-            try:
-                ib.qualifyContracts(underlying_contract)
-            except Exception:
-                pass
-
-        chains = ib.reqSecDefOptParams(underlying_contract.symbol, '', underlying_contract.secType, underlying_contract.conId)
-        if not chains:
-            chains = ib.reqSecDefOptParams(underlying_contract.symbol, 'SMART', underlying_contract.secType, underlying_contract.conId)
-
-        preferred = PREFERRED_TRADING_CLASS_MAP.get(underlying_sym)
-        trading_classes = set(c.tradingClass for c in chains) if chains else set()
-        opt_class = preferred if (preferred and preferred in trading_classes) else (chains[0].tradingClass if chains else underlying_sym)
-        return underlying_contract, opt_class, chains
-
-    # 2. 處理期貨類商品 (ES, NQ, CL, GC, ZC, HG...)
+    # 專門處理期貨類商品 (ES, NQ, CL, GC, ZC, HG...)
     fut_exchange = FUTURE_EXCHANGE_MAP.get(underlying_sym, '')
     details = ib.reqContractDetails(Future(symbol=underlying_sym, exchange=fut_exchange))
     valid_details = [d for d in details if d.contract.exchange not in ['QBALGO', 'SMART']]
@@ -862,10 +827,12 @@ def execute_butterfly(legs):
     limit_price = round(limit_price, 6)
 
     order_action = 'BUY' if is_long else 'SELL'
-    action_chinese = '限價買入' if is_long else '限價賣出'
+    action_chinese = 'Adaptive 買入' if is_long else 'Adaptive 賣出'
 
-    # 建立 BID LIMIT 訂單 (iron='long' -> BUY 組合單; iron='short' -> SELL 組合單)
-    order = LimitOrder(order_action, TRADE_QTY, limit_price)
+    # 建立 Adaptive Patient 演算法訂單 (iron='long' -> BUY 組合單; iron='short' -> SELL 組合單)
+    order = MarketOrder(order_action, TRADE_QTY)
+    order.algoStrategy = 'Adaptive'
+    order.algoParams = [TagValue('adaptivePriority', 'Patient')]
     order.tif = 'DAY'
 
     # 即時查詢 trade/.env 中的 OP_SEND_WEBHOOK 開關與目標帳號
@@ -880,7 +847,7 @@ def execute_butterfly(legs):
     actual_und = legs.get('actual_underlying')
     und_name = getattr(actual_und, 'localSymbol', symbol) if actual_und else symbol
     summary_str = (
-        f"Butterfly 蝶式組合單 ({strategy_name}):\n"
+        f"Butterfly 期貨期權組合單 ({strategy_name}):\n"
         f"  標的代號: {symbol} (真實掛鉤: {und_name}, 市價: {legs['underlying_price']:.2f})\n"
         f"  策略方向 (iron): {iron.upper()} (中心 ATM: {center_desc} / 價外上下翼: {wing_desc})\n"
         f"  中心 ATM ({center_desc} Call & Put): {legs['center_strike']}\n"
@@ -889,15 +856,14 @@ def execute_butterfly(legs):
         f"  到期日: {legs['expiry']} (DTE: {legs['dte']} 天)\n"
         f"  四腿即時報價與 Greeks:\n"
         f"{legs_quote_str}\n"
-        f"  下單方式: BID LIMIT ({action_chinese} {order_action} {TRADE_QTY} 口)\n"
-        f"  委託限價: ${limit_price} (即時Bid: {raw_bid}, 上限bid_up: {bid_up if bid_up is not None else '無'})\n"
+        f"  下單方式: Adaptive Patient ({action_chinese} {order_action} {TRADE_QTY} 口, 參考限價: ${limit_price})\n"
         f"  淨 Delta: {legs['total_delta']:+.3f} | 淨 Theta: {legs['total_theta']:.2f}"
     )
 
     if send_live:
         RECENT_IB_ERRORS.clear()
         trade = ib.placeOrder(combo_contract, order)
-        print(f"=== [已送出委託單至 IBKR] ===\n{summary_str}")
+        print(f"=== [已送出 Adaptive Patient 委託單至 IBKR] ===\n{summary_str}")
 
         # 等待 IBKR 接收與回報 (確認是否排入訂單簿或被退回)
         for _ in range(5):
@@ -905,8 +871,23 @@ def execute_butterfly(legs):
             if trade.orderStatus.status not in ('PendingSubmit', ''):
                 break
 
-        order_errors = [e for e in RECENT_IB_ERRORS if e[0] == trade.order.orderId or e[1] in (110, 201, 103, 321, 200)]
-        if order_errors:
+        order_errors = [e for e in RECENT_IB_ERRORS if e[0] == trade.order.orderId or e[1] in (110, 201, 387, 442, 103, 321, 200)]
+        algo_unsupported = any(e[1] in (201, 387, 442) for e in order_errors)
+        if algo_unsupported:
+            print(f"⚠️ [交易所限制] CME/COMEX/NYMEX 對此期權組合單未開放 Adaptive 演算法，自動無縫切換為 Patient Bid Limit (買價耐心限價單) 重新送單...")
+            fallback_order = LimitOrder(order_action, TRADE_QTY, limit_price)
+            fallback_order.tif = 'DAY'
+            if target_acct:
+                fallback_order.account = target_acct
+            RECENT_IB_ERRORS.clear()
+            trade = ib.placeOrder(combo_contract, fallback_order)
+            for _ in range(5):
+                ib.sleep(1)
+                if trade.orderStatus.status not in ('PendingSubmit', ''):
+                    break
+            order_errors = [e for e in RECENT_IB_ERRORS if e[0] == trade.order.orderId or e[1] in (110, 201, 103, 321, 200)]
+
+        if order_errors and trade.orderStatus.status not in ('Submitted', 'PreSubmitted', 'Filled'):
             err_code, err_msg = order_errors[-1][1], order_errors[-1][2]
             print(f"❌ [下單被拒絕] IBKR 回報錯誤 {err_code}: {err_msg}")
             reject_msg = (
@@ -915,7 +896,7 @@ def execute_butterfly(legs):
                 f"策略: {strategy_name} [{iron.upper()}]\n"
                 f"錯誤代碼: {err_code}\n"
                 f"錯誤訊息: {err_msg}\n"
-                f"委託動作: {action_chinese} {order_action} (限價: ${limit_price})"
+                f"委託動作: {action_chinese} {order_action} (Adaptive Patient)"
             )
             try:
                 send_trade_notification(symbol, reject_msg, {"error_code": err_code, "error_msg": err_msg})
@@ -923,7 +904,7 @@ def execute_butterfly(legs):
             except Exception as e:
                 print(f"❌ [LINE 推播異常] {e}")
         elif trade.orderStatus.status in ('PreSubmitted', 'Submitted'):
-            print(f"✅ [委託成功確認] IBKR 已成功接收並排入市場 (狀態: {trade.orderStatus.status}, 限價: {limit_price})")
+            print(f"✅ [委託成功確認] IBKR 已成功接收並排入市場 (狀態: {trade.orderStatus.status}, Adaptive Patient)")
             submit_msg = (
                 f"【IBKR 下單成功通知】\n"
                 f"商品: {symbol} (掛鉤: {und_name})\n"
@@ -935,8 +916,7 @@ def execute_butterfly(legs):
                 f"下翼 Put : {legs['put_wing_strike']} (-{legs['wing_width']})\n"
                 f"四腿報價:\n"
                 f"{line_legs_quote_str}\n"
-                f"委託方式: BID LIMIT ({action_chinese} {order_action} {TRADE_QTY} 口)\n"
-                f"委託限價: ${limit_price} (即時Bid: {raw_bid}, 上限: {bid_up if bid_up is not None else '無'})\n"
+                f"委託方式: Adaptive Patient ({action_chinese} {order_action} {TRADE_QTY} 口)\n"
                 f"排單狀態: {trade.orderStatus.status}\n"
                 f"淨 Delta: {legs['total_delta']:+.3f} | 淨 Theta: {legs['total_theta']:.2f}"
             )
@@ -1026,6 +1006,11 @@ def run_strategy_cycle():
         symbols = g_info.get('symbols', [])
         if not symbols:
             print(f"[略過] 群組 {g_name} 未指定 symbols。")
+            continue
+
+        # 排除指數類商品 (SPX, NDX 專門由 trade/DTE0.py 執行)
+        if any(s in ('SPX', 'SPXW', 'NDX', 'NDXP') for s in symbols) or 'SPX' in g_name or 'NDX' in g_name or '指數' in g_name:
+            print(f"[略過] 指數商品群組 {g_name} 已獨立至 trade/DTE0.py 專屬執行。")
             continue
 
         # 個別商品 DTE 開始日與結束日 (0 代表 0DTE 當天到期)
