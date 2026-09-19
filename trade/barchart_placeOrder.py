@@ -640,34 +640,40 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
 # ==============================================================================
 # 5. 主執行函式：解析報告並逐筆下單
 # ==============================================================================
-def place_barchart_orders(report_path=None, dry_run=False):
+def place_barchart_orders(report_path=None, dry_run=False, selected_suggestions=None):
     print("\n" + "=" * 65)
     print("🚀 Barchart AI 三大建議自動下單模組 (Adaptive Patient + Attached)")
     print("=" * 65)
 
-    if not report_path:
-        report_path = find_latest_report_file()
+    if selected_suggestions is not None:
+        suggestions = selected_suggestions
+        print(f"[INFO] 使用經 Options Flow 決選/過濾之專屬下單清單 (共 {len(suggestions)} 筆)")
+    else:
+        if not report_path:
+            report_path = find_latest_report_file()
 
-    if not report_path or not os.path.exists(report_path):
-        err = f"[ERROR] 找不到最新 AI 分析報告檔案 (搜尋路徑: {BASE_DIR}, {BARCHART_DIR}, {REPORTS_DIR})"
-        print(err)
-        return False
+        if not report_path or not os.path.exists(report_path):
+            err = f"[ERROR] 找不到最新 AI 分析報告檔案 (搜尋路徑: {BASE_DIR}, {BARCHART_DIR}, {REPORTS_DIR})"
+            print(err)
+            return False
 
-    print(f"[INFO] 讀取分析報告: {report_path}")
-    with open(report_path, "r", encoding="utf-8", errors="ignore") as f:
-        report_text = f.read()
+        print(f"[INFO] 讀取分析報告: {report_path}")
+        with open(report_path, "r", encoding="utf-8", errors="ignore") as f:
+            report_text = f.read()
 
-    suggestions = parse_report_suggestions(report_text)
+        suggestions = parse_report_suggestions(report_text)
+
     if not suggestions:
-        print("[ERROR] 無法從報告中解析出任何有效投資建議。")
+        print("[ERROR] 無法從報告或清單中解析出任何有效投資建議。")
         return False
 
-    print(f"[INFO] 成功自報告解析出 {len(suggestions)} 筆核心投資建議：")
+    print(f"[INFO] 準備執行 {len(suggestions)} 筆核心投資建議下單：")
     for s in suggestions:
-        if s["type"] == "bull_put":
-            print(f"  • 建議 {s['id']}: {s['symbol']} {s['strategy']} (賣出 P{s['short_put_strike']} / 買入 P{s['long_put_strike']}, 到期: {s['exp_date']})")
+        if s.get("type") == "bull_put":
+            print(f"  • 建議 {s.get('id', 3)}: {s['symbol']} {s['strategy']} (賣出 P{s['short_put_strike']} / 買入 P{s['long_put_strike']}, 到期: {s['exp_date']})")
         else:
-            print(f"  • 建議 {s['id']}: {s['symbol']} {s['strategy']} (履約價: ${s['strike']}, 到期: {s['exp_date']})")
+            flow_tag = " [🌟 Options Flow 決選最佳]" if s.get("flow_winner") else ""
+            print(f"  • 建議 {s.get('id', 1)}: {s['symbol']} {s['strategy']}{flow_tag} (履約價: ${s['strike']}, 到期: {s['exp_date']})")
 
     # 讀取連線參數
     cfg = load_env_settings(ENV_FILE)
@@ -681,6 +687,8 @@ def place_barchart_orders(report_path=None, dry_run=False):
         ib = create_fast_ib_connection(host=host, port=port)
         for s in suggestions:
             res = process_and_place_suggestion(ib, s, target_account=target_account, dry_run=dry_run)
+            if s.get("flow_winner"):
+                res["flow_winner"] = True
             results.append(res)
 
     except Exception as e:
@@ -703,7 +711,12 @@ def place_barchart_orders(report_path=None, dry_run=False):
     ]
 
     for i, r in enumerate(success_items, 1):
-        line_lines.append(f"📌 建議 {i}：{r['desc']}")
+        if r.get("flow_winner"):
+            line_lines.append(f"📌 決選最佳 Put/Call (由 Options Flow 評選)：{r['desc']}")
+        elif r.get("strategy") == "Bull Put Spread":
+            line_lines.append(f"📌 建議 3 (Bull Put 垂直價差)：{r['desc']}")
+        else:
+            line_lines.append(f"📌 建議 {i}：{r['desc']}")
 
     line_msg = "\n".join(line_lines)
 
