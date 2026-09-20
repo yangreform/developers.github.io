@@ -84,7 +84,7 @@ def is_valid_price(p):
 
 
 # ==============================================================================
-# 1. 交易參數與指數標的配置 (專門處理 SPX, NDX)
+# 1. 交易參數與指數標的配置 (專門處理 SPX, NDX, RUT)
 # ==============================================================================
 env_config = load_env_config()
 IB_HOST = env_config.get('IB_HOST', '127.0.0.1')
@@ -92,31 +92,36 @@ IB_PORT = int(env_config.get('IB_PORT', 4001))
 CLIENT_ID = int(env_config.get('IB_CLIENT_ID', 100)) + 7
 
 TRADE_QTY = 1
-INDEX_SYMBOLS = {'SPX', 'NDX'}
+INDEX_SYMBOLS = {'SPX', 'NDX', 'RUT'}
 
 INDEX_SYMBOL_MAP = {
     'SPX': 'SPX', 'SPXW': 'SPX',
     'NDX': 'NDX', 'NDXP': 'NDX',
+    'RUT': 'RUT', 'RUTW': 'RUT',
 }
 
 PREFERRED_TRADING_CLASS_MAP = {
     'SPX': 'SPXW',
     'NDX': 'NDXP',
+    'RUT': 'RUTW',
 }
 
 WING_WIDTH_MAP = {
     'SPX': 10,
     'NDX': 40,
+    'RUT': 10,
 }
 
 DEFAULT_BID_UP_MAP = {
     'SPX': 4.0,
     'NDX': 16.0,
+    'RUT': 3.0,
 }
 
 DEFAULT_PRICE_JUMP_MAP = {
-    'SPX': 30.0,
-    'NDX': 120.0,
+    'SPX': 20.0,
+    'NDX': 80.0,
+    'RUT': 10.0,
 }
 
 ib = IB()
@@ -172,6 +177,7 @@ def round_to_valid_tick(symbol, price, contract=None):
         FALLBACK_RULES = {
             'SPX': [(0.0, 0.05), (3.0, 0.10)],
             'NDX': [(0.0, 0.05), (3.0, 0.10)],
+            'RUT': [(0.0, 0.05), (3.0, 0.10)],
         }
         rules = FALLBACK_RULES.get(symbol, [(0.0, 0.05), (3.0, 0.10)])
 
@@ -290,7 +296,14 @@ def resolve_index_symbols(group_name, symbols):
     if not underlying_sym or underlying_sym not in INDEX_SYMBOLS:
         return None, None, []
 
-    exchange = 'CBOE' if underlying_sym == 'SPX' else 'NASDAQ'
+    if underlying_sym == 'SPX':
+        exchange = 'CBOE'
+    elif underlying_sym == 'NDX':
+        exchange = 'NASDAQ'
+    elif underlying_sym == 'RUT':
+        exchange = 'RUSSELL'
+    else:
+        exchange = 'SMART'
     underlying_contract = Index(underlying_sym, exchange, currency='USD')
     try:
         ib.qualifyContracts(underlying_contract)
@@ -398,9 +411,21 @@ def get_dte0_butterfly_sets(underlying, opt_class, chains, wing_width=None, bid_
             'target_center': base_atm_strike - price_jump,
             'offset': -price_jump,
         },
+        {
+            'label': f'ATM+2*{price_jump:g} 上上方偏置組',
+            'short_tag': f'ATM+2*{price_jump:g}',
+            'target_center': base_atm_strike + 2.0 * price_jump,
+            'offset': 2.0 * price_jump,
+        },
+        {
+            'label': f'ATM-2*{price_jump:g} 下下方偏置組',
+            'short_tag': f'ATM-2*{price_jump:g}',
+            'target_center': base_atm_strike - 2.0 * price_jump,
+            'offset': -2.0 * price_jump,
+        },
     ]
 
-    opt_exchange = 'SMART'
+    opt_exchange = 'CBOE' if underlying.symbol == 'RUT' else 'SMART'
     butterfly_sets = []
 
     for s_def in set_definitions:
@@ -411,7 +436,7 @@ def get_dte0_butterfly_sets(underlying, opt_class, chains, wing_width=None, bid_
         # 尋找最接近目標價位的履約價作為該組的中心履約價
         center_strike = min(strikes, key=lambda s: abs(s - target_center))
 
-        # 價外上下翼: 自動由新的中心履約價 (ATM / ATM+jump / ATM-jump) 來計算
+        # 價外上下翼: 自動由新的中心履約價 (ATM / ATM+jump / ATM-jump / ATM+2*jump / ATM-2*jump) 來計算
         target_call_wing = center_strike + wing_width
         target_put_wing = center_strike - wing_width
 
@@ -659,7 +684,7 @@ def execute_dte0_butterfly(legs):
 
 
 # ==============================================================================
-# 6. 主執行迴圈 (僅掃描 SPX, NDX)
+# 6. 主執行迴圈 (處理 SPX, NDX, RUT)
 # ==============================================================================
 def run_dte0_cycle():
     hedge_config = load_op_hedge_config()
@@ -667,15 +692,15 @@ def run_dte0_cycle():
         print("[資訊] trade/.env 中的 OP_HEDGE_CONFIG_JSON 為空，跳過。")
         return
 
-    # 僅篩選包含 SPX 或 NDX 的群組
+    # 篩選包含 SPX, NDX 或 RUT 的群組
     target_groups = {}
     for g_name, g_info in hedge_config.items():
         syms = g_info.get('symbols', [])
-        if any(s in INDEX_SYMBOLS or 'SPX' in s or 'NDX' in s for s in syms) or 'SPX' in g_name or 'NDX' in g_name:
+        if any(s in INDEX_SYMBOLS or 'SPX' in s or 'NDX' in s or 'RUT' in s for s in syms) or any(k in g_name for k in ['SPX', 'NDX', 'RUT', '羅素', 'Russell']):
             target_groups[g_name] = g_info
 
     if not target_groups:
-        print("[資訊] OP_HEDGE_CONFIG_JSON 中未找到 SPX 或 NDX 指數群組。")
+        print("[資訊] OP_HEDGE_CONFIG_JSON 中未找到 SPX, NDX 或 RUT 指數群組。")
         return
 
     market_date = get_market_today()
@@ -701,7 +726,7 @@ def run_dte0_cycle():
             continue
 
         if price_jump is None:
-            price_jump = DEFAULT_PRICE_JUMP_MAP.get(underlying.symbol, 30.0)
+            price_jump = DEFAULT_PRICE_JUMP_MAP.get(underlying.symbol, 20.0)
 
         current_pos = [p for p in ib.portfolio() if p.contract.symbol == underlying.symbol and p.contract.secType in ['OPT', 'IND']]
         is_dry_run = '--dry-run' in sys.argv
@@ -709,7 +734,7 @@ def run_dte0_cycle():
         if not current_pos or is_dry_run or is_force:
             if current_pos and (is_dry_run or is_force):
                 print(f"-> ⚠️ 注意: 帳戶目前已有 {underlying.symbol} 期權部位 ({len(current_pos)} 筆)，但因指定了 {'--dry-run' if is_dry_run else '--force'}，繼續執行。")
-            print(f"-> 準備為 {underlying.symbol} 建立 3 組 0DTE Butterfly 部位 (方向: {iron.upper()}, 翼寬: {wing_width or '預設'}, bid_up: {bid_up or '預設'}, price_jump: {price_jump})...")
+            print(f"-> 準備為 {underlying.symbol} 建立 5 組 0DTE Butterfly 部位 (方向: {iron.upper()}, 翼寬: {wing_width or '預設'}, bid_up: {bid_up or '預設'}, price_jump: {price_jump})...")
             sets = get_dte0_butterfly_sets(
                 underlying=underlying,
                 opt_class=opt_class,
@@ -732,7 +757,7 @@ def run_dte0_cycle():
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description="0DTE 指數期權 (SPX/NDX) Butterfly 自動建倉腳本")
+    parser = argparse.ArgumentParser(description="0DTE 指數期權 (SPX/NDX/RUT) Butterfly 自動建倉腳本")
     parser.add_argument("--dry-run", action="store_true", help="模擬模式（不實際送單至 IBKR）")
     parser.add_argument("--no-line", action="store_true", help="不發送 LINE 通知")
     parser.add_argument("--force", action="store_true", help="強制執行下單（忽略已有部位檢查）")

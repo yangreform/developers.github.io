@@ -99,8 +99,9 @@ def load_spx_ndx_config():
     """解析 trade/.env 中的 OP_HEDGE_CONFIG_JSON。"""
     cfg = load_env_config()
     raw = cfg.get('OP_HEDGE_CONFIG_JSON', '{}')
-    spx_cfg = {'symbols': ['SPX'], 'wing_width': 10.0, 'bid_up': 4.0, 'price_jump': 30.0, 'iron': 'long'}
-    ndx_cfg = {'symbols': ['NDX'], 'wing_width': 40.0, 'bid_up': 16.0, 'price_jump': 120.0, 'iron': 'long'}
+    spx_cfg = {'symbols': ['SPX'], 'wing_width': 10.0, 'bid_up': 4.0, 'price_jump': 20.0, 'iron': 'long'}
+    ndx_cfg = {'symbols': ['NDX'], 'wing_width': 40.0, 'bid_up': 16.0, 'price_jump': 80.0, 'iron': 'long'}
+    rut_cfg = {'symbols': ['RUT'], 'wing_width': 10.0, 'bid_up': 3.0, 'price_jump': 10.0, 'iron': 'long'}
 
     try:
         data = json.loads(raw)
@@ -109,20 +110,27 @@ def load_spx_ndx_config():
                 spx_cfg.update({
                     'wing_width': float(val.get('wing_width', 10.0)),
                     'bid_up': float(val.get('bid_up', 4.0)),
-                    'price_jump': float(val.get('price_jump', 30.0)),
+                    'price_jump': float(val.get('price_jump', 20.0)),
                     'iron': str(val.get('iron', 'long')).lower()
                 })
             elif 'NDX' in key or '那指' in key:
                 ndx_cfg.update({
                     'wing_width': float(val.get('wing_width', 40.0)),
                     'bid_up': float(val.get('bid_up', 16.0)),
-                    'price_jump': float(val.get('price_jump', 120.0)),
+                    'price_jump': float(val.get('price_jump', 80.0)),
+                    'iron': str(val.get('iron', 'long')).lower()
+                })
+            elif 'RUT' in key or '羅素' in key:
+                rut_cfg.update({
+                    'wing_width': float(val.get('wing_width', 10.0)),
+                    'bid_up': float(val.get('bid_up', 3.0)),
+                    'price_jump': float(val.get('price_jump', 10.0)),
                     'iron': str(val.get('iron', 'long')).lower()
                 })
     except Exception as e:
         print(f"[警告] 解析 OP_HEDGE_CONFIG_JSON 失敗，使用預設配置: {e}")
 
-    return {'SPX': spx_cfg, 'NDX': ndx_cfg}
+    return {'SPX': spx_cfg, 'NDX': ndx_cfg, 'RUT': rut_cfg}
 
 
 # ==============================================================================
@@ -227,7 +235,12 @@ class MarketDataLoader:
 
         if not offline and self._init_ib():
             try:
-                exchange = 'CBOE' if symbol == 'SPX' else 'NASDAQ'
+                if symbol == 'NDX':
+                    exchange = 'NASDAQ'
+                elif symbol == 'RUT':
+                    exchange = 'RUSSELL'
+                else:
+                    exchange = 'CBOE'
                 contract = Index(symbol, exchange, currency='USD')
                 self.ib.qualifyContracts(contract)
 
@@ -262,7 +275,7 @@ class MarketDataLoader:
             except Exception as e:
                 self.logger.warning(f"IBKR 下載數據異常 ({e})，切換至備援合成模式")
 
-        # 備援：合成符合 SPX / NDX 特性的真實感盤中 5 分鐘行情
+        # 備援：合成符合標的特性的真實感盤中 5 分鐘行情
         self.logger.info(f"使用歷史波動率統計模型合成 {symbol} 0DTE 盤中高頻行情 ({start_str} ~ {end_str})...")
         df = self._generate_synthetic_intraday(symbol, start_date, end_date)
         df.to_csv(cache_file)
@@ -270,10 +283,20 @@ class MarketDataLoader:
 
     def _generate_synthetic_intraday(self, symbol, start_date, end_date):
         """
-        根據標普500 (SPX: ~5800) 與那斯達克100 (NDX: ~20000) 的典型日內波動率與漂移產生測試資料。
+        根據各指數 (SPX, NDX, RUT) 典型日內波動率與漂移產生測試資料。
         """
-        base_price = 5850.0 if symbol == 'SPX' else 20200.0
-        daily_vol = 0.009 if symbol == 'SPX' else 0.013  # 年化約 14% / 20%
+        if symbol == 'SPX':
+            base_price = 5850.0
+            daily_vol = 0.009
+        elif symbol == 'NDX':
+            base_price = 20200.0
+            daily_vol = 0.013
+        elif symbol == 'RUT':
+            base_price = 2870.0
+            daily_vol = 0.012
+        else:
+            base_price = 2000.0
+            daily_vol = 0.010
         intraday_vol = daily_vol / math.sqrt(78)  # 一天 78 根 5 分鐘 K 棒
 
         records = []
@@ -429,7 +452,7 @@ class BacktestEngine:
     # 策略 A: 0DTE 多組 Butterfly (ATM, ATM+jump, ATM-jump) - 對應 trade/DTE0.py
     # --------------------------------------------------------------------------
     def _backtest_butterfly(self, market_data):
-        self.logger.info(">>> 執行 0DTE 蝶式 (Butterfly) 組合策略回測 (含 ATM / ATM+jump / ATM-jump 三組)...")
+        self.logger.info(">>> 執行 0DTE 蝶式 (Butterfly) 組合策略回測 (含 5 組偏置架構)...")
         cur_date = self.start_date
         current_cap = self.initial_capital
 
@@ -451,29 +474,31 @@ class BacktestEngine:
 
                 # 參數獲取
                 sym_cfg = self.hedge_cfg.get(sym, {})
-                wing_width = sym_cfg.get('wing_width', 10.0 if sym == 'SPX' else 40.0)
-                price_jump = sym_cfg.get('price_jump', 30.0 if sym == 'SPX' else 120.0)
-                bid_up = sym_cfg.get('bid_up', 4.0 if sym == 'SPX' else 16.0)
+                wing_width = sym_cfg.get('wing_width', 10.0 if sym in ('SPX', 'RUT') else 40.0)
+                price_jump = sym_cfg.get('price_jump', 10.0 if sym == 'RUT' else (20.0 if sym == 'SPX' else 80.0))
+                bid_up = sym_cfg.get('bid_up', 3.0 if sym == 'RUT' else (4.0 if sym == 'SPX' else 16.0))
                 is_long = (sym_cfg.get('iron', 'long') != 'short')
 
                 # 開盤基準價 (09:30 開盤第一根 K 棒)
                 open_bar = day_bars.iloc[0]
                 underlying_open = open_bar['open']
 
-                # 履約價四捨五入至整數 (SPX: 5 點一跳, NDX: 25 點一跳)
-                strike_step = 5.0 if sym == 'SPX' else 25.0
+                # 履約價四捨五入至整數 (SPX/RUT: 5 點一跳, NDX: 25 點一跳)
+                strike_step = 5.0 if sym in ('SPX', 'RUT') else 25.0
                 base_atm = round(underlying_open / strike_step) * strike_step
 
-                # 3 組中心點定義
+                # 5 組中心點定義
                 sets = [
                     {'tag': 'ATM', 'center': base_atm},
                     {'tag': f'ATM+{price_jump:g}', 'center': base_atm + price_jump},
                     {'tag': f'ATM-{price_jump:g}', 'center': base_atm - price_jump},
+                    {'tag': f'ATM+2*{price_jump:g}', 'center': base_atm + 2.0 * price_jump},
+                    {'tag': f'ATM-2*{price_jump:g}', 'center': base_atm - 2.0 * price_jump},
                 ]
 
                 # 計算各組進場成本 (09:30 進場，T = 6.5 小時 = 6.5 / (252*6.5) = 1/252 年)
                 t_entry = 1.0 / 252.0
-                iv = 0.15 if sym == 'SPX' else 0.20
+                iv = 0.15 if sym == 'SPX' else (0.18 if sym == 'RUT' else 0.20)
 
                 for s in sets:
                     center_k = s['center']
@@ -867,12 +892,12 @@ class BacktestEngine:
 # ==============================================================================
 def main():
     parser = argparse.ArgumentParser(
-        description="IBKR 0DTE Options Backtester for SPX & NDX (Based on jefrnc/ibkr-odte-strategies)"
+        description="IBKR 0DTE Options Backtester for SPX, NDX & RUT (Based on jefrnc/ibkr-odte-strategies)"
     )
     parser.add_argument('--strategy', choices=['butterfly', 'breakout', 'iron_condor'], default='butterfly',
-                        help="回測策略: butterfly (預設, 對應 DTE0.py 3組蝶式), breakout (突破追價), iron_condor (鐵鷹)")
-    parser.add_argument('--symbols', nargs='+', default=['SPX', 'NDX'],
-                        help="回測標的 (預設: SPX NDX)")
+                        help="回測策略: butterfly (預設, 對應 DTE0.py 5組蝶式), breakout (突破追價), iron_condor (鐵鷹)")
+    parser.add_argument('--symbols', nargs='+', default=['SPX', 'NDX', 'RUT'],
+                        help="回測標的 (預設: SPX NDX RUT)")
     parser.add_argument('--days', type=int, default=30,
                         help="回測天數 (預設: 30 天)")
     parser.add_argument('--start-date', type=str, default=None,
