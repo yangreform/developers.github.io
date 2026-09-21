@@ -6,13 +6,16 @@ import requests
 ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 
 
-def load_line_config(env_path: str = ENV_PATH):
+def load_line_config(env_path: str = None):
     """
     每次發送時動態從 trade/.env 讀取 USER_ID 與 LINE_TOKENS。
     支援格式：
       USER_ID='...' / USER_ID="..." / LINE_USER_ID=...
       LINE_TOKENS='["token1", "token2", ...]' 或逗號分隔字串
     """
+    if env_path is None:
+        env_path = ENV_PATH
+
     user_id = ""
     line_tokens = []
 
@@ -62,12 +65,68 @@ def load_line_config(env_path: str = ENV_PATH):
     return user_id, line_tokens
 
 
-def send_push_message(message_text: str) -> bool:
+def rotate_line_tokens_in_env(env_path: str = None, current_tokens: list = None) -> list:
+    """
+    將 trade/.env 中的 LINE_TOKENS 第一個元素移到最後一位，並寫回檔案。
+    回傳輪替後的 token 列表。
+    """
+    if env_path is None:
+        env_path = ENV_PATH
+
+    if current_tokens is None:
+        _, tokens = load_line_config(env_path)
+    else:
+        tokens = list(current_tokens)
+
+    if not tokens or len(tokens) <= 1:
+        return tokens
+
+    rotated_tokens = tokens[1:] + [tokens[0]]
+    val_str = json.dumps(rotated_tokens, ensure_ascii=False)
+
+    try:
+        lines = []
+        newline_char = "\n"
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+            if lines and lines[0].endswith("\r\n"):
+                newline_char = "\r\n"
+
+        new_lines = []
+        found = False
+        for line in lines:
+            stripped = line.strip()
+            if not stripped.startswith("#") and "=" in stripped:
+                k = stripped.split("=", 1)[0].strip()
+                if k in ("LINE_TOKENS", "LINE_TOKEN"):
+                    new_lines.append(f"LINE_TOKENS='{val_str}'{newline_char}")
+                    found = True
+                    continue
+            new_lines.append(line)
+
+        if not found:
+            new_lines.append(f"LINE_TOKENS='{val_str}'{newline_char}")
+
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+
+        return rotated_tokens
+    except Exception as e:
+        print(f"[LINE Push] ⚠️ 輪替寫入 .env 失敗: {e}")
+        return rotated_tokens
+
+
+def send_push_message(message_text: str, env_path: str = None) -> bool:
     """
     Directly push message to LINE with multi-token failover.
     每次發送時動態從 trade/.env 讀取最新的 USER_ID 與 LINE_TOKENS。
+    若推播失敗，會將 trade/.env 的 LINE_TOKENS 第一個 TOKEN 移至最後一位並重寫檔案，再嘗試下一個。
     """
-    user_id, line_tokens = load_line_config()
+    if env_path is None:
+        env_path = ENV_PATH
+
+    user_id, line_tokens = load_line_config(env_path)
 
     if not user_id:
         print("[LINE Push] 錯誤: trade/.env 內缺少 USER_ID 設定。")
@@ -83,7 +142,9 @@ def send_push_message(message_text: str) -> bool:
         'messages': [{'type': 'text', 'text': str(message_text)}]
     }
 
-    for i, current_token in enumerate(line_tokens):
+    total_tokens = len(line_tokens)
+    for i in range(total_tokens):
+        current_token = line_tokens[0]
         headers = {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + current_token
@@ -94,10 +155,14 @@ def send_push_message(message_text: str) -> bool:
                 print(f"[LINE Push] Token {i + 1} 發送成功")
                 return True
             print(f"[LINE Push] Token {i + 1} 失敗，狀態碼: {response.status_code}，準備嘗試下一個。")
-            if i == len(line_tokens) - 1:
+            line_tokens = rotate_line_tokens_in_env(env_path=env_path, current_tokens=line_tokens)
+            if i == total_tokens - 1:
                 print("[LINE Push] 所有 LINE Token 皆已失效或達到額度上限。")
         except Exception as e:
             print(f"[LINE Push] Token {i + 1} 連線出錯: {e}")
+            line_tokens = rotate_line_tokens_in_env(env_path=env_path, current_tokens=line_tokens)
+            if i == total_tokens - 1:
+                print("[LINE Push] 所有 LINE Token 皆已失效或達到額度上限。")
 
     return False
 
