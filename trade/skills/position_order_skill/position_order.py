@@ -110,15 +110,19 @@ class PositionOrderSkill:
 
     def ensure_ib(self):
         """
-        確保有可用的 IBKR 連線
+        確保有可用的 IBKR 連線 (具備完整即時倉位同步能力)
         """
         if self.ib is None or not self.ib.isConnected():
-            if create_fast_ib_connection is None:
-                raise RuntimeError("無法載入 create_fast_ib_connection，請確認 ib_insync 已安裝。")
+            import random
             host = self.cfg.get("IB_HOST", "127.0.0.1")
             port = int(self.cfg.get("IB_PORT", 4001))
-            self.ib = create_fast_ib_connection(host=host, port=port)
+            client_id = random.randint(7100, 7900)
+            print(f"[INFO] [PositionSkill] 正在建立具備即時倉位同步之 IBKR 連線 ({host}:{port}, ClientId: {client_id}) ...")
+            ib = IB()
+            ib.connect(host, port, clientId=client_id, timeout=12)
+            self.ib = ib
             self.owns_ib = True
+            print(f"[SUCCESS] ✅ 成功建立 IBKR 連線與部位同步！")
         return self.ib
 
     def close(self):

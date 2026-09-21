@@ -70,7 +70,8 @@ class BarchartOpinionSkill:
     @staticmethod
     def build_opinion_url(symbol_or_url: str) -> str:
         """
-        根據輸入字串轉換為合法的 Barchart Opinion 網址
+        根據輸入字串轉換為合法的 Barchart Opinion 網址。
+        自動辨識期貨格式 (如 TAV26, ESZ26, CLV26) 與美股/ETF格式 (如 AAPL, SPY)。
         """
         text = symbol_or_url.strip()
         if text.startswith("http://") or text.startswith("https://"):
@@ -79,8 +80,12 @@ class BarchartOpinionSkill:
             return text
 
         sym = text.upper()
-        # 預設為期貨路徑 /futures/quotes/{sym}/opinion
-        return f"https://www.barchart.com/futures/quotes/{sym}/opinion"
+        # 期貨格式特徵：代碼末尾帶有月份代碼 (FGHJKMNQUVXZ) 與 1~2 位數字年份
+        is_future = bool(re.match(r'^[A-Z0-9]+?[FGHJKMNQUVXZ]\d{1,2}$', sym))
+        if is_future:
+            return f"https://www.barchart.com/futures/quotes/{sym}/opinion"
+        else:
+            return f"https://www.barchart.com/stocks/quotes/{sym}/opinion"
 
     def ensure_driver(self):
         """
