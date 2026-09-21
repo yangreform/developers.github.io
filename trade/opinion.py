@@ -45,7 +45,7 @@ from skills.opinion_skill import BarchartOpinionSkill
 from skills.position_order_skill import PositionOrderSkill
 
 
-def run_opinion_strategy(url: str = None, symbol: str = None, dry_run: bool = False) -> dict:
+def run_opinion_strategy(url: str = None, symbol: str = None, dry_run: bool = False, send_line: bool = True) -> dict:
     """
     執行 Barchart Opinion 指標萃取與 IBKR 自動調倉流程
     """
@@ -102,7 +102,8 @@ def run_opinion_strategy(url: str = None, symbol: str = None, dry_run: bool = Fa
         order_res = order_skill.adjust_position(
             symbol=parsed_symbol,
             signal=signal,
-            dry_run=dry_run
+            dry_run=dry_run,
+            send_line=send_line
         )
     finally:
         order_skill.close()
@@ -157,6 +158,16 @@ if __name__ == "__main__":
         action="store_true",
         help="模擬測試模式，僅查詢指標與部位，不實際向交易所送單"
     )
+    parser.add_argument(
+        "--no-line",
+        action="store_true",
+        help="不發送 LINE 推播通知"
+    )
 
     args = parser.parse_args()
-    run_opinion_strategy(url=args.url, symbol=args.symbol, dry_run=args.dry_run)
+    run_opinion_strategy(
+        url=args.url,
+        symbol=args.symbol,
+        dry_run=args.dry_run,
+        send_line=(not args.no_line)
+    )

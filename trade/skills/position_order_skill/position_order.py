@@ -214,7 +214,7 @@ class PositionOrderSkill:
 
         return matched_qty
 
-    def adjust_position(self, symbol: str, signal: str, dry_run: bool = False) -> dict:
+    def adjust_position(self, symbol: str, signal: str, dry_run: bool = False, send_line: bool = True) -> dict:
         """
         依據方向訊號 (BUY / SELL) 檢查與調倉至目標部位：
           • signal == "BUY"  ➔ 目標淨部位: +1
@@ -340,7 +340,7 @@ class PositionOrderSkill:
             f"📋 狀態：{order_status}"
         )
 
-        if send_push_message:
+        if send_push_message and send_line:
             print(f"[INFO] [PositionSkill] 正在發送 LINE 調倉通知...")
             try:
                 ok = send_push_message(line_msg)
@@ -348,6 +348,8 @@ class PositionOrderSkill:
                     print("[SUCCESS] ✅ LINE 推播發送成功！")
             except Exception as le:
                 print(f"[WARN] LINE 推播異常: {le}")
+        elif not send_line:
+            print(f"[INFO] [PositionSkill] --no-line 已啟用，略過 LINE 推播發送。")
 
         return {
             "status": "ok",
