@@ -429,6 +429,162 @@ class CallPutFlowSkill:
             "stats2": stats2,
         }
 
+    def analyze_and_pick_best_option(self, candidate, csv_path, max_retries=3):
+        """
+        為單一標的分析其專屬 Options Flow CSV，由主力大單金流決定出「最賺錢的 Call 或 Put」合約。
+        不進行跨標的二選一，而是讓兩檔商品各自獨立挑選出主力最堅決的方向與合約。
+        """
+        sym = candidate.get("symbol", "").upper()
+        initial_strat = candidate.get("strategy", "Buy Call")
+        init_strike = candidate.get("strike")
+        init_exp = candidate.get("exp_date")
+        init_ref = candidate.get("ref_price")
+        cand_id = candidate.get("id", 1)
+
+        print(f"\n" + "=" * 65)
+        print(f"🐋 [CallPutFlowSkill] 標的 {sym} 期權大單流向深度分析與最佳合約決選")
+        print(f"  • 初步建議: 建議 {cand_id} - {sym} [{initial_strat}] @ Strike ${init_strike} (到期: {init_exp})")
+        print(f"  • Options Flow 檔案: {os.path.basename(csv_path) if csv_path else '無'}")
+        print("=" * 65)
+
+        if not csv_path or not os.path.exists(csv_path):
+            print(f"[WARN] [CallPutFlowSkill] 找不到 {sym} 的 Options Flow CSV，維持原始建議參數。")
+            upgraded = dict(candidate)
+            upgraded["flow_upgraded"] = False
+            return upgraded
+
+        # 雙向清洗 (不限定 target_type，同時讀取 Call 與 Put)
+        flow_str, top_df, stats = self.clean_and_prepare_flow(csv_path, sym, target_type=None)
+
+        if top_df.empty or not flow_str:
+            print(f"[WARN] [CallPutFlowSkill] {sym} 無有效期權大單數據，維持原始建議參數。")
+            upgraded = dict(candidate)
+            upgraded["flow_upgraded"] = False
+            return upgraded
+
+        # 組裝 Prompt
+        prompt = f"""你是一名華爾街頂級期權造市商（Market Maker）與主力期權大單（Whale Options Flow）量化專家。
+我們已透過初步掃描推薦標的：{sym}（原初步建議: {initial_strat} @ ${init_strike}，到期日: {init_exp}）。
+現在，我們已經取得該標的在市場上的最新微觀期權大單流向（Whale Options Flow）清洗數據如下：
+
+【{sym} 籌碼統計與多空期權大單明細】
+• 多空權利金分佈: Call 權利金 ${stats.get('total_call_prem', 0):,.0f} ({stats.get('call_prem_pct', 0)}%) vs Put 權利金 ${stats.get('total_put_prem', 0):,.0f} ({stats.get('put_prem_pct', 0)}%)
+• 主力買盤主動性 (Ask%): {stats.get('buyer_aggression_pct', 0)}% (Ask側權利金: ${stats.get('ask_side_prem', 0):,.0f})
+• 代表性主力期權大單明細 (按 Premium 排序):
+{flow_str}
+
+【分析要求與目標】
+請深入解讀主力大單的真實意圖，在多空之間做決斷，找出「最賺錢、勝率最高、機構掃貨最堅決的唯一一檔期權合約（CALL 或 PUT）」：
+1. **多空方向決斷 (CALL or PUT)**：
+   - 不受限於原初步建議！若市場主力在 CALL 側展現壓倒性 Ask 買盤掃貨，則建議 BUY CALL。
+   - 若市場主力在 PUT 側展現壓倒性 Ask 買盤（或 Call 側多為賣出，Put 側避險/做空買盤堅定），則建議 BUY PUT。
+2. **挑選最賺錢之合約規格**：
+   - 履約價 (Strike) 與 Delta：尋找性價比與獲利空間最佳者（Delta 建議 0.25~0.70）。
+   - 到期日 (Exp Date / DTE)：優先選擇 7 ~ 90 天到期的波段合約，過濾當日 0DTE 噪聲。
+   - 主動性：優先選擇在 Ask / Mid 成交、成交量 Volume > Open Int（主力新開倉）之大單。
+
+【輸出格式規範】
+請嚴格依循下列 Markdown 格式輸出：
+#### 🏆 【{sym} Options Flow 最佳合約精選】
+- **推薦標的代號 (Symbol)**: {sym}
+- **建議策略 (Strategy)**: [Buy Call 或 Buy Put]
+- **期權類型 (Right)**: [Call 或 Put]
+- **履約價 (Strike)**: $[請填寫數值，例如: 105.00]
+- **到期日 (Exp Date)**: [請填寫 YYYY-MM-DD，例如: 2026-10-16]
+- **到期天數 (DTE)**: [XX] 天
+- **參考價格 / 權利金 (Reference Price)**: $[請填寫數值，例如: 4.50]
+- **Delta**: [請填寫數值，例如: 0.45]
+- **決選理由與期權大單流向深度分析**:
+  1. [多空方向選擇依據：Call/Put 權利金體量對比與買方 Ask 吃單主動性]
+  2. [所選合約之大單特徵：成交金額、Side 主動性、新開倉判定]
+  3. [履約價行使空間與波段獲利潛力評估]
+"""
+        report_text = None
+        for attempt in range(1, max_retries + 1):
+            print(f"[INFO] [CallPutFlowSkill] 正在向 Gemini 請求 {sym} 最佳期權分析 (嘗試第 {attempt}/{max_retries} 次)...")
+            try:
+                if call_gemini_for_skill:
+                    res = call_gemini_for_skill(prompt, self.api_key, min_chars=300, max_output_tokens=4096)
+                    if res and len(res.strip()) > 100:
+                        report_text = res
+                        print(f"[SUCCESS] [CallPutFlowSkill] ✅ 第 {attempt} 次成功獲得 {sym} 期權大單精選報告！")
+                        break
+            except Exception as e:
+                print(f"[WARN] [CallPutFlowSkill] 第 {attempt} 次請求異常: {e}")
+            time.sleep(2)
+
+        if not report_text:
+            print(f"[WARN] [CallPutFlowSkill] AI 解析未果，啟動規則型大單量化挑選...")
+            best_trade = top_df.iloc[0]
+            trade_type = str(best_trade.get("Type", "Call")).strip().upper()
+            is_put = "PUT" in trade_type
+            strike = float(best_trade.get("Strike", init_strike or 100))
+            exp_raw = str(best_trade.get("Exp Date", init_exp or "20261016")).replace("-", "").replace("/", "").strip()
+            ref_p = float(best_trade.get("Price~", init_ref or 1.0))
+            delta_val = float(best_trade.get("Delta", 0.5)) if "Delta" in best_trade and not pd.isna(best_trade["Delta"]) else 0.5
+
+            upgraded = {
+                "id": cand_id,
+                "symbol": sym,
+                "strategy": f"Buy {'Put' if is_put else 'Call'}",
+                "action": "BUY",
+                "right": "P" if is_put else "C",
+                "strike": strike,
+                "exp_date": exp_raw,
+                "ref_price": ref_p,
+                "delta": delta_val,
+                "type": "single_option",
+                "flow_upgraded": True,
+                "report_text": f"【量化規則選取】自 {sym} 期權大單依權利金與主動性直接選定第一大單: {trade_type} Strike ${strike} 到期 {exp_raw}",
+                "original_suggestion": candidate,
+            }
+            return upgraded
+
+        # 解析 AI 報告
+        is_put = False
+        strat_match = re.search(r'建議策略[^\n:]*[：:]\s*[\*`]*\s*([A-Za-z\s]+)', report_text)
+        if strat_match:
+            is_put = "PUT" in strat_match.group(1).upper()
+        else:
+            right_match = re.search(r'期權類型[^\n:]*[：:]\s*[\*`]*\s*([A-Za-z]+)', report_text)
+            if right_match:
+                is_put = "PUT" in right_match.group(1).upper()
+            else:
+                is_put = "PUT" in initial_strat.upper()
+
+        strike_match = re.search(r'(?:履約價|Strike)[^\n:]*[：:]\s*[\*\$]*\s*(\d+\.?\d*)', report_text, re.IGNORECASE)
+        strike = float(strike_match.group(1)) if strike_match else init_strike
+
+        exp_match = re.search(r'到期日[^\d]*(\d{4}[-/]\d{2}[-/]\d{2})', report_text)
+        exp_date = exp_match.group(1).replace("-", "").replace("/", "") if exp_match else init_exp
+
+        ref_match = re.search(r'(?:參考價格|權利金|Reference Price)[^\$\d\n]*\$?(\d+\.?\d*)', report_text, re.IGNORECASE)
+        ref_price = float(ref_match.group(1)) if ref_match else (init_ref or 1.0)
+
+        delta_match = re.search(r'Delta[^\d\n\-+]*([+-]?\d+\.?\d*)', report_text, re.IGNORECASE)
+        delta = float(delta_match.group(1)) if delta_match else None
+
+        strategy_name = f"Buy {'Put' if is_put else 'Call'}"
+        right_letter = "P" if is_put else "C"
+
+        upgraded = {
+            "id": cand_id,
+            "symbol": sym,
+            "strategy": strategy_name,
+            "action": "BUY",
+            "right": right_letter,
+            "strike": strike,
+            "exp_date": exp_date,
+            "ref_price": ref_price,
+            "delta": delta,
+            "type": "single_option",
+            "flow_upgraded": True,
+            "report_text": report_text,
+            "original_suggestion": candidate,
+        }
+        print(f"[SUCCESS] [CallPutFlowSkill] ✅ 標的 {sym} 成功鎖定最賺錢合約: {strategy_name} Strike ${strike} (到期: {exp_date}, 參考價: ${ref_price})")
+        return upgraded
+
 
 if __name__ == "__main__":
     print("=" * 60)

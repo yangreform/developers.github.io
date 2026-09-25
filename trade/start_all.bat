@@ -19,7 +19,7 @@ echo =======================================================
 :: 取得當前星期幾的數字
 for /f "tokens=2 delims==." %%a in ('wmic path win32_localtime get dayofweek /value') do set DOW=%%a
 
-if "%MM%"=="34" (
+if "%MM%"=="24" (
     if "!last_killed_hour!" neq "%HH%" (
         set "last_killed_hour=%HH%"
         echo [!] Scheduled restart time %HH%:%MM% reached.
@@ -27,6 +27,18 @@ if "%MM%"=="34" (
         wmic process where "name='py.exe' and commandline like '%%q.py%%'" call terminate >nul 2>&1
         echo [%time%] Processes terminated. Watchdog will restart them now...
         timeout /t 3 /nobreak >nul
+    )
+
+    if "%HH%"=="12" set "MATCH=1"
+    if "%HH%"=="00" set "MATCH=1"
+    if "%MATCH%"=="1" (
+	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "opinion.py" >nul
+	if !errorlevel! equ 0 (
+	    echo [OK] opinion.py is running.
+	) else (
+	    start "opinion" /max py .\opinion.py
+	)
+	set "MATCH=0"
     )
 
     if "%HH%"=="01" (
@@ -46,16 +58,15 @@ if "%MM%"=="34" (
 	    start "barchart" /max py .\barchart_auto.py
 	)
     )
- 
+
     if "%HH%"=="03" (
-	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "option.py" >nul
+	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "DTE0.py" >nul
 	if !errorlevel! equ 0 (
-	    echo [OK] option.py is running.
+	    echo [OK] DTE0.py is running.
 	) else (
-	    start "option" /max py .\option.py
+	    start "DTE0" /max py .\DTE0.py
 	)
     )
-
 
     echo =======================================================
     if %DOW% == 3 (
@@ -95,27 +106,6 @@ if "%MM%"=="34" (
     	    )
     	)
     )
-    if %DOW% == 6 (
-    	if "%HH%"=="04" (
-    	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "close_Shioaji.py" >nul
-    	    if !errorlevel! equ 0 (
-    	        echo [OK] close_Shioaji.py is running.
-    	    ) else (
-    	        start "close_Shioaji" /max py .\close_Shioaji.py
-    	    )
-    	)
-    )
-    if %DOW% == 1 (
-    	if "%HH%"=="09" (
-    	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "open_Shioaji.py" >nul
-    	    if !errorlevel! equ 0 (
-    	        echo [OK] open_Shioaji.py is running.
-    	    ) else (
-    	        start "open_Shioaji" /max py .\open_Shioaji.py
-    	    )
-    	)
-    )
-
 
 )
 

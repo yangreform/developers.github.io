@@ -4,38 +4,123 @@
   "blacklist": [],
   "history": [
     {
-      "symbol": "RSG",
-      "recommended_at": "2026-09-15 01:39:43",
-      "company_name": "Republic Services",
-      "insider_net_buy": 159592998.0,
+      "symbol": "COO",
+      "recommended_at": "2026-09-17 01:35:57",
+      "company_name": "Cooper Companies",
+      "insider_net_buy": 1330789.0,
       "selected_call": {
-        "symbol": "RSG",
-        "strike": 240.0,
-        "exp_date": "20261120",
-        "ref_price": 3.0,
+        "symbol": "COO",
+        "strike": 55.0,
+        "exp_date": "20261016",
+        "ref_price": 1.8,
         "strategy": "Buy Call",
         "right": "C",
         "action": "BUY"
       },
       "status": "recommended",
-      "notes": "Selected by Skills Pipeline on 2026-09-15 01:34:07"
+      "notes": "Selected by Skills Pipeline on 2026-09-17 01:34:06"
     },
     {
-      "symbol": "UBER",
-      "recommended_at": "2026-09-16 08:47:44",
-      "company_name": "UBER Technologies",
-      "insider_net_buy": 10005953.0,
+      "symbol": "CELH",
+      "recommended_at": "2026-09-18 01:35:58",
+      "company_name": "Celsius Holdings Inc",
+      "insider_net_buy": 1336199.0,
       "selected_call": {
-        "symbol": "UBER",
-        "strike": 75.0,
-        "exp_date": "20261120",
-        "ref_price": 4.15,
+        "symbol": "CELH",
+        "strike": 25.0,
+        "exp_date": "20270319",
+        "ref_price": 6.7,
         "strategy": "Buy Call",
         "right": "C",
         "action": "BUY"
       },
       "status": "recommended",
-      "notes": "Selected by Skills Pipeline on 2026-09-16 08:46:56"
+      "notes": "Selected by Skills Pipeline on 2026-09-18 01:34:08"
+    },
+    {
+      "symbol": "CRBG",
+      "recommended_at": "2026-09-19 01:42:20",
+      "company_name": "New Fortress Energy Inc",
+      "insider_net_buy": 34450003.0,
+      "selected_call": {
+        "symbol": "CRBG",
+        "strike": 32.0,
+        "exp_date": "20270115",
+        "ref_price": 4.17,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-09-19 01:34:05"
+    },
+    {
+      "symbol": "BORR",
+      "recommended_at": "2026-09-22 02:12:37",
+      "company_name": "Borr Drilling Ltd",
+      "insider_net_buy": 5156625.0,
+      "selected_call": {
+        "symbol": "BORR",
+        "strike": 7.5,
+        "exp_date": "20280121",
+        "ref_price": 0.7,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-09-22 02:12:06"
+    },
+    {
+      "symbol": "GME",
+      "recommended_at": "2026-09-23 01:36:39",
+      "company_name": "Gamestop Corp",
+      "insider_net_buy": 26795680.0,
+      "selected_call": {
+        "symbol": "GME",
+        "strike": 23.5,
+        "exp_date": "20261030",
+        "ref_price": 2.09,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-09-23 01:34:07"
+    },
+    {
+      "symbol": "GRAB",
+      "recommended_at": "2026-09-24 01:26:38",
+      "company_name": "Grab Holdings Ltd Cl A",
+      "insider_net_buy": 30743148.0,
+      "selected_call": {
+        "symbol": "GRAB",
+        "strike": 3.0,
+        "exp_date": "20261120",
+        "ref_price": 0.4,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-09-24 01:24:09"
+    },
+    {
+      "symbol": "LEN",
+      "recommended_at": "2026-09-25 01:26:12",
+      "company_name": "Lennar Corp",
+      "insider_net_buy": 206696760.0,
+      "selected_call": {
+        "symbol": "LEN",
+        "strike": 90.0,
+        "exp_date": "20270115",
+        "ref_price": 3.7,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-09-25 01:24:11"
     }
   ]
 }

@@ -35,11 +35,17 @@ def proxy_webhook():
             "http://127.0.0.1:5500/webhook", 
             json=request.json, 
             headers={key: value for (key, value) in request.headers if key != 'Host'},
-            timeout=15  # 設定超時，避免卡死
+            timeout=30  # 設定超時，避免卡死
         )
         # 把交易核心的回傳結果，原樣回傳給 Ngrok/發送方
         return Response(resp.content, status=resp.status_code, content_type=resp.headers.get('Content-Type'))
         
+    except requests.exceptions.Timeout:
+        print("⚠️ 警告: Webhook 轉發至交易核心 (Port 5500) 逾時！")
+        return jsonify({
+            'status': 'error', 
+            'message': '交易核心處理逾時 (Port 5500)'
+        }), 504
     except requests.exceptions.ConnectionError:
         # 🌟 完美防護機制：如果剛好遇到 main.py 正在重啟 (5500 連不上)
         print("⚠️ 警告: 收到 webhook，但交易核心 (Port 5500) 正在重啟中！")
@@ -47,6 +53,11 @@ def proxy_webhook():
             'status': 'error', 
             'message': '交易伺服器目前正在維護/重啟中，請稍後再試'
         }), 503
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            'status': 'error', 
+            'message': f'Webhook 轉發異常: {str(e)}'
+        }), 502
 
 
 # 🌟 手機監控面板轉發：/dashboard, /api/* -> 127.0.0.1:5800 (q.py 內建的 Flask)
@@ -56,25 +67,41 @@ DASHBOARD_UPSTREAM = "http://127.0.0.1:5800"
 @gateway_app.route('/dashboard', methods=['GET'])
 def proxy_dashboard():
     try:
-        resp = requests.get(f"{DASHBOARD_UPSTREAM}/dashboard", timeout=10)
+        resp = requests.get(f"{DASHBOARD_UPSTREAM}/dashboard", timeout=20)
         return Response(resp.content, status=resp.status_code, content_type=resp.headers.get('Content-Type'))
+    except requests.exceptions.Timeout:
+        return jsonify({'status': 'error', 'message': '監控面板 (Port 5800) 回應逾時'}), 504
     except requests.exceptions.ConnectionError:
         return jsonify({'status': 'error', 'message': '監控面板 (Port 5800) 尚未啟動或正在重啟中'}), 503
+    except requests.exceptions.RequestException as e:
+        return jsonify({'status': 'error', 'message': f'存取儀表板異常: {str(e)}'}), 502
 
 
 @gateway_app.route('/api/<path:subpath>', methods=['GET', 'POST'])
 def proxy_dashboard_api(subpath):
+    # 腳本執行 (例如 /api/tmf/run_script, /api/tmf/run_open_shioaji) 需耗時 60~120 秒，
+    # 給予 180 秒超時保護；一般查詢設定 30 秒。
+    if 'run_' in subpath or subpath.startswith('tmf/'):
+        api_timeout = 180
+    else:
+        api_timeout = 30
+
     try:
         upstream_url = f"{DASHBOARD_UPSTREAM}/api/{subpath}"
         if request.query_string:
             upstream_url += "?" + request.query_string.decode("utf-8")
         if request.method == 'POST':
-            resp = requests.post(upstream_url, json=request.get_json(silent=True), timeout=10)
+            resp = requests.post(upstream_url, json=request.get_json(silent=True), timeout=api_timeout)
         else:
-            resp = requests.get(upstream_url, timeout=10)
+            resp = requests.get(upstream_url, timeout=api_timeout)
         return Response(resp.content, status=resp.status_code, content_type=resp.headers.get('Content-Type'))
+    except requests.exceptions.Timeout:
+        print(f"⚠️ 警告: 轉發至監控面板 API (/api/{subpath}) 逾時 (超過 {api_timeout} 秒)！")
+        return jsonify({'status': 'error', 'message': f'後端腳本執行逾時 (超過 {api_timeout} 秒)，請檢查伺服器狀態'}), 504
     except requests.exceptions.ConnectionError:
         return jsonify({'status': 'error', 'message': '監控面板 (Port 5800) 尚未啟動或正在重啟中'}), 503
+    except requests.exceptions.RequestException as e:
+        return jsonify({'status': 'error', 'message': f'網關轉發異常: {str(e)}'}), 502
 
 # ── 健康檢查 & 根路由（避免 /  /app 直接打出 404）──────────────
 @gateway_app.route('/', methods=['GET'])

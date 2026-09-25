@@ -59,6 +59,15 @@ try:
 except ImportError:
     send_push_message = None
 
+RECENT_IB_ERRORS = []
+
+
+def on_ib_error(reqId, errorCode, errorString, contract):
+    RECENT_IB_ERRORS.append((reqId, errorCode, errorString, contract))
+    if errorCode in (110, 201, 103, 321, 200):
+        print(f"[IBKR 委託警示] ReqId: {reqId} | 代碼: {errorCode} | 訊息: {errorString}")
+
+
 
 # ==============================================================================
 # 1. 讀取 .env 設定 (IBKR 連線與帳號)
@@ -99,6 +108,12 @@ def load_env_settings(env_path=ENV_FILE):
 # 2. 解析 latest_ai_analysis.txt 報告中的三大建議
 # ==============================================================================
 def find_latest_report_file():
+    # 優先由 reports/ 目錄取得最新時間戳報告
+    reports = glob.glob(os.path.join(REPORTS_DIR, "*ai_analysis_*.txt"))
+    if reports:
+        reports.sort(key=os.path.getmtime, reverse=True)
+        return reports[0]
+
     candidates = [
         os.path.join(BASE_DIR, "latest_ai_analysis.txt"),
         os.path.join(BARCHART_DIR, "latest_ai_analysis.txt"),
@@ -107,12 +122,6 @@ def find_latest_report_file():
     for p in candidates:
         if os.path.exists(p):
             return p
-
-    # Fallback to newest in reports/
-    reports = glob.glob(os.path.join(REPORTS_DIR, "ai_analysis_*.txt"))
-    if reports:
-        reports.sort(key=os.path.getmtime, reverse=True)
-        return reports[0]
     return None
 
 
@@ -384,6 +393,7 @@ def create_fast_ib_connection(host="127.0.0.1", port=4001, client_id=None):
 
     print(f"[INFO] 正在連線至 IBKR TWS/Gateway ({host}:{port}, ClientId: {client_id}) ...")
     ib.connect(host, port, clientId=client_id, timeout=12)
+    ib.errorEvent += on_ib_error
     print(f"[SUCCESS] ✅ 成功建立 IBKR 連線！")
     return ib
 
@@ -403,9 +413,9 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
     s_id = item["id"]
     stype = item["type"]
     symbol = item["symbol"]
-    exp_date = item["exp_date"]
-    action = item["action"]
-    ref_price = item.get("ref_price") or 1.0
+    exp_date = item.get("exp_date")
+    action = item.get("action", "SELL" if stype == "bull_put" else "BUY")
+    ref_price = item.get("ref_price") or item.get("ref_credit") or 1.0
 
     print(f"\n" + "-" * 60)
     print(f"👉 【處理建議 {s_id}】{symbol} - {item['strategy']} (到期日: {exp_date})")
@@ -481,7 +491,7 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
         print(f"     • 🎯 Profit Taker (停利單): ${take_profit_price:.2f}")
         print(f"     • 🛑 Stop Loss    (停損單): ${stop_loss_price:.2f}")
 
-        # 建立 Bracket Order
+        # 建立 Bracket Order (母單為市價 Adaptive Patient，附屬單為停利與停損)
         bracket = ib.bracketOrder(
             action=action,
             quantity=1,
@@ -490,7 +500,9 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
             stopLossPrice=stop_loss_price,
         )
 
-        # 母單套用 Adaptive Patient 演算法
+        # 母單設定為市價 Adaptive Patient 演算法
+        bracket.parent.orderType = "MKT"
+        bracket.parent.lmtPrice = 0
         bracket.parent.algoStrategy = "Adaptive"
         bracket.parent.algoParams = [TagValue("adaptivePriority", "Patient")]
         bracket.parent.tif = "DAY"
@@ -505,14 +517,77 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
         order_list = [bracket.parent, bracket.takeProfit, bracket.stopLoss]
         desc = (
             f"{item['strategy']} {contract.localSymbol}\n"
-            f"     委託: {action} 1口 @ 限價 ${current_price:.2f} (Adaptive Patient)\n"
+            f"     委託: {action} 1口 @ 市價 (Adaptive Patient, 參考現價 ${current_price:.2f})\n"
             f"     停利: ${take_profit_price:.2f} | 停損: ${stop_loss_price:.2f}"
         )
 
         if not dry_run:
-            for o in order_list:
-                ib.placeOrder(contract, o)
-            ib.sleep(1)
+            RECENT_IB_ERRORS.clear()
+            parent_trade = ib.placeOrder(contract, bracket.parent)
+            ib.placeOrder(contract, bracket.takeProfit)
+            ib.placeOrder(contract, bracket.stopLoss)
+            ib.sleep(1.5)
+
+            # 檢查是否觸發 Error 201 兩側掛單衝突 (Cannot have open orders on both sides)
+            is_error_201 = False
+            error_detail_201 = ""
+            for e in RECENT_IB_ERRORS:
+                if e[1] == 201 and ("both sides" in str(e[2]) or "Cannot have open orders" in str(e[2])):
+                    is_error_201 = True
+                    error_detail_201 = str(e[2])
+                    break
+            if not is_error_201 and hasattr(parent_trade, 'log'):
+                for log_entry in getattr(parent_trade, 'log', []):
+                    if getattr(log_entry, 'errorCode', 0) == 201 and ("both sides" in str(getattr(log_entry, 'message', '')) or "Cannot have open orders" in str(getattr(log_entry, 'message', ''))):
+                        is_error_201 = True
+                        error_detail_201 = str(getattr(log_entry, 'message', ''))
+                        break
+
+            if is_error_201:
+                print(f"\n⚠️ [警示] 偵測到 IBKR Error 201: 同一期權合約兩側掛單衝突 (現有平倉單阻礙加碼委託)！")
+                print(f"   訊息: {error_detail_201}")
+                print(f"🔄 立即調用 ScaleInOrderSkill 啟動 4 步驟加碼重組機制...")
+                try:
+                    from skills.scale_in_order_skill import ScaleInOrderSkill
+                    scale_skill = ScaleInOrderSkill(ib)
+                    scale_res = scale_skill.execute(
+                        contract=contract,
+                        symbol=symbol,
+                        action=action,
+                        quantity=1,
+                        credit=current_price,
+                        take_profit_price=take_profit_price,
+                        stop_loss_price=stop_loss_price,
+                        target_account=target_account,
+                        dry_run=dry_run,
+                        item=item
+                    )
+                    if scale_res and scale_res.get("status") == "ok":
+                        return {
+                            "status": "ok",
+                            "symbol": symbol,
+                            "desc": desc + f" (經 ScaleInSkill 成功加碼重組為 {scale_res.get('total_qty', 2):g} 口 OCA)",
+                            "strategy": item["strategy"],
+                            "entry_price": current_price,
+                            "take_profit": take_profit_price,
+                            "stop_loss": stop_loss_price,
+                            "order_status": "Filled",
+                            "scale_in_handled": True,
+                            "total_qty": scale_res.get("total_qty"),
+                            "id": item.get("id"),
+                        }
+                    else:
+                        return {
+                            "status": "error",
+                            "symbol": symbol,
+                            "desc": desc + f" (ScaleInSkill 加碼重組失敗: {(scale_res or {}).get('message', '未知原因')})",
+                            "strategy": item["strategy"],
+                            "order_status": "Failed",
+                            "id": item.get("id"),
+                        }
+                except Exception as se:
+                    print(f"❌ [ScaleInOrderSkill 異常] {se}")
+
             status = bracket.parent.orderStatus.status if hasattr(bracket.parent, 'orderStatus') else "Submitted"
             print(f"  -> ✅ [已送出委託至 IBKR] 母單狀態: {status}")
         else:
@@ -528,6 +603,7 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
             "take_profit": take_profit_price,
             "stop_loss": stop_loss_price,
             "order_status": status,
+            "id": item.get("id"),
         }
 
     elif stype == "bull_put":
@@ -586,7 +662,7 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
         print(f"     • 🎯 Profit Taker (停利單): 買回平倉價 ${take_profit_price:.2f} (收斂 50%)")
         print(f"     • 🛑 Stop Loss    (停損單): 買回止損價 ${stop_loss_price:.2f} (擴大 200%)")
 
-        # 建立組合單母單 + 附屬訂單
+        # 建立組合單母單 + 附屬訂單 (母單為市價 Adaptive Patient)
         bracket = ib.bracketOrder(
             action="SELL",
             quantity=1,
@@ -594,6 +670,8 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
             takeProfitPrice=take_profit_price,
             stopLossPrice=stop_loss_price,
         )
+        bracket.parent.orderType = "MKT"
+        bracket.parent.lmtPrice = 0
         bracket.parent.algoStrategy = "Adaptive"
         bracket.parent.algoParams = [TagValue("adaptivePriority", "Patient")]
         bracket.parent.tif = "DAY"
@@ -607,18 +685,77 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
 
         desc = (
             f"Bull Put Spread {symbol} P{short_put} / P{long_put} ({exp_date})\n"
-            f"     委託: SELL 1手組合單 @ 淨收權利金 ${credit:.2f} (Adaptive Patient)\n"
+            f"     委託: SELL 1手組合單 @ 市價 (Adaptive Patient, 參考淨收權利金 ${credit:.2f})\n"
             f"     停利: 買回價 ${take_profit_price:.2f} | 停損: 買回價 ${stop_loss_price:.2f}"
         )
 
         if not dry_run:
-            # 依序送出母單與附屬單
-            for o in [bracket.parent, bracket.takeProfit, bracket.stopLoss]:
+            RECENT_IB_ERRORS.clear()
+            parent_trade = ib.placeOrder(combo, bracket.parent)
+            ib.placeOrder(combo, bracket.takeProfit)
+            ib.placeOrder(combo, bracket.stopLoss)
+            ib.sleep(1.5)
+
+            # 檢查是否觸發 Error 201 兩側掛單衝突 (Cannot have open orders on both sides)
+            is_error_201 = False
+            error_detail_201 = ""
+            for e in RECENT_IB_ERRORS:
+                if e[1] == 201 and ("both sides" in str(e[2]) or "Cannot have open orders" in str(e[2])):
+                    is_error_201 = True
+                    error_detail_201 = str(e[2])
+                    break
+            if not is_error_201 and hasattr(parent_trade, 'log'):
+                for log_entry in getattr(parent_trade, 'log', []):
+                    if getattr(log_entry, 'errorCode', 0) == 201 and ("both sides" in str(getattr(log_entry, 'message', '')) or "Cannot have open orders" in str(getattr(log_entry, 'message', ''))):
+                        is_error_201 = True
+                        error_detail_201 = str(getattr(log_entry, 'message', ''))
+                        break
+
+            if is_error_201:
+                print(f"\n⚠️ [警示] 偵測到 IBKR Error 201: 同一期權合約兩側掛單衝突 (現有平倉單阻礙加碼委託)！")
+                print(f"   訊息: {error_detail_201}")
+                print(f"🔄 立即調用 ScaleInOrderSkill 啟動 4 步驟加碼重組機制...")
                 try:
-                    ib.placeOrder(combo, o)
-                except Exception as oe:
-                    print(f"  -> [提示] 附屬單 {o.orderType} 委託反饋: {oe}")
-            ib.sleep(1)
+                    from skills.scale_in_order_skill import ScaleInOrderSkill
+                    scale_skill = ScaleInOrderSkill(ib)
+                    scale_res = scale_skill.execute(
+                        contract=combo,
+                        symbol=symbol,
+                        action="SELL",
+                        quantity=1,
+                        credit=credit,
+                        take_profit_price=take_profit_price,
+                        stop_loss_price=stop_loss_price,
+                        target_account=target_account,
+                        dry_run=dry_run,
+                        item=item
+                    )
+                    if scale_res and scale_res.get("status") == "ok":
+                        return {
+                            "status": "ok",
+                            "symbol": symbol,
+                            "desc": desc + f" (經 ScaleInSkill 成功加碼重組為 {scale_res.get('total_qty', 2):g} 口 OCA)",
+                            "strategy": "Bull Put Spread",
+                            "entry_price": credit,
+                            "take_profit": take_profit_price,
+                            "stop_loss": stop_loss_price,
+                            "order_status": "Filled",
+                            "scale_in_handled": True,
+                            "total_qty": scale_res.get("total_qty"),
+                            "id": item.get("id", 3),
+                        }
+                    else:
+                        return {
+                            "status": "error",
+                            "symbol": symbol,
+                            "desc": desc + f" (ScaleInSkill 加碼重組失敗: {(scale_res or {}).get('message', '未知原因')})",
+                            "strategy": "Bull Put Spread",
+                            "order_status": "Failed",
+                            "id": item.get("id", 3),
+                        }
+                except Exception as se:
+                    print(f"❌ [ScaleInOrderSkill 異常] {se}")
+
             status = bracket.parent.orderStatus.status if hasattr(bracket.parent, 'orderStatus') else "Submitted"
             print(f"  -> ✅ [已送出委託至 IBKR] 母單狀態: {status}")
         else:
@@ -634,6 +771,7 @@ def process_and_place_suggestion(ib, item, target_account=None, dry_run=False):
             "take_profit": take_profit_price,
             "stop_loss": stop_loss_price,
             "order_status": status,
+            "id": item.get("id", 3),
         }
 
 
@@ -672,7 +810,7 @@ def place_barchart_orders(report_path=None, dry_run=False, selected_suggestions=
         if s.get("type") == "bull_put":
             print(f"  • 建議 {s.get('id', 3)}: {s['symbol']} {s['strategy']} (賣出 P{s['short_put_strike']} / 買入 P{s['long_put_strike']}, 到期: {s['exp_date']})")
         else:
-            flow_tag = " [🌟 Options Flow 決選最佳]" if s.get("flow_winner") else ""
+            flow_tag = " [🌟 Options Flow 精選]" if (s.get("flow_winner") or s.get("flow_upgraded")) else ""
             print(f"  • 建議 {s.get('id', 1)}: {s['symbol']} {s['strategy']}{flow_tag} (履約價: ${s['strike']}, 到期: {s['exp_date']})")
 
     # 讀取連線參數
@@ -687,7 +825,7 @@ def place_barchart_orders(report_path=None, dry_run=False, selected_suggestions=
         ib = create_fast_ib_connection(host=host, port=port)
         for s in suggestions:
             res = process_and_place_suggestion(ib, s, target_account=target_account, dry_run=dry_run)
-            if s.get("flow_winner"):
+            if s.get("flow_winner") or s.get("flow_upgraded"):
                 res["flow_winner"] = True
             results.append(res)
 
@@ -711,12 +849,13 @@ def place_barchart_orders(report_path=None, dry_run=False, selected_suggestions=
     ]
 
     for i, r in enumerate(success_items, 1):
-        if r.get("flow_winner"):
-            line_lines.append(f"📌 決選最佳 Put/Call (由 Options Flow 評選)：{r['desc']}")
+        cand_id = r.get("id", i)
+        if r.get("flow_winner") or r.get("flow_upgraded"):
+            line_lines.append(f"📌 建議 {cand_id} (由 Options Flow 精選最佳)：{r['desc']}")
         elif r.get("strategy") == "Bull Put Spread":
             line_lines.append(f"📌 建議 3 (Bull Put 垂直價差)：{r['desc']}")
         else:
-            line_lines.append(f"📌 建議 {i}：{r['desc']}")
+            line_lines.append(f"📌 建議 {cand_id}：{r['desc']}")
 
     line_msg = "\n".join(line_lines)
 

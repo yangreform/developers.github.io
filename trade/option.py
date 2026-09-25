@@ -434,13 +434,15 @@ def resolve_group_symbols(group_name, symbols):
 # ==============================================================================
 # 4. 獲取 Butterfly 蝶式四腿合約與當前市價
 # ==============================================================================
-def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, max_dte=DEFAULT_MAX_DTE, wing_width=None, bid_up=None, iron='long'):
+def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, max_dte=DEFAULT_MAX_DTE, wing_width=None, wing_width_call=None, wing_width_put=None, bid_up=None, iron='long'):
     """
-    根據商品設定的 DTE 範圍篩選到期日（支援 0DTE 當天到期末日期權），並以市價最近之 ATM 履約價建立 Butterfly 蝶式：
+    根據商品設定的 DTE 範圍篩選到期日（支援 0DTE 當天到期末日期權），並以市價最近之 ATM 履約價建立期權組合：
+    - 若 wing_width_call == 0 且 wing_width_put == 0: 僅建立中心 ATM 雙腿 (Call + Put)，無價外上下翼 (Straddle 結構)
+    - 若 wing_width_call > 0 或 wing_width_put > 0: 建立 Butterfly 蝶式四腿 (中心 ATM + 價外上下翼)
     - iron='long': 中心 ATM 買入 (BUY Call & Put)，價外上下翼賣出 (SELL Call & Put)
     - iron='short': 中心 ATM 賣出 (SELL Call & Put)，價外上下翼買入 (BUY Call & Put)
-    - 上翼（Upper Wing）：Call 履約價為 中心 + wing_width
-    - 下翼（Lower Wing）：Put  履約價為 中心 - wing_width
+    - 上翼（Upper Wing）：Call 履約價為 ATM + wing_width_call
+    - 下翼（Lower Wing）：Put  履約價為 ATM - wing_width_put
     - 限價上限（bid_up）：鎖定委託限價之最高上限 min(即時bid, bid_up)
     """
     iron = str(iron).strip().lower() if iron else 'long'
@@ -569,10 +571,33 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
     under_desc = getattr(actual_underlying, 'localSymbol', actual_underlying.symbol)
     print(f"-> {underlying.symbol} 期權真實掛鉤標的: {under_desc} (當前標的市價: {ref_price:.2f})")
 
-    # 決定動態翼寬 WING_WIDTH (優先採用群組個別設定，無設定則退回預設對應表)
-    if wing_width is None or float(wing_width) <= 0:
-        wing_width = WING_WIDTH_MAP.get(underlying.symbol, DEFAULT_WING_WIDTH)
-    wing_width = float(wing_width)
+    # 決定動態翼寬 wing_width_call 與 wing_width_put (若皆為 0 則僅建立 ATM 雙腿 two legs，不建立價外雙翼)
+    if wing_width_call is None and wing_width is not None:
+        wing_width_call = wing_width
+    if wing_width_put is None and wing_width is not None:
+        wing_width_put = wing_width
+
+    def_wing = float(WING_WIDTH_MAP.get(underlying.symbol, DEFAULT_WING_WIDTH))
+    if wing_width_call is None:
+        wing_width_call = def_wing
+    else:
+        try:
+            wing_width_call = float(wing_width_call)
+        except (ValueError, TypeError):
+            wing_width_call = def_wing
+
+    if wing_width_put is None:
+        wing_width_put = def_wing
+    else:
+        try:
+            wing_width_put = float(wing_width_put)
+        except (ValueError, TypeError):
+            wing_width_put = def_wing
+
+    is_atm_only = (wing_width_call == 0 and wing_width_put == 0)
+
+    if is_atm_only:
+        strategy_name = "Long Straddle (跨式買方 / ATM 雙腿)" if is_long else "Short Straddle (跨式賣方 / ATM 雙腿)"
 
     # 決定限價上限 BID_UP (優先採用群組設定，若無設定則退回預設對應表)
     if bid_up is None or float(bid_up) <= 0:
@@ -585,67 +610,107 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
     # 1. 鎖定中心 ATM 履約價
     center_strike = min(valid_strikes, key=lambda s: abs(s - ref_price))
 
-    # 2. 鎖定上翼 (Upper Wing / 賣出 Call，履約價為 中心 + wing_width)
-    target_upper = center_strike + wing_width
-    upper_candidates = [s for s in valid_strikes if s > center_strike]
-    if not upper_candidates:
-        print(f"[錯誤] 找不到高於中心履約價 ({center_strike}) 的上翼履約價。")
-        return None
-    call_wing_strike = min(upper_candidates, key=lambda s: abs(s - target_upper))
+    if is_atm_only:
+        call_wing_strike = None
+        put_wing_strike = None
+        print(
+            f"-> 策略結構 ({strategy_name}) 履約價確認:\n"
+            f"   ~ 策略方向 (iron): {iron.upper()} (ATM 雙腿: {center_action_desc})\n"
+            f"   ~ 翼寬: wing_width_call=0, wing_width_put=0 (僅建立 ATM 雙腿，不建立價外雙翼)\n"
+            f"   ~ ATM 履約價: {center_strike} (市價: {ref_price:.2f}) [{center_action_desc} Call + {center_action_desc} Put]\n"
+            f"   ~ 到期日: {closest_expiry} ({dte_desc})"
+        )
 
-    # 3. 鎖定下翼 (Lower Wing / 賣出 Put，履約價為 中心 - wing_width)
-    target_lower = center_strike - wing_width
-    lower_candidates = [s for s in valid_strikes if s < center_strike]
-    if not lower_candidates:
-        print(f"[錯誤] 找不到低於中心履約價 ({center_strike}) 的下翼履約價。")
-        return None
-    put_wing_strike = min(lower_candidates, key=lambda s: abs(s - target_lower))
+        c_center = exact_contract_map.get((center_strike, 'C'))
+        p_center = exact_contract_map.get((center_strike, 'P'))
+        c_wing = None
+        p_wing = None
 
-    actual_upper_width = call_wing_strike - center_strike
-    actual_lower_width = center_strike - put_wing_strike
+        if not all([c_center, p_center]):
+            if is_idx:
+                c_center = c_center or Option(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+                p_center = p_center or Option(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+            else:
+                c_center = c_center or FuturesOption(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
+                p_center = p_center or FuturesOption(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, tradingClass=chosen_opt_class)
 
-    print(
-        f"-> 蝶式結構 ({strategy_name}) 履約價確認:\n"
-        f"   ~ 策略方向 (iron): {iron.upper()} (中心 ATM: {center_action_desc} / 價外上下翼: {wing_action_desc})\n"
-        f"   ~ 中心 (Center Body) ATM: {center_strike} (市價: {ref_price:.2f}) [{center_action_desc} Call + {center_action_desc} Put]\n"
-        f"   ~ 上翼 (Call Wing) {wing_action_desc} Call: {call_wing_strike} (設定翼寬: {wing_width}, 實際間距: {actual_upper_width})\n"
-        f"   ~ 下翼 (Put Wing)  {wing_action_desc} Put : {put_wing_strike} (設定翼寬: {wing_width}, 實際間距: {actual_lower_width})\n"
-        f"   ~ 到期日: {closest_expiry} ({dte_desc})"
-    )
+        qualified = ib.qualifyContracts(c_center, p_center)
+        if len(qualified) < 2:
+            print(f"[錯誤] 合約驗證失敗，無法完整取得 ATM 雙腿合約 (成功數: {len(qualified)}/2)")
+            return None
 
-    # 建立 4 條腿合約物件並驗證
-    c_center = exact_contract_map.get((center_strike, 'C'))
-    p_center = exact_contract_map.get((center_strike, 'P'))
-    c_wing = exact_contract_map.get((call_wing_strike, 'C'))
-    p_wing = exact_contract_map.get((put_wing_strike, 'P'))
+        # 取得報價與 Greeks
+        print(f"-> 正在取得 ATM 雙腿期權合約即時報價與 Greeks...")
+        tickers = ib.reqTickers(c_center, p_center)
+        ib.sleep(3)
 
-    if not all([c_center, p_center, c_wing, p_wing]):
-        if is_idx:
-            c_center = c_center or Option(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
-            p_center = p_center or Option(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
-            c_wing = c_wing or Option(underlying.symbol, closest_expiry, call_wing_strike, 'C', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
-            p_wing = p_wing or Option(underlying.symbol, closest_expiry, put_wing_strike, 'P', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
-        else:
-            c_center = c_center or FuturesOption(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
-            p_center = p_center or FuturesOption(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, tradingClass=chosen_opt_class)
-            c_wing = c_wing or FuturesOption(underlying.symbol, closest_expiry, call_wing_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
-            p_wing = p_wing or FuturesOption(underlying.symbol, closest_expiry, put_wing_strike, 'P', opt_exchange, tradingClass=chosen_opt_class)
+        t_map = {t.contract.conId: t for t in tickers}
+        tc_center = t_map.get(c_center.conId)
+        tp_center = t_map.get(p_center.conId)
+        tc_wing = None
+        tp_wing = None
+    else:
+        # 2. 鎖定價外上翼 Call (履約價為 ATM + wing_width_call)
+        target_upper = center_strike + wing_width_call
+        upper_candidates = [s for s in valid_strikes if s > center_strike]
+        if not upper_candidates:
+            print(f"[錯誤] 找不到高於中心履約價 ({center_strike}) 的上翼履約價。")
+            return None
+        call_wing_strike = min(upper_candidates, key=lambda s: abs(s - target_upper))
 
-    qualified = ib.qualifyContracts(c_center, p_center, c_wing, p_wing)
-    if len(qualified) < 4:
-        print(f"[錯誤] 合約驗證失敗，無法完整取得 4 腿合約 (成功數: {len(qualified)}/4)")
-        return None
+        # 3. 鎖定價外下翼 Put (履約價為 ATM - wing_width_put)
+        target_lower = center_strike - wing_width_put
+        lower_candidates = [s for s in valid_strikes if s < center_strike]
+        if not lower_candidates:
+            print(f"[錯誤] 找不到低於中心履約價 ({center_strike}) 的下翼履約價。")
+            return None
+        put_wing_strike = min(lower_candidates, key=lambda s: abs(s - target_lower))
 
-    # 取得報價與 Greeks
-    print(f"-> 正在取得 4 腿期權合約即時報價與 Greeks...")
-    tickers = ib.reqTickers(c_center, p_center, c_wing, p_wing)
-    ib.sleep(3)
+        actual_upper_width = call_wing_strike - center_strike
+        actual_lower_width = center_strike - put_wing_strike
 
-    t_map = {t.contract.conId: t for t in tickers}
-    tc_center = t_map.get(c_center.conId)
-    tp_center = t_map.get(p_center.conId)
-    tc_wing = t_map.get(c_wing.conId)
-    tp_wing = t_map.get(p_wing.conId)
+        print(
+            f"-> 蝶式結構 ({strategy_name}) 履約價確認:\n"
+            f"   ~ 策略方向 (iron): {iron.upper()} (中心 ATM: {center_action_desc} / 價外上下翼: {wing_action_desc})\n"
+            f"   ~ 中心 (Center Body) ATM: {center_strike} (市價: {ref_price:.2f}) [{center_action_desc} Call + {center_action_desc} Put]\n"
+            f"   ~ 上翼 (Call Wing) {wing_action_desc} Call: {call_wing_strike} (設定 wing_width_call: {wing_width_call}, 實際間距: {actual_upper_width})\n"
+            f"   ~ 下翼 (Put Wing)  {wing_action_desc} Put : {put_wing_strike} (設定 wing_width_put: {wing_width_put}, 實際間距: {actual_lower_width})\n"
+            f"   ~ 到期日: {closest_expiry} ({dte_desc})"
+        )
+
+        # 建立 4 條腿合約物件並驗證
+        c_center = exact_contract_map.get((center_strike, 'C'))
+        p_center = exact_contract_map.get((center_strike, 'P'))
+        c_wing = exact_contract_map.get((call_wing_strike, 'C'))
+        p_wing = exact_contract_map.get((put_wing_strike, 'P'))
+
+        if not all([c_center, p_center, c_wing, p_wing]):
+            if is_idx:
+                c_center = c_center or Option(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+                p_center = p_center or Option(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+                c_wing = c_wing or Option(underlying.symbol, closest_expiry, call_wing_strike, 'C', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+                p_wing = p_wing or Option(underlying.symbol, closest_expiry, put_wing_strike, 'P', opt_exchange, currency='USD', tradingClass=chosen_opt_class)
+            else:
+                c_center = c_center or FuturesOption(underlying.symbol, closest_expiry, center_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
+                p_center = p_center or FuturesOption(underlying.symbol, closest_expiry, center_strike, 'P', opt_exchange, tradingClass=chosen_opt_class)
+                c_wing = c_wing or FuturesOption(underlying.symbol, closest_expiry, call_wing_strike, 'C', opt_exchange, tradingClass=chosen_opt_class)
+                p_wing = p_wing or FuturesOption(underlying.symbol, closest_expiry, put_wing_strike, 'P', opt_exchange, tradingClass=chosen_opt_class)
+
+        qualified = ib.qualifyContracts(c_center, p_center, c_wing, p_wing)
+        if len(qualified) < 4:
+            print(f"[錯誤] 合約驗證失敗，無法完整取得 4 腿合約 (成功數: {len(qualified)}/4)")
+            return None
+
+        # 取得報價與 Greeks
+        print(f"-> 正在取得 4 腿期權合約即時報價與 Greeks...")
+        tickers = ib.reqTickers(c_center, p_center, c_wing, p_wing)
+        ib.sleep(3)
+
+        t_map = {t.contract.conId: t for t in tickers}
+        tc_center = t_map.get(c_center.conId)
+        tp_center = t_map.get(p_center.conId)
+        tc_wing = t_map.get(c_wing.conId)
+        tp_wing = t_map.get(p_wing.conId)
 
     def format_leg_quote(label, strike, right, action_text, t):
         if not t:
@@ -677,24 +742,36 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
         g_d = f" Δ{t.modelGreeks.delta:+.2f}" if (t.modelGreeks and t.modelGreeks.delta is not None and not math.isnan(t.modelGreeks.delta)) else ""
         return f"{label} [{action_text} {right}{strike}]: B:{b} / A:{a}{g_d}"
 
-    legs_quote_str = (
-        f"{format_leg_quote('中心 Call', center_strike, 'C', center_action_desc, tc_center)}\n"
-        f"{format_leg_quote('中心 Put ', center_strike, 'P', center_action_desc, tp_center)}\n"
-        f"{format_leg_quote('上翼 Call', call_wing_strike, 'C', wing_action_desc, tc_wing)}\n"
-        f"{format_leg_quote('下翼 Put ', put_wing_strike, 'P', wing_action_desc, tp_wing)}"
-    )
-
-    line_legs_quote_str = (
-        f"  • {format_leg_compact('中心 Call', center_strike, 'C', center_action_desc, tc_center)}\n"
-        f"  • {format_leg_compact('中心 Put ', center_strike, 'P', center_action_desc, tp_center)}\n"
-        f"  • {format_leg_compact('上翼 Call', call_wing_strike, 'C', wing_action_desc, tc_wing)}\n"
-        f"  • {format_leg_compact('下翼 Put ', put_wing_strike, 'P', wing_action_desc, tp_wing)}"
-    )
-
-    print(
-        f"-> 4 腿期權合約即時報價與 Greeks 詳情:\n"
-        f"{legs_quote_str}"
-    )
+    if is_atm_only:
+        legs_quote_str = (
+            f"{format_leg_quote('ATM Call', center_strike, 'C', center_action_desc, tc_center)}\n"
+            f"{format_leg_quote('ATM Put ', center_strike, 'P', center_action_desc, tp_center)}"
+        )
+        line_legs_quote_str = (
+            f"  • {format_leg_compact('ATM Call', center_strike, 'C', center_action_desc, tc_center)}\n"
+            f"  • {format_leg_compact('ATM Put ', center_strike, 'P', center_action_desc, tp_center)}"
+        )
+        print(
+            f"-> ATM 雙腿期權合約即時報價與 Greeks 詳情:\n"
+            f"{legs_quote_str}"
+        )
+    else:
+        legs_quote_str = (
+            f"{format_leg_quote('中心 Call', center_strike, 'C', center_action_desc, tc_center)}\n"
+            f"{format_leg_quote('中心 Put ', center_strike, 'P', center_action_desc, tp_center)}\n"
+            f"{format_leg_quote('上翼 Call', call_wing_strike, 'C', wing_action_desc, tc_wing)}\n"
+            f"{format_leg_quote('下翼 Put ', put_wing_strike, 'P', wing_action_desc, tp_wing)}"
+        )
+        line_legs_quote_str = (
+            f"  • {format_leg_compact('中心 Call', center_strike, 'C', center_action_desc, tc_center)}\n"
+            f"  • {format_leg_compact('中心 Put ', center_strike, 'P', center_action_desc, tp_center)}\n"
+            f"  • {format_leg_compact('上翼 Call', call_wing_strike, 'C', wing_action_desc, tc_wing)}\n"
+            f"  • {format_leg_compact('下翼 Put ', put_wing_strike, 'P', wing_action_desc, tp_wing)}"
+        )
+        print(
+            f"-> 4 腿期權合約即時報價與 Greeks 詳情:\n"
+            f"{legs_quote_str}"
+        )
 
     def get_greek(t, name):
         if t and t.modelGreeks and getattr(t.modelGreeks, name, None) is not None:
@@ -702,16 +779,24 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
         return 0.0
 
     # 組合總淨 Delta 與 Theta (依 long 或 short 方向計算淨部位暴露)
-    if is_long:
-        total_delta = (+ get_greek(tc_center, 'delta') + get_greek(tp_center, 'delta')
-                       - get_greek(tc_wing, 'delta') - get_greek(tp_wing, 'delta'))
-        total_theta = (+ get_greek(tc_center, 'theta') + get_greek(tp_center, 'theta')
-                       - get_greek(tc_wing, 'theta') - get_greek(tp_wing, 'theta'))
+    if is_atm_only:
+        if is_long:
+            total_delta = + get_greek(tc_center, 'delta') + get_greek(tp_center, 'delta')
+            total_theta = + get_greek(tc_center, 'theta') + get_greek(tp_center, 'theta')
+        else:
+            total_delta = - get_greek(tc_center, 'delta') - get_greek(tp_center, 'delta')
+            total_theta = - get_greek(tc_center, 'theta') - get_greek(tp_center, 'theta')
     else:
-        total_delta = (- get_greek(tc_center, 'delta') - get_greek(tp_center, 'delta')
-                       + get_greek(tc_wing, 'delta') + get_greek(tp_wing, 'delta'))
-        total_theta = (- get_greek(tc_center, 'theta') - get_greek(tp_center, 'theta')
-                       + get_greek(tc_wing, 'theta') + get_greek(tp_wing, 'theta'))
+        if is_long:
+            total_delta = (+ get_greek(tc_center, 'delta') + get_greek(tp_center, 'delta')
+                           - get_greek(tc_wing, 'delta') - get_greek(tp_wing, 'delta'))
+            total_theta = (+ get_greek(tc_center, 'theta') + get_greek(tp_center, 'theta')
+                           - get_greek(tc_wing, 'theta') - get_greek(tp_wing, 'theta'))
+        else:
+            total_delta = (- get_greek(tc_center, 'delta') - get_greek(tp_center, 'delta')
+                           + get_greek(tc_wing, 'delta') + get_greek(tp_wing, 'delta'))
+            total_theta = (- get_greek(tc_center, 'theta') - get_greek(tp_center, 'theta')
+                           + get_greek(tc_wing, 'theta') + get_greek(tp_wing, 'theta'))
 
     return {
         'symbol': underlying.symbol,
@@ -726,7 +811,10 @@ def get_butterfly_legs(underlying, opt_class, chains, min_dte=DEFAULT_MIN_DTE, m
         'center_strike': center_strike,
         'call_wing_strike': call_wing_strike,
         'put_wing_strike': put_wing_strike,
-        'wing_width': wing_width,
+        'wing_width': wing_width_call,
+        'wing_width_call': wing_width_call,
+        'wing_width_put': wing_width_put,
+        'is_atm_only': is_atm_only,
         'bid_up': bid_up,
         'iron': iron,
         'is_long': is_long,
@@ -760,20 +848,32 @@ def execute_butterfly(legs):
     legs_quote_str = legs.get('legs_quote_str', '')
     line_legs_quote_str = legs.get('line_legs_quote_str', '')
 
+    is_atm_only = legs.get('is_atm_only', False) or (legs.get('wing_width_call', 0) == 0 and legs.get('wing_width_put', 0) == 0)
+
     # 建立 BAG 組合單合約
     combo_contract = Contract(symbol=symbol, secType='BAG', currency='USD', exchange=exchange)
 
-    # 4 腿定義：
-    # 中心 ATM 2 腿為 BUY，價外上下翼為 SELL
-    # 若 iron == 'long': 送出 BUY 訂單 (BUY*BUY=買中心, BUY*SELL=賣雙翼)
-    # 若 iron == 'short': 送出 SELL 訂單 (SELL*BUY=賣中心, SELL*SELL=買雙翼)
-    # 保持組合單為標準正限價，完全符合 CME/CBOE 交易所的正值限價規範 (避免 Error 201 負價被拒)
-    combo_contract.comboLegs = [
-        ComboLeg(conId=legs['c_center'].conId, ratio=1, action='BUY', exchange=exchange),
-        ComboLeg(conId=legs['p_center'].conId, ratio=1, action='BUY', exchange=exchange),
-        ComboLeg(conId=legs['c_wing'].conId, ratio=1, action='SELL', exchange=exchange),
-        ComboLeg(conId=legs['p_wing'].conId, ratio=1, action='SELL', exchange=exchange),
-    ]
+    if is_atm_only:
+        # ATM 雙腿 (Straddle 組合單)：僅 ATM Call 與 ATM Put 兩隻腳
+        # 中心 ATM 2 腿為 BUY (Call & Put)
+        # 若 iron == 'long': 送出 BUY 訂單 (BUY*BUY = 買中心 ATM Call & Put)
+        # 若 iron == 'short': 送出 SELL 訂單 (SELL*BUY = 賣中心 ATM Call & Put)
+        combo_contract.comboLegs = [
+            ComboLeg(conId=legs['c_center'].conId, ratio=1, action='BUY', exchange=exchange),
+            ComboLeg(conId=legs['p_center'].conId, ratio=1, action='BUY', exchange=exchange),
+        ]
+    else:
+        # 4 腿定義 (Butterfly 蝶式組合單)：
+        # 中心 ATM 2 腿為 BUY，價外上下翼為 SELL
+        # 若 iron == 'long': 送出 BUY 訂單 (BUY*BUY=買中心, BUY*SELL=賣雙翼)
+        # 若 iron == 'short': 送出 SELL 訂單 (SELL*BUY=賣中心, SELL*SELL=買雙翼)
+        # 保持組合單為標準正限價，完全符合 CME/CBOE 交易所的正值限價規範 (避免 Error 201 負價被拒)
+        combo_contract.comboLegs = [
+            ComboLeg(conId=legs['c_center'].conId, ratio=1, action='BUY', exchange=exchange),
+            ComboLeg(conId=legs['p_center'].conId, ratio=1, action='BUY', exchange=exchange),
+            ComboLeg(conId=legs['c_wing'].conId, ratio=1, action='SELL', exchange=exchange),
+            ComboLeg(conId=legs['p_wing'].conId, ratio=1, action='SELL', exchange=exchange),
+        ]
 
     ticker = ib.reqMktData(combo_contract, '', False, False)
     ib.sleep(2)
@@ -781,16 +881,20 @@ def execute_butterfly(legs):
     combo_bid = ticker.bid if (ticker and ticker.bid is not None and ticker.bid > 0) else 0.0
     combo_ask = ticker.ask if (ticker and ticker.ask is not None and ticker.ask > 0) else 0.0
 
-    # 若交易所尚未回傳組合單即時 Bid，從 4 腿報價計算合成 Bid (Synthetic Bid)
+    # 若交易所尚未回傳組合單即時 Bid，從腿報價計算合成 Bid (Synthetic Bid)
     # 買進腿取 Bid，賣出腿取 Ask：
-    c_center_bid = (legs['tc_center'].bid or 0.0) if legs['tc_center'] else 0.0
-    p_center_bid = (legs['tp_center'].bid or 0.0) if legs['tp_center'] else 0.0
-    c_wing_ask = (legs['tc_wing'].ask or 0.0) if legs['tc_wing'] else 0.0
-    p_wing_ask = (legs['tp_wing'].ask or 0.0) if legs['tp_wing'] else 0.0
+    c_center_bid = (legs['tc_center'].bid or 0.0) if legs.get('tc_center') else 0.0
+    p_center_bid = (legs['tp_center'].bid or 0.0) if legs.get('tp_center') else 0.0
 
     synthetic_bid = 0.0
-    if c_center_bid > 0 and p_center_bid > 0:
-        synthetic_bid = (c_center_bid + p_center_bid) - (c_wing_ask + p_wing_ask)
+    if is_atm_only:
+        if c_center_bid > 0 and p_center_bid > 0:
+            synthetic_bid = c_center_bid + p_center_bid
+    else:
+        c_wing_ask = (legs['tc_wing'].ask or 0.0) if legs.get('tc_wing') else 0.0
+        p_wing_ask = (legs['tp_wing'].ask or 0.0) if legs.get('tp_wing') else 0.0
+        if c_center_bid > 0 and p_center_bid > 0:
+            synthetic_bid = (c_center_bid + p_center_bid) - (c_wing_ask + p_wing_ask)
 
     # 嚴格執行「全部都下 BID LIMIT」，並套用交易所合法的階梯跳動點 (Market Rule)
     raw_bid = combo_bid if combo_bid > 0 else synthetic_bid
@@ -846,17 +950,41 @@ def execute_butterfly(legs):
 
     actual_und = legs.get('actual_underlying')
     und_name = getattr(actual_und, 'localSymbol', symbol) if actual_und else symbol
+
+    if is_atm_only:
+        legs_info_summary = f"  ATM 雙腿 ({center_desc} Call & Put): {legs['center_strike']} (翼寬: 0, 僅 ATM 雙腿)\n"
+        direction_desc = f"ATM 雙腿 {center_desc}"
+        strike_summary_line = f"ATM 雙腿: {legs['center_strike']} (翼寬: 0, 僅 ATM 雙腿)\n"
+        submit_action_name = f"{order_action}_STRADDLE_SUBMITTED"
+        fill_action_name = f"{order_action}_STRADDLE_FILLED"
+        fill_strike_info = f"ATM 雙腿: {legs['center_strike']} (翼寬: 0, 僅 ATM 雙腿)"
+    else:
+        w_c = legs.get('wing_width_call', legs.get('wing_width', 0))
+        w_p = legs.get('wing_width_put', legs.get('wing_width', 0))
+        legs_info_summary = (
+            f"  中心 ATM ({center_desc} Call & Put): {legs['center_strike']}\n"
+            f"  上翼 ({wing_desc} Call): {legs['call_wing_strike']} (+{w_c})\n"
+            f"  下翼 ({wing_desc} Put) : {legs['put_wing_strike']} (-{w_p})\n"
+        )
+        direction_desc = f"中心 ATM {center_desc} / 價外上下翼 {wing_desc}"
+        strike_summary_line = (
+            f"中心 ATM: {legs['center_strike']}\n"
+            f"上翼 Call: {legs['call_wing_strike']} (+{w_c})\n"
+            f"下翼 Put : {legs['put_wing_strike']} (-{w_p})\n"
+        )
+        submit_action_name = f"{order_action}_BUTTERFLY_SUBMITTED"
+        fill_action_name = f"{order_action}_BUTTERFLY_FILLED"
+        fill_strike_info = f"中心 ATM: {legs['center_strike']} / 上翼: {legs['call_wing_strike']} / 下翼: {legs['put_wing_strike']}"
+
     summary_str = (
-        f"Butterfly 期貨期權組合單 ({strategy_name}):\n"
+        f"期權組合單 ({strategy_name}):\n"
         f"  標的代號: {symbol} (真實掛鉤: {und_name}, 市價: {legs['underlying_price']:.2f})\n"
-        f"  策略方向 (iron): {iron.upper()} (中心 ATM: {center_desc} / 價外上下翼: {wing_desc})\n"
-        f"  中心 ATM ({center_desc} Call & Put): {legs['center_strike']}\n"
-        f"  上翼 ({wing_desc} Call): {legs['call_wing_strike']} (+{legs['wing_width']})\n"
-        f"  下翼 ({wing_desc} Put) : {legs['put_wing_strike']} (-{legs['wing_width']})\n"
+        f"  策略方向 (iron): {iron.upper()} ({direction_desc})\n"
+        f"{legs_info_summary}"
         f"  到期日: {legs['expiry']} (DTE: {legs['dte']} 天)\n"
-        f"  四腿即時報價與 Greeks:\n"
+        f"  即時報價與 Greeks:\n"
         f"{legs_quote_str}\n"
-        f"  下單方式: Adaptive Patient ({action_chinese} {order_action} {TRADE_QTY} 口, 參考限價: ${limit_price})\n"
+        f"  下單方式: 市價 Adaptive Patient ({action_chinese} {order_action} {TRADE_QTY} 口, 參考限價: ${limit_price})\n"
         f"  淨 Delta: {legs['total_delta']:+.3f} | 淨 Theta: {legs['total_theta']:.2f}"
     )
 
@@ -909,12 +1037,10 @@ def execute_butterfly(legs):
                 f"【IBKR 下單成功通知】\n"
                 f"商品: {symbol} (掛鉤: {und_name})\n"
                 f"策略: {strategy_name} [{iron.upper()}]\n"
-                f"方向: 中心 ATM {center_desc} / 價外上下翼 {wing_desc}\n"
+                f"方向: {direction_desc}\n"
                 f"到期日: {legs['expiry']} (DTE: {legs['dte']} 天)\n"
-                f"中心 ATM: {legs['center_strike']}\n"
-                f"上翼 Call: {legs['call_wing_strike']} (+{legs['wing_width']})\n"
-                f"下翼 Put : {legs['put_wing_strike']} (-{legs['wing_width']})\n"
-                f"四腿報價:\n"
+                f"{strike_summary_line}"
+                f"報價詳情:\n"
                 f"{line_legs_quote_str}\n"
                 f"委託方式: Adaptive Patient ({action_chinese} {order_action} {TRADE_QTY} 口)\n"
                 f"排單狀態: {trade.orderStatus.status}\n"
@@ -923,7 +1049,7 @@ def execute_butterfly(legs):
             payload = {
                 "symbol": symbol,
                 "iron": iron,
-                "action": f"{order_action}_BUTTERFLY_SUBMITTED",
+                "action": submit_action_name,
                 "quantity": TRADE_QTY,
                 "price": limit_price,
                 "bid_up": bid_up,
@@ -931,8 +1057,8 @@ def execute_butterfly(legs):
                 "status": trade.orderStatus.status,
                 "order_id": trade.order.orderId,
                 "center_strike": legs['center_strike'],
-                "call_wing": legs['call_wing_strike'],
-                "put_wing": legs['put_wing_strike'],
+                "call_wing": legs.get('call_wing_strike'),
+                "put_wing": legs.get('put_wing_strike'),
                 "expiry": legs['expiry'],
                 "dte": legs['dte'],
                 "net_delta": round(legs['total_delta'], 3),
@@ -963,12 +1089,12 @@ def execute_butterfly(legs):
                 f"狀態: 完全成交 (Filled)\n"
                 f"成交均價: ${fill_price}\n"
                 f"成交動作: {action_chinese} {order_action} {TRADE_QTY} 口\n"
-                f"中心 ATM: {legs['center_strike']} / 上翼: {legs['call_wing_strike']} / 下翼: {legs['put_wing_strike']}"
+                f"{fill_strike_info}"
             )
             fill_payload = {
                 "symbol": symbol,
                 "iron": iron,
-                "action": f"{order_action}_BUTTERFLY_FILLED",
+                "action": fill_action_name,
                 "quantity": TRADE_QTY,
                 "price": fill_price,
                 "status": "Filled",
@@ -1009,7 +1135,7 @@ def run_strategy_cycle():
             continue
 
         # 排除指數類商品 (SPX, NDX 專門由 trade/DTE0.py 執行)
-        if any(s in ('SPX', 'SPXW', 'NDX', 'NDXP') for s in symbols) or 'SPX' in g_name or 'NDX' in g_name or '指數' in g_name:
+        if any(s in ('SPX', 'SPXW', 'NDX', 'NDXP', 'TXO', 'TX') for s in symbols) or 'SPX' in g_name or 'NDX' in g_name or '指數' in g_name:
             print(f"[略過] 指數商品群組 {g_name} 已獨立至 trade/DTE0.py 專屬執行。")
             continue
 
@@ -1021,8 +1147,25 @@ def run_strategy_cycle():
         if min_dte > max_dte:
             min_dte, max_dte = max_dte, min_dte
 
-        # 個別商品動態翼寬 WING_WIDTH
-        wing_width = g_info.get('wing_width')
+        # 個別商品動態翼寬 WING_WIDTH_CALL 與 WING_WIDTH_PUT (若皆為 0 代表僅建立 ATM 雙腿)
+        raw_wing_call = g_info.get('wing_width_call')
+        raw_wing_put = g_info.get('wing_width_put')
+        raw_wing = g_info.get('wing_width')
+
+        if raw_wing_call is None and raw_wing is not None:
+            raw_wing_call = raw_wing
+        if raw_wing_put is None and raw_wing is not None:
+            raw_wing_put = raw_wing
+
+        try:
+            wing_width_call = float(raw_wing_call) if raw_wing_call is not None else None
+        except (ValueError, TypeError):
+            wing_width_call = None
+
+        try:
+            wing_width_put = float(raw_wing_put) if raw_wing_put is not None else None
+        except (ValueError, TypeError):
+            wing_width_put = None
 
         # 個別商品買入限價上限 BID_UP
         bid_up = g_info.get('bid_up')
@@ -1039,14 +1182,22 @@ def run_strategy_cycle():
         current_pos = [p for p in ib.portfolio() if p.contract.symbol == underlying.symbol and p.contract.secType in ['FOP', 'OPT']]
         if not current_pos:
             dte_label = "0DTE" if min_dte == 0 else f"{min_dte}~{max_dte}天"
-            print(f"-> 準備為 {underlying.symbol} (Class: {opt_class}) 建立 Butterfly 部位 (方向: {iron.upper()}, DTE: {dte_label}, 翼寬: {wing_width or '預設'}, bid_up: {bid_up or '預設'})...")
+            is_zero_wing = (wing_width_call is not None and wing_width_put is not None and wing_width_call == 0 and wing_width_put == 0)
+            if is_zero_wing:
+                wing_label = "0 (僅 ATM 雙腿)"
+                strat_label = "Straddle (僅 ATM 雙腿)"
+            else:
+                wing_label = f"Call: +{wing_width_call}, Put: -{wing_width_put}" if (wing_width_call is not None or wing_width_put is not None) else '預設'
+                strat_label = "Butterfly"
+            print(f"-> 準備為 {underlying.symbol} (Class: {opt_class}) 建立 {strat_label} 部位 (方向: {iron.upper()}, DTE: {dte_label}, 翼寬: {wing_label}, bid_up: {bid_up or '預設'})...")
             legs = get_butterfly_legs(
                 underlying=underlying,
                 opt_class=opt_class,
                 chains=chains,
                 min_dte=min_dte,
                 max_dte=max_dte,
-                wing_width=wing_width,
+                wing_width_call=wing_width_call,
+                wing_width_put=wing_width_put,
                 bid_up=bid_up,
                 iron=iron
             )

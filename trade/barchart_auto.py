@@ -341,10 +341,11 @@ def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_a
     analysis_text, archive_fname = analyze_and_report_with_retry(downloaded=downloaded, max_retries=max_retries)
 
     # 步驟 3.5: 調用 CallPutFlowSkill 進行建議 1 (個股) 與建議 2 (ETF) 之 Options Flow 評估決選
+    # 步驟 3.5: 調用 CallPutFlowSkill 針對建議 1 (個股) 與建議 2 (ETF) 各自分析 Options Flow 並選出最佳 Call/Put (二者雙雙下單)
     selected_suggestions = None
     if CallPutFlowSkill and parse_report_suggestions:
         print("\n" + "=" * 65)
-        print("【步驟 3.5】調用 CallPutFlowSkill 進行雙向期權大單流向決選 (建議 1 vs 建議 2)")
+        print("【步驟 3.5】調用 CallPutFlowSkill 針對建議 1 & 建議 2 各自精選期權大單 (雙雙下單)")
         print("=" * 65)
         try:
             suggestions = parse_report_suggestions(analysis_text)
@@ -352,11 +353,12 @@ def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_a
             cand2 = next((s for s in suggestions if s.get("id") == 2), None)
             cand3 = next((s for s in suggestions if s.get("type") == "bull_put" or s.get("id") == 3), None)
 
-            if cand1 and cand2:
-                sym1 = cand1.get("symbol")
-                sym2 = cand2.get("symbol")
+            if cand1 or cand2:
                 api_key = load_gemini_api_key(ENV_FILE)
                 flow_skill = CallPutFlowSkill(api_key=api_key, env_path=ENV_FILE)
+
+                sym1 = cand1.get("symbol") if cand1 else None
+                sym2 = cand2.get("symbol") if cand2 else None
 
                 csv1 = None
                 csv2 = None
@@ -368,19 +370,21 @@ def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_a
                         account, password = load_credentials_from_env(ENV_FILE)
                         driver = init_driver(download_dir=BARCHART_DIR, profile_dir=PROFILE_DIR, headless=headless)
                         try:
-                            csv1 = download_options_flow_csv(driver, sym1, target_dir=BARCHART_DIR)
-                            csv2 = download_options_flow_csv(driver, sym2, target_dir=BARCHART_DIR)
+                            if sym1:
+                                csv1 = download_options_flow_csv(driver, sym1, target_dir=BARCHART_DIR)
+                            if sym2:
+                                csv2 = download_options_flow_csv(driver, sym2, target_dir=BARCHART_DIR)
                         finally:
                             driver.quit()
                     except Exception as e_dl:
                         print(f"[WARN] 下載 Options Flow 發生異常: {e_dl}，將嘗試使用本地快取。")
 
-                if not csv1:
+                if sym1 and not csv1:
                     candidates1 = glob.glob(os.path.join(BARCHART_DIR, f"*{sym1.lower()}*options-flow*.csv")) + glob.glob(os.path.join(OLD_DIR, f"*{sym1.lower()}*options-flow*.csv"))
                     if candidates1:
                         candidates1.sort(key=os.path.getmtime, reverse=True)
                         csv1 = candidates1[0]
-                if not csv2:
+                if sym2 and not csv2:
                     candidates2 = glob.glob(os.path.join(BARCHART_DIR, f"*{sym2.lower()}*options-flow*.csv")) + glob.glob(os.path.join(OLD_DIR, f"*{sym2.lower()}*options-flow*.csv"))
                     if candidates2:
                         candidates2.sort(key=os.path.getmtime, reverse=True)
@@ -390,62 +394,85 @@ def run_barchart_auto(headless=False, max_retries=3, skip_download=False, skip_a
                 all_flows = glob.glob(os.path.join(BARCHART_DIR, "*options-flow*.csv")) + glob.glob(os.path.join(OLD_DIR, "*options-flow*.csv"))
                 if all_flows:
                     all_flows.sort(key=os.path.getmtime, reverse=True)
-                    if not csv1:
+                    if sym1 and not csv1:
                         csv1 = all_flows[0]
-                    if not csv2:
+                    if sym2 and not csv2:
                         csv2 = all_flows[1] if len(all_flows) > 1 else all_flows[0]
 
-                eval_res = flow_skill.evaluate_best_put_call(
-                    candidate1=cand1,
-                    candidate2=cand2,
-                    csv_path1=csv1,
-                    csv_path2=csv2,
-                    max_retries=max_retries
-                )
+                # 獨立分析建議 1 (個股) 之 Options Flow 找出最賺錢的 Call 或 Put
+                opt1 = None
+                if cand1:
+                    print("\n" + "-" * 60)
+                    print(f"👉 正在分析建議 1: {sym1} 之期權大單流向...")
+                    print("-" * 60)
+                    opt1 = flow_skill.analyze_and_pick_best_option(
+                        candidate=cand1,
+                        csv_path=csv1,
+                        max_retries=max_retries
+                    )
+                    opt1["id"] = 1
 
-                winner_contract = eval_res.get("winner")
-                winner_id = eval_res.get("winner_id", 1)
-                decision_text = eval_res.get("report_text", "")
+                # 獨立分析建議 2 (ETF) 之 Options Flow 找出最賺錢的 Call 或 Put
+                opt2 = None
+                if cand2:
+                    print("\n" + "-" * 60)
+                    print(f"👉 正在分析建議 2: {sym2} 之期權大單流向...")
+                    print("-" * 60)
+                    opt2 = flow_skill.analyze_and_pick_best_option(
+                        candidate=cand2,
+                        csv_path=csv2,
+                        max_retries=max_retries
+                    )
+                    opt2["id"] = 2
 
                 print("\n" + "=" * 65)
-                print(f"🏆 【Options Flow 決選勝出者】：建議 {winner_id} - {winner_contract['symbol']} {winner_contract['strategy']} @ ${winner_contract['strike']}")
-                print("=" * 65)
-                print(decision_text)
+                print(f"🏆 【Options Flow 雙標的大單精選成果 (雙雙保留下單)】")
+                if opt1:
+                    print(f"  • 建議 1: {opt1['symbol']} {opt1['strategy']} @ ${opt1['strike']} (到期: {opt1['exp_date']}, 參考價: ${opt1['ref_price']})")
+                if opt2:
+                    print(f"  • 建議 2: {opt2['symbol']} {opt2['strategy']} @ ${opt2['strike']} (到期: {opt2['exp_date']}, 參考價: ${opt2['ref_price']})")
                 print("=" * 65)
 
-                # 儲存決選報告至 reports 目錄與 latest_flow_decision.txt
+                # 儲存精選報告至 reports 目錄 (檔名加上日期)
                 now_ts = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
-                flow_rpt_path = os.path.join(REPORTS_DIR, f"flow_decision_{now_ts}.txt")
-                flow_latest_path = os.path.join(BASE_DIR, "latest_flow_decision.txt")
-                root_flow_path = os.path.join(BARCHART_DIR, "latest_flow_decision.txt")
-                content_with_header = f"==分析時間：{now_str}==\n{decision_text}\n"
-                with open(flow_rpt_path, "w", encoding="utf-8") as f:
-                    f.write(content_with_header)
-                with open(flow_latest_path, "w", encoding="utf-8") as f:
-                    f.write(content_with_header)
-                with open(root_flow_path, "w", encoding="utf-8") as f:
-                    f.write(content_with_header)
+                flow_rpt_fname = f"latest_flow_decision_{now_ts}.txt"
+                flow_rpt_path = os.path.join(REPORTS_DIR, flow_rpt_fname)
 
-                # LINE 推播決選結果
+                decision_parts = [f"==分析時間：{now_str}=="]
+                if opt1 and opt1.get("report_text"):
+                    decision_parts.append(f"\n### 【建議 1: {opt1['symbol']} 期權大單精選】\n{opt1['report_text']}")
+                if opt2 and opt2.get("report_text"):
+                    decision_parts.append(f"\n### 【建議 2: {opt2['symbol']} 期權大單精選】\n{opt2['report_text']}")
+                combined_report_text = "\n".join(decision_parts) + "\n"
+
+                with open(flow_rpt_path, "w", encoding="utf-8") as f:
+                    f.write(combined_report_text)
+                print(f"[INFO] 期權大單精選報告已存檔至：{flow_rpt_path}")
+
+                # LINE 推播雙標的大單精選結果
                 if send_push_message:
                     try:
-                        flow_line_msg = (
-                            f"🐋【Options Flow 雙向大單決選結果】\n"
-                            f"🏆 獲勝標的：建議 {winner_id} - {winner_contract['symbol']} {winner_contract['strategy']}\n"
-                            f"🎯 履約價：${winner_contract['strike']} | 到期日：{winner_contract['exp_date']}\n"
-                            f"💵 參考價：${winner_contract['ref_price']}\n"
-                            f"📌 決選重點：經最新微觀大單流向深度對比，{winner_contract['symbol']} 獲主力機構更高權利金與主動性掃貨確認！"
-                        )
-                        send_push_message(flow_line_msg)
+                        line_parts = [
+                            f"🐋【Options Flow 雙商品大單精選回報】",
+                            f"🕒 時間：{now_str}",
+                        ]
+                        if opt1:
+                            line_parts.append(f"📌 建議 1 ({opt1['symbol']})：{opt1['strategy']} Strike ${opt1['strike']} (到期: {opt1['exp_date']})")
+                        if opt2:
+                            line_parts.append(f"📌 建議 2 ({opt2['symbol']})：{opt2['strategy']} Strike ${opt2['strike']} (到期: {opt2['exp_date']})")
+                        line_parts.append("💡 兩標的皆已依各自期權大單挑選出最賺錢合約，全數排入下單！")
+                        send_push_message("\n".join(line_parts))
                     except Exception as pe:
-                        print(f"[WARN] LINE 決選推播異常: {pe}")
+                        print(f"[WARN] LINE 推播異常: {pe}")
 
-                # 組裝最終下單清單：決選出的 1 檔最佳 Put/Call + 建議 3 Bull Put Spread
-                winner_contract["flow_winner"] = True
-                winner_contract["id"] = 1
-                selected_suggestions = [winner_contract]
+                # 組裝最終下單清單：兩檔期權大單精選標的 + 建議 3 Bull Put Spread，全數下單！
+                selected_suggestions = []
+                if opt1:
+                    selected_suggestions.append(opt1)
+                if opt2:
+                    selected_suggestions.append(opt2)
                 if cand3:
-                    cand3["id"] = 2
+                    cand3["id"] = 3
                     selected_suggestions.append(cand3)
             else:
                 print("[WARN] 無法從分析報告中取得建議 1 與建議 2，跳過大單決選。")

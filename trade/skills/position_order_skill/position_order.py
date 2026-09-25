@@ -66,34 +66,68 @@ FUTURES_MONTH_MAP = {
 
 # Barchart 代碼至 IBKR 代碼/交易所映射表
 BARCHART_TO_IBKR_FUTURES = {
+    # 日圓期貨 (Barchart J6/6J -> IBKR symbols: MJY)
+    "J6": ("MJY", "CME"),
+    "6J": ("MJY", "CME"),
+    "JPY": ("MJY", "CME"),
+    "MJY": ("MJY", "CME"),
+    "JP": ("MJY", "CME"),
+    "JPU": ("MJY", "CME"),
+
+    # 歐元期貨 (Barchart E6/6E -> IBKR symbols: M6E)
+    "E6": ("M6E", "CME"),
+    "6E": ("M6E", "CME"),
+    "EUR": ("M6E", "CME"),
+    "M6E": ("M6E", "CME"),
+    "EUU": ("M6E", "CME"),
+
+    # 加密貨幣
     "TA": ("MET", "CME"),     # Micro Ether
+    "TAV": ("MET", "CME"),
     "MET": ("MET", "CME"),
     "ETH": ("ETH", "CME"),
     "BTC": ("BRR", "CME"),
     "MBT": ("MBT", "CME"),
-    "ES": ("ES", "CME"),
+    "BA": ("PBT", "CFE"),
+    "PET": ("PET", "CFE"),
+    "PBT": ("PBT", "CFE"),
+
+    # 指數期貨
+    "ES": ("MES", "CME"),
     "MES": ("MES", "CME"),
-    "NQ": ("NQ", "CME"),
+    "NQ": ("MNQ", "CME"),
     "MNQ": ("MNQ", "CME"),
-    "CL": ("CL", "NYMEX"),
+    "RTY": ("M2K", "CME"),
+    "M2K": ("M2K", "CME"),
+    "YM": ("MYM", "CBOT"),
+    "MYM": ("MYM", "CBOT"),
+
+    # 能源與金屬
+    "CL": ("MCL", "NYMEX"),
     "MCL": ("MCL", "NYMEX"),
-    "GC": ("GC", "COMEX"),
+    "GC": ("MGC", "COMEX"),
     "MGC": ("MGC", "COMEX"),
-    "HG": ("HG", "COMEX"),
+    "GS": ("1OZ", "COMEX"),
+    "1OZ": ("1OZ", "COMEX"),
+    "HG": ("MHG", "COMEX"),
     "MHG": ("MHG", "COMEX"),
-    "NG": ("NG", "NYMEX"),
+    "NG": ("MNG", "NYMEX"),
     "MNG": ("MNG", "NYMEX"),
+
+    # 債券與利率
+    "VU": ("MTN", "CBOT"),
+    "MTN": ("MTN", "CBOT"),
+    "TN": ("TN", "CBOT"),
+
+    # 農產品
     "YC": ("YC", "CBOT"),
     "XC": ("YC", "CBOT"),
     "ZC": ("ZC", "CBOT"),
     "ZW": ("ZW", "CBOT"),
     "ZS": ("ZS", "CBOT"),
-    "6E": ("EUR", "CME"),
-    "M6E": ("M6E", "CME"),
-    "6J": ("JPY", "CME"),
-    "MJY": ("MJY", "CME"),
+
+    # 波動率
     "VXM": ("VXM", "CFE"),
-    "TAV": ("MET", "CME"),
 }
 
 
@@ -143,6 +177,16 @@ class PositionOrderSkill:
         """
         ib = self.ensure_ib()
         sym = raw_symbol.strip().upper()
+
+        # 0. 特殊處理 CFE 交易所之期貨合約 (如 PET, PBT)
+        if sym in ("PET", "PBT") or sym.startswith("PET") or sym.startswith("PBT"):
+            cfe_root = "PET" if sym.startswith("PET") else "PBT"
+            print(f"[INFO] [PositionSkill] 識別為 CFE 加密指數期貨: {sym} (根合約: {cfe_root}, 交易所: CFE)")
+            c_cfe = Contract(symbol=cfe_root, secType="FUT", exchange="CFE", currency="USD")
+            qualified = ib.qualifyContracts(c_cfe)
+            if qualified and c_cfe.conId:
+                print(f"[SUCCESS] ✅ CFE 期貨合約驗證成功: {c_cfe.localSymbol} (conId: {c_cfe.conId})")
+                return c_cfe
 
         # 1. 嘗試解析期貨格式：Root + MonthCode + Year (例如 TAV26 -> Root=TA, Month=V, Year=26)
         m = re.match(r'^([A-Z0-9]+?)([FGHJKMNQUVXZ])(\d{1,2})$', sym)
@@ -284,7 +328,15 @@ class PositionOrderSkill:
         print(f"[INFO] [PositionSkill] 部位需調整: 當前 {current_pos:+g} ➔ 目標 {target_pos:+g} 口 (差額: {diff:+g})")
         print(f"       -> 預備送出委託: {order_action} {order_qty} 口 (Adaptive Patient)")
 
-        # 5. 預查現價
+        # 5. 預查現價與最小跳動點 (minTick)
+        min_tick = 0.01
+        try:
+            cds = ib.reqContractDetails(contract)
+            if cds and cds[0].minTick and cds[0].minTick > 0:
+                min_tick = cds[0].minTick
+        except Exception as e:
+            print(f"[WARN] 取得合約 minTick 失敗，使用預設值 0.01: {e}")
+
         ticker = ib.reqMktData(contract, "", False, False)
         ib.sleep(2)
 
@@ -304,22 +356,28 @@ class PositionOrderSkill:
             elif ticker.close and not math.isnan(ticker.close) and ticker.close > 0:
                 market_price = ticker.close
 
-        # 6. 組裝 Adaptive Patient 委託
-        if market_price and market_price > 0:
-            limit_p = round(market_price, 2)
-            order = LimitOrder(order_action, order_qty, limit_p)
-            price_desc = f"限價 ${limit_p:.2f}"
-        else:
-            order = MarketOrder(order_action, order_qty)
-            price_desc = "市價"
-
+        # 6. 組裝市價 Adaptive Patient 委託
+        order = MarketOrder(order_action, order_qty)
         order.algoStrategy = "Adaptive"
         order.algoParams = [TagValue("adaptivePriority", "Patient")]
         order.tif = "DAY"
         if target_account:
             order.account = target_account
 
-        order_desc = f"{order_action} {order_qty} 口 {contract.localSymbol} @ {price_desc} (Adaptive Patient)"
+        if market_price and market_price > 0:
+            if min_tick < 0.001:
+                ref_p_str = f"${market_price:.6f}"
+            elif min_tick < 0.01:
+                ref_p_str = f"${market_price:.4f}"
+            elif min_tick >= 1.0:
+                ref_p_str = f"${market_price:.0f}"
+            else:
+                ref_p_str = f"${market_price:.2f}"
+            price_desc = f"市價 (Adaptive Patient, 參考現價: {ref_p_str})"
+        else:
+            price_desc = "市價 (Adaptive Patient)"
+
+        order_desc = f"{order_action} {order_qty} 口 {contract.localSymbol} @ {price_desc}"
 
         # 7. 執行下單
         order_status = "DryRun"

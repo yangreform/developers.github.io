@@ -53,6 +53,7 @@ class BarchartOpinionSkill:
         """
         從網址中擷取標的代碼，例如：
         https://www.barchart.com/futures/quotes/TAV26/opinion -> TAV26
+        https://www.barchart.com/futures/quotes/GSZ26/overview -> GSZ26
         若傳入純代碼則直接清理回傳。
         """
         if not url_or_symbol:
@@ -61,22 +62,21 @@ class BarchartOpinionSkill:
         text = url_or_symbol.strip()
         if text.startswith("http://") or text.startswith("https://"):
             # 匹配 /quotes/XXXX/ 或 /quotes/XXXX
-            m = re.search(r'/quotes/([^/?#]+)(?:/opinion)?', text, re.IGNORECASE)
+            m = re.search(r'/quotes/([^/?#]+)(?:/(?:opinion|overview))?', text, re.IGNORECASE)
             if m:
                 return m.group(1).strip().upper()
         # 純代碼或未能從 URL 匹配到的回退
-        return text.split("/")[-1].replace("opinion", "").strip().upper()
+        return text.split("/")[-1].replace("opinion", "").replace("overview", "").strip().upper()
 
     @staticmethod
     def build_opinion_url(symbol_or_url: str) -> str:
         """
-        根據輸入字串轉換為合法的 Barchart Opinion 網址。
+        根據輸入字串轉換為合法的 Barchart 網址。
+        若傳入已為完整 http/https 網址則保持原有指定網址 (例如 overview 或 opinion)。
         自動辨識期貨格式 (如 TAV26, ESZ26, CLV26) 與美股/ETF格式 (如 AAPL, SPY)。
         """
         text = symbol_or_url.strip()
         if text.startswith("http://") or text.startswith("https://"):
-            if not text.endswith("/opinion"):
-                text = text.rstrip("/") + "/opinion"
             return text
 
         sym = text.upper()
@@ -150,9 +150,25 @@ class BarchartOpinionSkill:
         driver = self.ensure_driver()
 
         try:
+            try:
+                driver.set_page_load_timeout(25)
+            except Exception:
+                pass
+
             print(f"[INFO] [OpinionSkill] 正在導航至: {url} ...")
-            driver.get(url)
-            time.sleep(5)
+            try:
+                driver.get(url)
+            except Exception as nav_e:
+                if "timeout" in str(nav_e).lower():
+                    print(f"[WARN] [OpinionSkill] 頁面載入超過 25 秒 (外部資源卡住)，執行 window.stop() 繼續解析 DOM: {nav_e}")
+                    try:
+                        driver.execute_script("window.stop();")
+                    except Exception:
+                        pass
+                else:
+                    raise nav_e
+
+            time.sleep(3)
 
             if dismiss_popups:
                 dismiss_popups(driver)
@@ -188,11 +204,43 @@ class BarchartOpinionSkill:
                     matched_tr = tr
                     break
 
+            # 若當前頁面未找到指標，且當前為概覽頁 (overview) 或非 opinion 頁面，智慧切換至 opinion 頁面再嘗試
+            if not matched_tr:
+                curr_url = driver.current_url.lower()
+                if "/overview" in curr_url or not curr_url.rstrip("/").endswith("/opinion"):
+                    opinion_url = re.sub(r'/overview/?$', '/opinion', driver.current_url, flags=re.IGNORECASE)
+                    if not opinion_url.rstrip("/").endswith("/opinion"):
+                        opinion_url = opinion_url.rstrip("/") + "/opinion"
+                    print(f"[INFO] [OpinionSkill] 當前為概覽/非Opinion頁面，正在自動切換至技術觀點頁面: {opinion_url} 擷取 [{target_indicator}] ...")
+                    try:
+                        driver.get(opinion_url)
+                    except Exception as op_nav_e:
+                        if "timeout" in str(op_nav_e).lower():
+                            try:
+                                driver.execute_script("window.stop();")
+                            except Exception:
+                                pass
+                        else:
+                            print(f"[WARN] [OpinionSkill] 導航至 opinion 頁面異常: {op_nav_e}")
+
+                    time.sleep(3)
+                    if dismiss_popups:
+                        dismiss_popups(driver)
+                    trs = driver.find_elements(By.TAG_NAME, "tr")
+                    print(f"[INFO] [OpinionSkill] 技術觀點頁面載入完成，正在掃描 {len(trs)} 個表格列...")
+                    for tr in trs:
+                        text = tr.text
+                        if not text:
+                            continue
+                        if target_clean in text.lower():
+                            matched_tr = tr
+                            break
+
             if matched_tr:
                 tds = matched_tr.find_elements(By.TAG_NAME, "td")
                 # 預期結構：
                 # TD 0: 圖表連結
-                # TD 1: 指標名稱 (7 Day Average Directional Indicator)
+                # TD 1: 指標名稱 (例如 7 Day Average Directional Indicator 或 20 Day Bollinger Bands)
                 # TD 2: 指標方向 (BUY / SELL / HOLD)
                 signal_td = None
                 # 先依 class 搜尋
@@ -216,9 +264,10 @@ class BarchartOpinionSkill:
 
                     print(f"[SUCCESS] ✅ 成功定位指標 [{target_indicator}] -> 方向: 【{found_signal}】 (原始值: {raw_signal_text})")
             else:
-                # 備援：正則表達式從頁面文字或原始碼匹配
+                # 備援：動態正則表達式從頁面文字或原始碼匹配
                 page_source = driver.page_source
-                m_regex = re.search(r'7\s*Day\s*Average\s*Directional\s*Indicator[^\w<>]*(?:<[^>]+>)*\s*(BUY|SELL|HOLD)', page_source, re.IGNORECASE)
+                escaped_target = re.escape(target_indicator).replace(r'\ ', r'\s*')
+                m_regex = re.search(rf'{escaped_target}[^\w<>]*(?:<[^>]+>)*\s*(BUY|SELL|HOLD)', page_source, re.IGNORECASE)
                 if m_regex:
                     found_signal = m_regex.group(1).upper()
                     raw_signal_text = m_regex.group(1)

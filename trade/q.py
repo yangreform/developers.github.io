@@ -79,7 +79,7 @@ IB_CLIENT_ID = env_int("IB_CLIENT_ID", random.randint(1, 9999))
 TARGET_ACCOUNT = env_str("IB_TARGET_ACCOUNT", required=True)
 REFRESH_SECONDS = env_int("REFRESH_SECONDS", 300)
 RESTART_INTERVAL = env_int("RESTART_INTERVAL", 3600)
-IB_GREEKS_WAIT_SECONDS = env_float("IB_GREEKS_WAIT_SECONDS", 1.5)
+IB_GREEKS_WAIT_SECONDS = env_float("IB_GREEKS_WAIT_SECONDS", 0.5)
 MIN_FUTURE_DTE = env_int("MIN_FUTURE_DTE", 2)  # 期貨新開倉/對沖最小剩餘到期天數 (預設 2 天，避開 Error 201 實物交割臨期限制)
 
 # 📱 手機監控面板設定
@@ -91,7 +91,6 @@ DASHBOARD_PASSWORD = env_str("DASHBOARD_PASSWORD", required=False)  # 留空 = �
 # 手機面板改過的值會整包寫回 .env 的 HEDGE_CONFIG_JSON，重開 q.py 後也不會消失
 # ------------------------------------------------------------------------------
 HEDGE_COOLDOWN_SECONDS = 60 * 5
-
 
 def serialize_hedge_config(config: dict) -> str:
     """把 HEDGE_CONFIG 轉成可以寫進 .env 的單行 JSON 字串（symbols 用 list）。"""
@@ -467,6 +466,7 @@ DASHBOARD_HTML = """
     <button class="tablinks active" onclick="openTab(event, 'overview')">Delta Hedge</button>
     <button class="tablinks" onclick="openTab(event, 'tmf_tab')">台指TMF</button>
     <button class="tablinks" onclick="openTab(event, 'ai_report')">AI 投資建議</button>
+    <button class="tablinks" onclick="openTab(event, 'env_tab')">.env</button>
 </div>
 
 <div id="overview" class="tabcontent" style="display:block;">
@@ -804,6 +804,67 @@ DASHBOARD_HTML = """
     <div class="card" style="padding:16px;">
         <div id="ai_report_meta" style="margin-bottom:12px; font-size:12px; color:#8b949e; display:flex; justify-content:space-between;"></div>
         <div id="ai_report_content" style="white-space:pre-wrap; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; line-height:1.7; font-size:14px; color:#e6edf3; background:#0d1117; padding:18px; border-radius:8px; border:1px solid #30363d; overflow-x:auto;">載入中...</div>
+    </div>
+</div>
+
+<div id="env_tab" class="tabcontent">
+    <!-- 1. IBKR 有效掛單清單區塊 (上半部) -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h2 id="ib_orders_title" style="margin:0; display:flex; align-items:center; gap:8px;">
+                    <span>⚡ --- [ 有效掛單 (Orders: ...) ] ---</span>
+                </h2>
+                <div style="font-size:12px; color:#8b949e; margin-top:4px;">即時連線 IBKR 查詢所有未完成之有效委託，可逐筆點擊取消</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span id="ib_orders_status" style="font-size:12px; color:#8b949e;"></span>
+                <button class="action-btn" onclick="loadIBOrders()" style="background-color:#1f6feb; display:flex; align-items:center; gap:6px; padding:6px 14px; font-size:13px;">
+                    <span>🔄</span> <span>重新整理掛單</span>
+                </button>
+            </div>
+        </div>
+        <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead>
+                    <tr style="border-bottom:1px solid #30363d; color:#8b949e; text-align:left;">
+                        <th style="padding:8px 10px;">商品 / 代號</th>
+                        <th style="padding:8px 10px;">動作</th>
+                        <th style="padding:8px 10px;">數量</th>
+                        <th style="padding:8px 10px;">類型</th>
+                        <th style="padding:8px 10px;">委託價格</th>
+                        <th style="padding:8px 10px;">狀態</th>
+                        <th style="padding:8px 10px;">委託編號 (ID)</th>
+                        <th style="padding:8px 10px; text-align:center;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="ib_orders_tbody">
+                    <tr><td colspan="8" style="text-align:center; padding:24px; color:#8b949e;">點擊上方 .env 分頁或重新整理載入掛單...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 2. trade/.env 即時編輯區塊 -->
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h2 style="margin:0; display:flex; align-items:center; gap:8px;">
+                    <span>📝 trade\.env 即時設定編輯區</span>
+                </h2>
+                <div style="font-size:12px; color:#8b949e; margin-top:4px;">可直接修改環境變數與策略參數，儲存後即時寫入 trade/.env (自動建立 .env.bak 備份)</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span id="env_save_status" style="font-size:13px; font-weight:600;"></span>
+                <button class="action-btn" onclick="loadEnvContent()" style="background-color:#30363d; display:flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px;">
+                    <span>🔄</span> <span>重新讀取</span>
+                </button>
+                <button class="action-btn" id="btn_save_env" onclick="saveEnvContent()" style="background-color:#238636; display:flex; align-items:center; gap:6px; padding:7px 18px; font-size:13px; font-weight:600;">
+                    <span>💾</span> <span>Save (儲存)</span>
+                </button>
+            </div>
+        </div>
+        <textarea id="env_editor_textarea" spellcheck="false" style="width:100%; min-height:460px; background:#0d1117; color:#58a6ff; border:1px solid #30363d; border-radius:6px; padding:12px 14px; font-family:Consolas, Monaco, 'Courier New', monospace; font-size:13px; line-height:1.6; resize:vertical; outline:none; white-space:pre;"></textarea>
     </div>
 </div>
 
@@ -1199,6 +1260,9 @@ function openTab(evt, tabName) {
         loadBarchartData();
     } else if(tabName === 'ai_report') {
         loadAIReportList();
+    } else if(tabName === 'env_tab') {
+        loadIBOrders();
+        loadEnvContent();
     }
 }
 
@@ -2064,6 +2128,330 @@ async function saveVXMConfig(btn) {
     alert("儲存連線失敗: " + e);
   }
 }
+
+// ==========================================
+// .env & IBKR 有效掛單 Tab Functions
+// ==========================================
+async function loadIBOrders() {
+    const titleEl = document.getElementById("ib_orders_title");
+    const statusEl = document.getElementById("ib_orders_status");
+    const tbody = document.getElementById("ib_orders_tbody");
+    
+    if (statusEl) statusEl.textContent = "連線 IBKR 查詢掛單中...";
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:24px; color:#8b949e;">🔄 正在連線至 IBKR 擷取最新有效掛單...</td></tr>';
+    }
+    
+    try {
+        const res = await fetch('/api/ib/open_orders?t=' + Date.now());
+        const data = await res.json();
+        
+        if (data.status === 'ok') {
+            const orders = data.orders || [];
+            window.CURRENT_IB_ORDERS = orders;
+            
+            // 依商品代號分組統計
+            const bySymbol = {};
+            const symbolList = [];
+            orders.forEach(function(o) {
+                const s = o.symbol || '-';
+                if (!bySymbol[s]) {
+                    bySymbol[s] = [];
+                    symbolList.push(s);
+                }
+                bySymbol[s].push(o);
+            });
+            
+            if (titleEl) {
+                titleEl.innerHTML = '<span>⚡ --- [ 有效掛單 (Orders: <span style="color:#58a6ff;">' + orders.length + '</span>，標的: <span style="color:#7ee787;">' + symbolList.length + '</span> 檔) ] ---</span>';
+            }
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color:#3fb950;">● 即時更新於 ' + new Date().toLocaleTimeString() + '</span>';
+            }
+            
+            if (!orders.length) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:#8b949e; font-size:14px;">目前無任何有效掛單 (No Active Orders)</td></tr>';
+                return;
+            }
+            
+            let html = "";
+            symbolList.forEach(function(sym) {
+                const symOrders = bySymbol[sym] || [];
+                
+                // 群組化該商品內的括號單 (Bracket sets)
+                const bracketMap = {};
+                const bKeyList = [];
+                symOrders.forEach(function(o) {
+                    const bk = o.bracket_key || ('S_' + o.order_id);
+                    if (!bracketMap[bk]) {
+                        bracketMap[bk] = [];
+                        bKeyList.push(bk);
+                    }
+                    bracketMap[bk].push(o);
+                });
+                
+                let bracketSetsCount = 0;
+                bKeyList.forEach(function(bk) {
+                    if (bracketMap[bk].length > 1 || (bracketMap[bk][0] && bracketMap[bk][0].is_bracket)) {
+                        bracketSetsCount++;
+                    }
+                });
+                
+                // 商品大分組標題行
+                html += '<tr style="background:#161b22; border-top:2px solid #30363d; border-bottom:1px solid #30363d;">' +
+                    '<td colspan="8" style="padding:9px 12px;">' +
+                        '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
+                            '<div style="display:flex; align-items:center; gap:8px;">' +
+                                '<span style="font-size:14px; font-weight:700; color:#58a6ff;">📌 ' + sym + '</span>' +
+                                '<span class="badge" style="background-color:#21262d; border:1px solid #30363d; color:#c9d1d9; font-size:11px;">共 ' + symOrders.length + ' 筆掛單</span>' +
+                            '</div>' +
+                            '<div style="font-size:12px; color:#8b949e;">' +
+                                (bracketSetsCount > 0 ? '<span style="color:#d2a8ff; font-weight:600;">🔗 包含 ' + bracketSetsCount + ' 組括號掛單</span>' : '<span style="color:#8b949e;">獨立掛單</span>') +
+                            '</div>' +
+                        '</div>' +
+                    '</td>' +
+                '</tr>';
+                
+                // 逐組呈現該商品內的委託
+                bKeyList.forEach(function(bk) {
+                    const bOrders = bracketMap[bk];
+                    const isMultiBracket = bOrders.length > 1;
+                    
+                    if (isMultiBracket) {
+                        const ocaInfo = bOrders[0].oca_group ? ('OCA: ' + bOrders[0].oca_group) : (bOrders[0].parent_id ? ('Parent: #' + bOrders[0].parent_id) : '');
+                        html += '<tr style="background:rgba(137, 87, 229, 0.08); border-top:1px dashed rgba(137, 87, 229, 0.35);">' +
+                            '<td colspan="8" style="padding:6px 12px 6px 20px; font-size:12px; color:#d2a8ff;">' +
+                                '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+                                    '<span style="display:flex; align-items:center; gap:6px;">' +
+                                        '<span>🔗</span> <strong style="color:#e6edf3;">括號掛單組 (Bracket Set - ' + bOrders.length + ' 筆)</strong>' +
+                                        '<span style="color:#8b949e; font-size:11px; font-family:monospace;">' + ocaInfo + '</span>' +
+                                    '</span>' +
+                                    '<button class="danger-btn" data-bkey="' + encodeURIComponent(bk) + '" onclick="cancelBracketGroup(this)" style="padding:2px 8px; font-size:11px; background:#da363388; border:1px solid #da3633; border-radius:3px;" title="一次取消此組括號單的所有委託">' +
+                                        '❌ 取消此組括號單 (' + bOrders.length + ')' +
+                                    '</button>' +
+                                '</div>' +
+                            '</td>' +
+                        '</tr>';
+                    }
+                    
+                    bOrders.forEach(function(o) {
+                        const actionColor = (o.action === 'BUY' ? '#3fb950' : '#f85149');
+                        const actionBadge = '<span style="background:' + actionColor + '22; color:' + actionColor + '; border:1px solid ' + actionColor + '55; padding:2px 8px; border-radius:4px; font-weight:700;">' + o.action + '</span>';
+                        const statusColor = (o.status === 'Submitted' ? '#3fb950' : (o.status === 'PreSubmitted' ? '#d29922' : '#8b949e'));
+                        const statusBadge = '<span style="color:' + statusColor + '; font-weight:600;">' + o.status + '</span>';
+                        const priceDisp = o.price || 'MKT';
+                        
+                        let roleBadge = '';
+                        if (o.role_tag === 'TP') {
+                            roleBadge = '<span style="background:#23863622; color:#3fb950; border:1px solid #23863655; padding:1px 6px; border-radius:3px; font-size:11px; margin-right:6px; font-weight:600;">🎯 停利 LMT</span>';
+                        } else if (o.role_tag === 'SL') {
+                            roleBadge = '<span style="background:#da363322; color:#f85149; border:1px solid #da363355; padding:1px 6px; border-radius:3px; font-size:11px; margin-right:6px; font-weight:600;">🛑 停損 STP</span>';
+                        } else if (o.is_bracket) {
+                            roleBadge = '<span style="background:#8957e522; color:#d2a8ff; border:1px solid #8957e555; padding:1px 6px; border-radius:3px; font-size:11px; margin-right:6px;">🔗 括號單</span>';
+                        } else {
+                            roleBadge = '<span style="background:#1f6feb22; color:#58a6ff; border:1px solid #1f6feb55; padding:1px 6px; border-radius:3px; font-size:11px; margin-right:6px;">📌 獨立單</span>';
+                        }
+                        
+                        const rowBg = isMultiBracket ? 'rgba(137, 87, 229, 0.03)' : 'transparent';
+                        const paddingLeft = isMultiBracket ? '30px' : '12px';
+                        
+                        html += '<tr style="border-bottom: 1px solid #21262d; background:' + rowBg + ';">' +
+                            '<td style="padding:8px 12px; padding-left:' + paddingLeft + '; color:#e6edf3;">' +
+                                roleBadge + '<span style="font-weight:600;">' + o.symbol + '</span>' +
+                            '</td>' +
+                            '<td style="padding:8px 10px;">' + actionBadge + '</td>' +
+                            '<td style="padding:8px 10px; font-weight:600;">' + o.quantity + '</td>' +
+                            '<td style="padding:8px 10px; color:#8b949e;">' + (o.order_type || '-') + '</td>' +
+                            '<td style="padding:8px 10px; font-family:Consolas,monospace; color:#58a6ff; font-weight:600;">' + priceDisp + '</td>' +
+                            '<td style="padding:8px 10px;">' + statusBadge + '</td>' +
+                            '<td style="padding:8px 10px; font-family:Consolas,monospace; font-size:12px; color:#8b949e;">#' + o.order_id + ' <span style="font-size:10px; color:#484f58;">(cid:' + o.client_id + ')</span></td>' +
+                            '<td style="padding:8px 10px; text-align:center;">' +
+                                '<button class="danger-btn" onclick="cancelIBOrder(' + o.order_id + ', ' + o.client_id + ', ' + o.perm_id + ')" style="padding:3px 10px; font-size:11px;">取消</button>' +
+                            '</td>' +
+                        '</tr>';
+                    });
+                });
+            });
+            tbody.innerHTML = html;
+        } else {
+            if (titleEl) {
+                titleEl.innerHTML = '<span>⚡ --- [ 有效掛單 (查詢異常) ] ---</span>';
+            }
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color:#f85149;">❌ ' + (data.message || '查詢失敗') + '</span>';
+            }
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:24px; color:#f85149;">無法取得掛單資料: ' + (data.message || '未知錯誤') + '</td></tr>';
+        }
+    } catch (e) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f85149;">❌ 連線失敗: ' + e.message + '</span>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:24px; color:#f85149;">網路或伺服器連線異常: ' + e.message + '</td></tr>';
+    }
+}
+
+async function cancelBracketGroup(target) {
+    const bKey = (typeof target === 'string') ? target : decodeURIComponent(target.getAttribute('data-bkey') || '');
+    const list = window.CURRENT_IB_ORDERS || [];
+    const targets = list.filter(function(x) { return x.bracket_key === bKey; });
+    if (!targets.length) {
+        alert("找不到此組括號單的委託。");
+        return;
+    }
+    const sym = targets[0].symbol || "";
+    const msg = "⚠️ 確定要取消【" + sym + "】整組括號掛單嗎？\\n\\n包含以下 " + targets.length + " 筆委託：\\n" +
+        targets.map(function(t) { return " • Order #" + t.order_id + " (" + t.action + " " + t.quantity + " " + (t.role || t.order_type) + ")"; }).join("\\n");
+    if (!confirm(msg)) {
+        return;
+    }
+    showToast("正在取消整組括號單 (" + targets.length + " 筆)...");
+    let successCount = 0;
+    const pw = localStorage.getItem(PASSWORD_KEY) || "";
+    for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        try {
+            const res = await fetch('/api/ib/cancel_order', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    order_id: t.order_id,
+                    client_id: t.client_id,
+                    perm_id: t.perm_id,
+                    password: pw
+                })
+            });
+            const d = await res.json();
+            if (d.status === 'ok') successCount++;
+        } catch (e) {
+            console.error("取消委託失敗:", e);
+        }
+    }
+    showToast("括號單取消完成 (成功送出: " + successCount + "/" + targets.length + ")");
+    setTimeout(loadIBOrders, 1200);
+}
+
+async function cancelIBOrder(orderId, clientId, permId) {
+    const list = window.CURRENT_IB_ORDERS || [];
+    let sym = "Order #" + orderId;
+    for (let i = 0; i < list.length; i++) {
+        if (list[i].order_id === orderId && list[i].perm_id === permId) {
+            sym = list[i].symbol || sym;
+            break;
+        }
+    }
+    const confirmMsg = "⚠️ 確定要取消此筆有效掛單嗎？\\n\\n標的: " + sym + "\\nOrder ID: #" + orderId + "\\nClient ID: " + clientId;
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    showToast("正在向 IBKR 發送取消 Order #" + orderId + "...");
+    try {
+        const pw = localStorage.getItem(PASSWORD_KEY) || "";
+        const res = await fetch('/api/ib/cancel_order', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                order_id: orderId,
+                client_id: clientId,
+                perm_id: permId,
+                password: pw
+            })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            showToast(data.message || ("已成功取消 Order #" + orderId));
+            setTimeout(loadIBOrders, 1000);
+        } else {
+            alert("取消掛單失敗: " + (data.message || "未知原因"));
+        }
+    } catch (e) {
+        alert("連線伺服器異常: " + e.message);
+    }
+}
+
+async function loadEnvContent() {
+    const textarea = document.getElementById("env_editor_textarea");
+    const statusEl = document.getElementById("env_save_status");
+    if (!textarea) return;
+    
+    if (statusEl) {
+        statusEl.innerHTML = '<span style="color:#8b949e;">🔄 正在讀取 trade/.env ...</span>';
+    }
+    try {
+        const res = await fetch('/api/env_content?t=' + Date.now());
+        const data = await res.json();
+        if (data.status === 'ok') {
+            textarea.value = data.content || '';
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color:#3fb950;">✓ 已載入 (最後修改: ' + (data.mtime || '未知') + ')</span>';
+            }
+        } else {
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color:#f85149;">❌ 讀取失敗: ' + data.message + '</span>';
+            }
+            alert("讀取 .env 失敗: " + data.message);
+        }
+    } catch (e) {
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#f85149;">❌ 連線失敗: ' + e.message + '</span>';
+        }
+    }
+}
+
+async function saveEnvContent() {
+    const textarea = document.getElementById("env_editor_textarea");
+    const statusEl = document.getElementById("env_save_status");
+    const btn = document.getElementById("btn_save_env");
+    if (!textarea) return;
+    
+    if (!confirm("⚠️ 確定要將當前編輯內容儲存回 trade/.env 嗎？\\n(系統將自動備份為 .env.bak)")) {
+        return;
+    }
+    
+    const origText = btn ? btn.innerHTML : "Save";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳</span> <span>儲存中...</span>';
+    }
+    if (statusEl) {
+        statusEl.innerHTML = '<span style="color:#8b949e;">💾 正在儲存至 trade/.env ...</span>';
+    }
+    
+    try {
+        const pw = localStorage.getItem(PASSWORD_KEY) || "";
+        const res = await fetch('/api/save_env', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                content: textarea.value,
+                password: pw
+            })
+        });
+        const data = await res.json();
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origText;
+        }
+        
+        if (data.status === 'ok') {
+            showToast(data.message || ".env 儲存成功！");
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color:#3fb950; font-weight:700;">✅ 儲存成功！(' + data.mtime + ')</span>';
+            }
+        } else {
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color:#f85149;">❌ 儲存失敗: ' + data.message + '</span>';
+            }
+            alert("儲存失敗: " + (data.message || '未知錯誤'));
+        }
+    } catch (e) {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origText;
+        }
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#f85149;">❌ 網路異常: ' + e.message + '</span>';
+        }
+        alert("儲存請求失敗: " + e.message);
+    }
+}
 </script>
 </body>
 </html>
@@ -2415,6 +2803,254 @@ def api_snapshot():
     return jsonify(get_snapshot())
 
 
+@dash_app.route("/api/ib/open_orders", methods=["GET"])
+def api_ib_open_orders():
+    import asyncio, random
+    from ib_insync import IB
+    order_list = []
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        local_ib = IB()
+        local_ib.reqPositionsAsync = lambda: asyncio.sleep(0)
+        local_ib.reqAccountUpdatesAsync = lambda acct: asyncio.sleep(0)
+        local_ib.reqAccountUpdatesMultiAsync = lambda acct: asyncio.sleep(0)
+        local_ib.reqOpenOrdersAsync = lambda: asyncio.sleep(0)
+        local_ib.reqCompletedOrdersAsync = lambda apiOnly: asyncio.sleep(0)
+        local_ib.reqExecutionsAsync = lambda: asyncio.sleep(0)
+        cid = random.randint(8100, 8990)
+        local_ib.connect(IB_HOST, IB_PORT, clientId=cid, timeout=8)
+        trades = local_ib.reqAllOpenOrders()
+
+        for t in trades:
+            c, o, s = t.contract, t.order, t.orderStatus
+            # 格式化價格顯示
+            price_parts = []
+            if getattr(o, 'lmtPrice', 0) and o.lmtPrice > 0:
+                price_parts.append(f"LMT ${format_price(o.lmtPrice, 4)}")
+            if getattr(o, 'auxPrice', 0) and o.auxPrice > 0:
+                price_parts.append(f"Aux ${format_price(o.auxPrice, 4)}")
+            if not price_parts:
+                price_parts.append("MKT")
+            price_disp = " / ".join(price_parts)
+
+            # 商品/代號名稱判斷 (BAG 組合單顯示標的代號避免純數字合約碼)
+            if c.secType == "BAG":
+                disp_sym = f"{c.symbol} (BAG)" if c.symbol else (c.localSymbol or "BAG")
+            else:
+                disp_sym = c.localSymbol if (c.localSymbol and not c.localSymbol.isdigit()) else (c.symbol or "UNKNOWN")
+
+            parent_id = getattr(o, 'parentId', 0) or 0
+            oca_group = str(getattr(o, 'ocaGroup', '') or '').strip()
+            is_bracket = bool(parent_id > 0 or oca_group)
+
+            # 括號單分組 Key
+            if parent_id > 0:
+                bracket_key = f"P_{parent_id}_{disp_sym}"
+            elif oca_group:
+                bracket_key = f"OCA_{oca_group}_{disp_sym}"
+            else:
+                bracket_key = f"S_{o.orderId}_{o.permId}"
+
+            role_tag = ""
+            role = "獨立委託"
+            if is_bracket:
+                if o.orderType == "LMT":
+                    role_tag = "TP"
+                    role = "停利 (Take Profit)"
+                elif "STP" in o.orderType or "TRAIL" in o.orderType:
+                    role_tag = "SL"
+                    role = "停損 (Stop Loss)"
+                else:
+                    role_tag = "BRK"
+                    role = "括號委託"
+
+            order_list.append({
+                "order_id": o.orderId,
+                "perm_id": o.permId,
+                "client_id": o.clientId,
+                "symbol": disp_sym,
+                "raw_symbol": c.symbol,
+                "sec_type": c.secType,
+                "exchange": c.exchange,
+                "action": o.action,
+                "quantity": o.totalQuantity,
+                "order_type": o.orderType,
+                "price": price_disp,
+                "status": s.status,
+                "filled": s.filled,
+                "remaining": s.remaining,
+                "parent_id": parent_id,
+                "oca_group": oca_group,
+                "is_bracket": is_bracket,
+                "bracket_key": bracket_key,
+                "role": role,
+                "role_tag": role_tag
+            })
+
+        # 排序：優先依商品代號 A-Z，次依括號分組 Key，再依委託類型 (TP/LMT 先、SL/STP 後)，最後依 Order ID
+        def order_sort_key(item):
+            t_type = item.get("order_type", "")
+            type_prio = 0 if t_type == "LMT" else (1 if ("STP" in t_type or "TRAIL" in t_type) else 2)
+            return (
+                item.get("symbol", "").upper(),
+                item.get("bracket_key", ""),
+                type_prio,
+                item.get("order_id", 0)
+            )
+
+        order_list.sort(key=order_sort_key)
+        local_ib.disconnect()
+        return jsonify({"status": "ok", "count": len(order_list), "orders": order_list})
+    except Exception as e:
+        if 'local_ib' in locals() and local_ib.isConnected():
+            local_ib.disconnect()
+        # 失敗時嘗試降級讀取 LATEST_SNAPSHOT 中的 orders
+        snap = get_snapshot()
+        snap_orders = snap.get('orders', [])
+        if snap_orders:
+            return jsonify({"status": "ok", "from_cache": True, "count": len(snap_orders), "orders": snap_orders})
+        return jsonify({"status": "error", "message": str(e), "count": 0, "orders": []})
+
+
+@dash_app.route("/api/ib/cancel_order", methods=["POST"])
+def api_ib_cancel_order():
+    payload = request.get_json(silent=True) or {}
+    if not check_dashboard_auth(payload):
+        return jsonify({"status": "error", "message": "密碼錯誤"}), 401
+
+    order_id = payload.get("order_id")
+    client_id = payload.get("client_id")
+    perm_id = payload.get("perm_id")
+
+    if order_id is None and perm_id is None:
+        return jsonify({"status": "error", "message": "缺少 order_id 或 perm_id"}), 400
+
+    import asyncio, random
+    from ib_insync import IB
+
+    cancelled = False
+    res_msg = ""
+
+    # 1. 先檢查主程式全域連線 ib 是否有該筆 trade
+    global ib
+    if 'ib' in globals() and ib and ib.isConnected():
+        try:
+            for t in ib.openTrades():
+                if (perm_id and t.order.permId == int(perm_id)) or (t.order.orderId == int(order_id) and (client_id is None or t.order.clientId == int(client_id))):
+                    ib.cancelOrder(t.order)
+                    cancelled = True
+                    res_msg = f"已由主連線成功發送取消委託 #{order_id}"
+                    break
+        except Exception as e:
+            pass
+
+    # 2. 若未取消成功，使用專屬 client_id 連線進行取消
+    if not cancelled:
+        cids_to_try = []
+        if client_id is not None:
+            try:
+                cids_to_try.append(int(client_id))
+            except (ValueError, TypeError):
+                pass
+        cids_to_try.extend([0, random.randint(8100, 8990)])
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        for cid in cids_to_try:
+            local_ib = IB()
+            local_ib.reqPositionsAsync = lambda: asyncio.sleep(0)
+            local_ib.reqAccountUpdatesAsync = lambda acct: asyncio.sleep(0)
+            local_ib.reqAccountUpdatesMultiAsync = lambda acct: asyncio.sleep(0)
+            local_ib.reqOpenOrdersAsync = lambda: asyncio.sleep(0)
+            local_ib.reqCompletedOrdersAsync = lambda apiOnly: asyncio.sleep(0)
+            local_ib.reqExecutionsAsync = lambda: asyncio.sleep(0)
+            try:
+                local_ib.connect(IB_HOST, IB_PORT, clientId=cid, timeout=4)
+                trades = local_ib.reqOpenOrders()
+                matched = None
+                for t in trades:
+                    if perm_id and t.order.permId == int(perm_id):
+                        matched = t
+                        break
+                    if order_id and t.order.orderId == int(order_id):
+                        matched = t
+                        break
+                
+                if matched:
+                    local_ib.cancelOrder(matched.order)
+                    local_ib.sleep(0.8)
+                    cancelled = True
+                    res_msg = f"已成功取消掛單 (Order #{order_id}, ClientID: {cid}, PermID: {perm_id})"
+                else:
+                    # 直接透過 API client 發送 cancelOrder
+                    if order_id:
+                        local_ib.client.cancelOrder(int(order_id))
+                        local_ib.sleep(0.5)
+                        cancelled = True
+                        res_msg = f"已發送取消指令 (Order #{order_id}, ClientID: {cid})"
+                local_ib.disconnect()
+                if cancelled:
+                    break
+            except Exception as ex:
+                if local_ib.isConnected():
+                    local_ib.disconnect()
+                continue
+
+    if cancelled:
+        print(f"[看板] {res_msg}")
+        return jsonify({"status": "ok", "message": res_msg})
+    else:
+        return jsonify({"status": "error", "message": f"未能取消委託 Order #{order_id}，請檢查 IBKR 是否已成交或已過期"}), 500
+
+
+@dash_app.route("/api/env_content", methods=["GET"])
+def api_get_env_content():
+    try:
+        env_path = os.path.join(BASE_DIR, ".env")
+        if not os.path.exists(env_path):
+            return jsonify({"status": "error", "message": f"找不到 .env 檔案"}), 404
+        with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(env_path)).strftime("%Y-%m-%d %H:%M:%S")
+        return jsonify({
+            "status": "ok",
+            "content": content,
+            "mtime": mtime,
+            "path": env_path
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@dash_app.route("/api/save_env", methods=["POST"])
+def api_save_env():
+    payload = request.get_json(silent=True) or {}
+    if not check_dashboard_auth(payload):
+        return jsonify({"status": "error", "message": "密碼錯誤"}), 401
+
+    content = payload.get("content")
+    if content is None:
+        return jsonify({"status": "error", "message": "缺少 content 內容"}), 400
+
+    try:
+        env_path = os.path.join(BASE_DIR, ".env")
+        # 自動建立備份檔 .env.bak
+        if os.path.exists(env_path):
+            import shutil
+            shutil.copyfile(env_path, env_path + ".bak")
+
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        mtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[看板] trade/.env 已成功由線上看板更新！(已自動備份為 .env.bak)")
+        return jsonify({"status": "ok", "message": "trade/.env 儲存成功！(已自動備份為 .env.bak)", "mtime": mtime})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @dash_app.route("/api/vxm/status", methods=["GET"])
 def api_vxm_status():
     return jsonify(get_vxm_status_data())
@@ -2695,7 +3331,7 @@ def api_group_close():
             return jsonify({"status": "ok", "message": f"【{group_name}】部位已處於平倉狀態，無須送單", "details": []})
 
         # 等待委託狀態回報
-        local_ib.sleep(2)
+        local_ib.sleep(0.5)
 
         orders_sent = []
         has_failure = False

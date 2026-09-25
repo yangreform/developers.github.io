@@ -197,20 +197,13 @@ def save_report_and_notify(report_text, filename_prefix, line_title):
 
     archive_fname = f"{filename_prefix}_{ts_str}.txt"
     archive_path = os.path.join(REPORTS_DIR, archive_fname)
-    latest_path = os.path.join(BASE_DIR, f"{filename_prefix}.txt")
-    root_latest_path = os.path.join(BARCHART_DIR, f"{filename_prefix}.txt")
 
     content = f"==分析時間：{now_str}==\n{report_text}\n"
 
     with open(archive_path, "w", encoding="utf-8") as f:
         f.write(content)
-    with open(latest_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    with open(root_latest_path, "w", encoding="utf-8") as f:
-        f.write(content)
 
     print(f"[INFO] 報告已存檔至：{archive_path}")
-    print(f"[INFO] 最新文字檔已同步至：{latest_path}")
 
     # 組裝推播訊息 (前 15 行重點)
     lines = report_text.split("\n")
@@ -311,7 +304,7 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
         print(f"     • 🎯 Profit Taker (2倍停利單): ${take_profit_price:.2f}")
         print(f"     • 🛑 Stop Loss    (一半停損單): ${stop_loss_price:.2f}")
 
-        # 組裝 Bracket Order
+        # 組裝 Bracket Order (母單為市價 Adaptive Patient，附屬單為停利與停損)
         bracket = ib.bracketOrder(
             action="BUY",
             quantity=1,
@@ -320,7 +313,9 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
             stopLossPrice=stop_loss_price,
         )
 
-        # 母單套用 Adaptive Patient 演算法
+        # 母單設定為市價 Adaptive Patient 演算法
+        bracket.parent.orderType = "MKT"
+        bracket.parent.lmtPrice = 0
         bracket.parent.algoStrategy = "Adaptive"
         bracket.parent.algoParams = [TagValue("adaptivePriority", "Patient")]
         bracket.parent.tif = "DAY"
@@ -335,7 +330,7 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
         order_list = [bracket.parent, bracket.takeProfit, bracket.stopLoss]
         desc = (
             f"Buy Call {contract.localSymbol}\n"
-            f"     委託: BUY 1口 @ 限價 ${current_price:.2f} (Adaptive Patient)\n"
+            f"     委託: BUY 1口 @ 市價 (Adaptive Patient, 參考現價 ${current_price:.2f})\n"
             f"     🎯 停利 (2倍): ${take_profit_price:.2f} | 🛑 停損 (一半): ${stop_loss_price:.2f}"
         )
 
@@ -355,10 +350,10 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
 🕒 時間：{now_str}
 ⚙️ 模式：{'模擬測試 (Dry-Run)' if dry_run else '正式送單 (Live)'}
 📋 合約：{contract.localSymbol} (conId: {contract.conId})
-💵 即時限價：${current_price:.2f}
+💵 參考現價：${current_price:.2f}
 🎯 停利單 (2倍)：${take_profit_price:.2f}
 🛑 停損單 (一半)：${stop_loss_price:.2f}
-⚡ 演算法：Adaptive Patient
+⚡ 委託方式：市價 Adaptive Patient
 📊 委託狀態：{status}"""
 
         if send_push_message:

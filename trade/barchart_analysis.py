@@ -248,13 +248,21 @@ def is_report_complete(text):
 def call_gemini_rest(prompt, api_key):
     """
     Direct REST API call with model fallback chain.
-    優先使用產出最為迅速且穩定的 gemini-3.6-flash (~3s)，次選 gemini-3.8-flash，備援 gemini-3.7-flash。
     """
+    candidate_models = [
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3-flash-preview",
+        "gemini-3.5-flash",
+        "gemini-3.6-flash",
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+    ]
     if call_gemini_for_skill:
         res = call_gemini_for_skill(
             prompt=prompt,
             api_key=api_key,
-            candidate_models=["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.7-flash"],
+            candidate_models=candidate_models,
             timeout=50,
             min_chars=1000,
             validate_func=is_report_complete,
@@ -264,8 +272,6 @@ def call_gemini_rest(prompt, api_key):
         if res and is_report_complete(res):
             return res
         raise RuntimeError("所有 Gemini 模型呼叫均未成功或回傳報告均不完整。")
-
-    candidate_models = ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.7-flash"]
 
     for m_name in candidate_models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{m_name}:generateContent?key={api_key}"
@@ -316,30 +322,15 @@ def save_analysis_to_text_file(analysis_text, target_dir=REPORTS_DIR):
     ts_str = now.strftime("%Y-%m-%d_%H%M%S")
     now_readable = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    archive_filename = f"ai_analysis_{ts_str}.txt"
+    archive_filename = f"latest_ai_analysis_{ts_str}.txt"
     archive_path = os.path.join(target_dir, archive_filename)
-    latest_path = os.path.join(target_dir, "latest_ai_analysis.txt")
-    root_latest_path = os.path.join(BARCHART_DIR, "latest_ai_analysis.txt")
-    base_latest_path = os.path.join(BASE_DIR, "latest_ai_analysis.txt")
 
-    file_content = f"""==分析時間：{now_readable}==
-{analysis_text}
-"""
+    file_content = f"""==分析時間：{now_readable}=={analysis_text}"""
 
     with open(archive_path, "w", encoding="utf-8") as f:
         f.write(file_content)
 
-    with open(latest_path, "w", encoding="utf-8") as f:
-        f.write(file_content)
-
-    with open(root_latest_path, "w", encoding="utf-8") as f:
-        f.write(file_content)
-
-    with open(base_latest_path, "w", encoding="utf-8") as f:
-        f.write(file_content)
-
     print(f"[INFO] 完整文字檔已成功存檔至：{archive_path}")
-    print(f"[INFO] 最新文字檔已同步至：{latest_path} 及 {base_latest_path}")
     return archive_filename, archive_path
 
 

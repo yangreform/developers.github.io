@@ -78,6 +78,24 @@ class InsiderSelectionSkill:
         # 符號大寫化
         df["Symbol"] = df["Symbol"].astype(str).str.strip().str.upper()
 
+        # 【非期權標的物理過濾】：剔除特別股 (Preferred)、權證 (Warrants)、單位 (Units) 等無期權市場之代碼
+        # 1. 包含特殊字符 (., -, +, /, ^ 等非美股常規代碼，如 TFPM.TO, PSA-L, BRK.B)
+        # 2. 5 碼以上且字尾為 P (特別股 如 NFEGP, LILAP), W (權證), R (權益), U (單位), 或包含 PR
+        def _is_non_opt(sym_str):
+            s = str(sym_str).strip().upper()
+            if re.search(r'[\.\-\+\/\^]', s):
+                return True
+            if len(s) >= 5:
+                if s.endswith(('P', 'W', 'R', 'U')) or 'PR' in s:
+                    return True
+            return False
+
+        non_opt_mask = df["Symbol"].apply(_is_non_opt)
+        if non_opt_mask.any():
+            filtered_non_opt = df[non_opt_mask]["Symbol"].unique().tolist()
+            df = df[~non_opt_mask]
+            print(f"[INFO] [SelectionSkill] 已剔除非期權標的 (特別股/權證/單位等共 {len(filtered_non_opt)} 檔): {filtered_non_opt[:8]}")
+
         # 【資料層物理過濾】：排除冷卻中與黑名單標的
         excluded_set = {s.upper() for s in (excluded_symbols or [])}
         if excluded_set:
