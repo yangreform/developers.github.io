@@ -29,8 +29,8 @@ if "%MM%"=="24" (
         timeout /t 3 /nobreak >nul
     )
 
-    if "%HH%"=="12" set "MATCH=1"
-    if "%HH%"=="00" set "MATCH=1"
+    if "%HH%"=="11" set "MATCH=1"
+    if "%HH%"=="23" set "MATCH=1"
     if "%MATCH%"=="1" (
 	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "opinion.py" >nul
 	if !errorlevel! equ 0 (
@@ -41,12 +41,21 @@ if "%MM%"=="24" (
 	set "MATCH=0"
     )
 
-    if "%HH%"=="01" (
+    if "%HH%"=="00" (
 	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "insider.py" >nul
 	if !errorlevel! equ 0 (
 	    echo [OK] insider.py is running.
 	) else (
 	    start "insider" /max py .\insider.py
+	)
+    )
+
+    if "%HH%"=="01" (
+	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "long-call-options-screener.py" >nul
+	if !errorlevel! equ 0 (
+	    echo [OK] long-call-options-screener.py is running.
+	) else (
+	    start "long-call-options-screener.py" /max py .\long-call-options-screener.py
 	)
     )
 

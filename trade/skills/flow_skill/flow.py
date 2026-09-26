@@ -71,6 +71,13 @@ class OptionsFlowSkill:
             print(f"[WARN] [FlowSkill] {sym_clean} Options Flow 表格為空或無有效交易數據。")
             return "", pd.DataFrame()
 
+        # 嚴格校驗 CSV 內容是否包含目標 symbol，杜絕跨標的混淆
+        df_symbols = set(df["Symbol"].astype(str).str.strip().str.upper().unique())
+        if sym_clean not in df_symbols:
+            print(f"[ERROR] [FlowSkill] CSV 標的 ({df_symbols}) 與請求標的 ({sym_clean}) 不符，拒絕分析非目標股票數據！")
+            return "", pd.DataFrame()
+        df = df[df["Symbol"].astype(str).str.strip().str.upper() == sym_clean]
+
         # 數值型態清理
         numeric_cols = ["Price~", "Strike", "DTE", "Trade", "Size", "Premium", "Volume", "Open Int", "Delta"]
         for col in numeric_cols:

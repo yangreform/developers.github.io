@@ -121,6 +121,32 @@
       },
       "status": "recommended",
       "notes": "Selected by Skills Pipeline on 2026-09-25 01:24:11"
+    },
+    {
+      "symbol": "DKS",
+      "recommended_at": "2026-09-25 22:33:03",
+      "company_name": "Dick's Sporting Goods Inc",
+      "insider_net_buy": 1244890.0,
+      "selected_call": {
+        "symbol": "DKS",
+        "strike": 135.0,
+        "exp_date": "20261009",
+        "ref_price": 3.9,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-09-25 22:31:08"
+    },
+    {
+      "symbol": "NYAX",
+      "recommended_at": "2026-09-26 01:25:52",
+      "company_name": "Nayax Ltd",
+      "insider_net_buy": 4720709.0,
+      "selected_call": {},
+      "status": "invalid_no_options",
+      "notes": "No options listed on US exchanges (IBKR Error 200). Non-optionable stock."
     }
   ]
 }

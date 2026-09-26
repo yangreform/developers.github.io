@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Barchart Insider Trading & Options Flow Pipeline with Skills Architecture (trade/insider.py)
+Barchart Long Call Options Screener Pipeline with Skills Architecture (trade/long-call-options-screener.py)
 ================================================================================
 本模組為高階管線調度器 (High-level Pipeline Orchestrator)，導入模組化 Agentic Skills 設計：
   1. Memory Skill (trade/skills/memory_skill/):
-     - 負責讀寫 trade/memory/selection_history.json
+     - 負責讀寫 trade/memory/long-call-options-screener_history.json
      - 追蹤歷史推薦標的，提供 14 天冷卻期 (Cooldown) 與永久黑名單過濾，杜絕重複推薦
-  2. Selection Skill (trade/skills/selection_skill/):
-     - 內部人交易數據清洗、真金白銀淨買入聚合、雙重防重複（資料層物理剔除 + Prompt 風控約束）
-     - Gemini AI 深度量化分析，精選唯一最佳標的
-  3. Flow Skill (trade/skills/flow_skill/):
-     - 標的期權大單流向 (Options Flow) 清洗、過濾 0DTE 雜訊、權利金大單排序
-     - Gemini AI 大單解讀，精選唯一最佳 CALL 合約規格 (Strike, Exp Date, Ref Price)
-  4. IBKR 智能下單模組:
-     - 預查即時市價，發送 Adaptive Patient 限價母單，掛出 2 倍停利與一半停損 Attached Orders
+  2. Selection Skill (trade/skills/long_call_skill/):
+     - 前往 https://www.barchart.com/options/long-call-options-screener 下載官方 CSV
+     - 真金白銀淨買入聚合、雙重防重複（資料層物理剔除 + Prompt 風控約束）
+     - Gemini AI 深度量化分析，精選唯一最佳 Long Call 合約
+  3. IBKR 智能下單模組:
+     - 預查即時市價，發送 Adaptive Patient 市價母單，掛出 2 倍停利與一半停損 Attached Orders
      - 即時結果推播至手機 LINE
 ================================================================================
 """
@@ -47,10 +45,13 @@ ENV_FILE = os.path.join(BASE_DIR, ".env")
 BARCHART_DIR = os.path.join(BASE_DIR, "Barchart")
 OLD_DIR = os.path.join(BARCHART_DIR, "old")
 REPORTS_DIR = os.path.join(BARCHART_DIR, "reports")
+MEMORY_DIR = os.path.join(BASE_DIR, "memory")
+HISTORY_FILE = os.path.join(MEMORY_DIR, "long-call-options-screener_history.json")
 
 os.makedirs(BARCHART_DIR, exist_ok=True)
 os.makedirs(OLD_DIR, exist_ok=True)
 os.makedirs(REPORTS_DIR, exist_ok=True)
+os.makedirs(MEMORY_DIR, exist_ok=True)
 
 # 載入現有基礎輔助模組
 try:
@@ -94,100 +95,67 @@ try:
 except ImportError:
     IB = None
 
-# 載入三大模組化 Skills
+# 載入模組化 Skills
 try:
-    from trade.skills import SelectionMemory, InsiderSelectionSkill, OptionsFlowSkill
+    from trade.skills import SelectionMemory, LongCallSelectionSkill
 except ImportError:
-    from skills.memory_skill import SelectionMemory
-    from skills.selection_skill import InsiderSelectionSkill
-    from skills.flow_skill import OptionsFlowSkill
+    try:
+        from skills import SelectionMemory, LongCallSelectionSkill
+    except ImportError:
+        from skills.memory_skill import SelectionMemory
+        from skills.long_call_skill import LongCallSelectionSkill
 
 
 # ==============================================================================
 # 1. 網頁自動化下載輔助
 # ==============================================================================
-def download_insider_activity_csv(driver, target_dir=BARCHART_DIR):
+def download_long_call_screener_csv(driver, target_dir=BARCHART_DIR):
     """
-    導航至 https://www.barchart.com/investing-ideas/insider-trading-activity
+    導航至 https://www.barchart.com/options/long-call-options-screener
     點擊下載按鈕下載官方 CSV。
     """
     from selenium.webdriver.common.by import By
 
-    url = "https://www.barchart.com/investing-ideas/insider-trading-activity"
-    print(f"\n[INFO] 正在導航至內部人交易頁面: {url} ...")
+    url = "https://www.barchart.com/options/long-call-options-screener"
+    print(f"\n[INFO] 正在導航至 Long Call Options Screener 頁面: {url} ...")
     driver.get(url)
     time.sleep(6)
     dismiss_popups(driver)
 
     before_snapshot = set(glob.glob(os.path.join(target_dir, "*.csv")))
-    dl_buttons = driver.find_elements(By.CSS_SELECTOR, "a.toolbar-button.download, [data-bc-download-button], button.download")
+    dl_buttons = driver.find_elements(
+        By.CSS_SELECTOR,
+        "a.toolbar-button.download, [data-bc-download-button], button.download"
+    )
 
     downloaded_file = None
     if dl_buttons:
         btn = dl_buttons[0]
-        print(f"[INFO] 找到下載按鈕 (text='{btn.text.strip()}'), 點擊下載內部人交易 CSV ...")
+        print(f"[INFO] 找到下載按鈕 (text='{btn.text.strip()}'), 點擊下載 Long Call Screener CSV ...")
         driver.execute_script("arguments[0].click();", btn)
-        downloaded_file = wait_for_file_download(target_dir, before_snapshot, timeout=18)
+        downloaded_file = wait_for_file_download(target_dir, before_snapshot, timeout=20)
 
     if not downloaded_file or not os.path.exists(downloaded_file):
-        candidates = glob.glob(os.path.join(target_dir, "*insider*.csv"))
-        if candidates:
-            candidates.sort(key=os.path.getmtime, reverse=True)
-            downloaded_file = candidates[0]
-            print(f"[INFO] 沿用現存內部人交易 CSV: {downloaded_file}")
-
-    if downloaded_file and os.path.exists(downloaded_file):
-        print(f"[SUCCESS] ✅ 內部人交易 CSV 準備就緒: {downloaded_file} (大小: {os.path.getsize(downloaded_file):,} 位元組)")
-        return downloaded_file
-
-    raise RuntimeError("無法成功下載或取得 Insider Trading Activity CSV 表格。")
-
-
-def download_options_flow_csv(driver, symbol, target_dir=BARCHART_DIR):
-    """
-    導航至 https://www.barchart.com/stocks/quotes/{symbol}/options-flow
-    點擊下載按鈕下載期權大單流向 CSV。
-    """
-    from selenium.webdriver.common.by import By
-
-    sym_clean = symbol.strip().upper()
-    url = f"https://www.barchart.com/stocks/quotes/{sym_clean}/options-flow"
-    print(f"\n[INFO] 正在導航至 {sym_clean} 期權大單流向頁面: {url} ...")
-    driver.get(url)
-    time.sleep(6)
-    dismiss_popups(driver)
-
-    before_snapshot = set(glob.glob(os.path.join(target_dir, "*.csv")))
-    dl_buttons = driver.find_elements(By.CSS_SELECTOR, "a.toolbar-button.download, [data-bc-download-button], button.download")
-
-    downloaded_file = None
-    if dl_buttons:
-        btn = dl_buttons[0]
-        print(f"[INFO] 找到下載按鈕 (text='{btn.text.strip()}'), 點擊下載 {sym_clean} Options Flow CSV ...")
-        driver.execute_script("arguments[0].click();", btn)
-        downloaded_file = wait_for_file_download(target_dir, before_snapshot, timeout=18)
-
-    if not downloaded_file or not os.path.exists(downloaded_file):
-        candidates = glob.glob(os.path.join(target_dir, f"*{sym_clean.lower()}*options-flow*.csv"))
+        candidates = glob.glob(os.path.join(target_dir, "*long-call*.csv"))
         old_dir = os.path.join(target_dir, "old")
         if not candidates and os.path.exists(old_dir):
-            candidates = glob.glob(os.path.join(old_dir, f"*{sym_clean.lower()}*options-flow*.csv"))
+            candidates = glob.glob(os.path.join(old_dir, "*long-call*.csv"))
         if candidates:
             candidates.sort(key=os.path.getmtime, reverse=True)
             downloaded_file = candidates[0]
-            print(f"[INFO] 沿用現存 {sym_clean} Options Flow CSV: {downloaded_file}")
+            print(f"[INFO] 沿用現存 Long Call Screener CSV: {downloaded_file}")
 
     if downloaded_file and os.path.exists(downloaded_file):
-        print(f"[SUCCESS] ✅ {sym_clean} Options Flow CSV 準備就緒: {downloaded_file} (大小: {os.path.getsize(downloaded_file):,} 位元組)")
+        print(f"[SUCCESS] ✅ Long Call Screener CSV 準備就緒: {downloaded_file} (大小: {os.path.getsize(downloaded_file):,} 位元組)")
         return downloaded_file
 
-    raise RuntimeError(f"無法成功下載或取得 {sym_clean} Options Flow CSV 表格 (該標的可能無期權合約或無大單資料)。")
+    raise RuntimeError("無法成功下載或取得 Long Call Options Screener CSV 表格。")
 
 
 # ==============================================================================
 # 2. 存檔與 LINE 推播通知輔助
 # ==============================================================================
-def save_report_and_notify(report_text, filename_prefix, line_title):
+def save_report_and_notify(report_text, filename_prefix="latest_long_call", line_title="Barchart Long Call 選擇權 AI 最佳推薦"):
     """
     儲存分析報告並推播至手機 LINE
     """
@@ -209,7 +177,11 @@ def save_report_and_notify(report_text, filename_prefix, line_title):
     # 組裝推播訊息 (前 15 行重點)
     lines = report_text.split("\n")
     summary_lines = []
-    keywords = ["【", "📌", "推薦", "代號", "履約價", "到期日", "金額", "理由", "增持", "均價", "主力", "權利金", "Profit", "Stop", "Symbol"]
+    keywords = [
+        "【", "📌", "推薦", "代號", "履約價", "到期日", "金額", "理由",
+        "現價", "均價", "主力", "權利金", "Profit", "Stop", "Symbol",
+        "Delta", "DTE", "IV", "Ask", "勝率"
+    ]
     for l in lines:
         if any(kw in l for kw in keywords):
             summary_lines.append(l)
@@ -234,6 +206,9 @@ def save_report_and_notify(report_text, filename_prefix, line_title):
     return archive_path
 
 
+# ==============================================================================
+# 3. IBKR 合約驗證與下單模組
+# ==============================================================================
 def check_ibkr_contract_validity(symbol, exp_date, strike, right="C", host="127.0.0.1", port=4001):
     """
     快速向 IBKR 驗證期權合約是否存在且可交易。
@@ -241,13 +216,12 @@ def check_ibkr_contract_validity(symbol, exp_date, strike, right="C", host="127.
     若 IBKR 回報無該合約定義 (No security definition) 或已過期，回傳 (False, None)。
     若 IBKR 未開啟或無法連線，回傳 (True, None) 允許離線流程通行。
     """
-    ib = None
     try:
         from ib_insync import Option
         ib = create_fast_ib_connection(host=host, port=port, client_id=random.randint(9780, 9799))
         if not ib or not ib.isConnected():
             return True, None
-    except Exception:
+    except Exception as conn_err:
         return True, None
 
     try:
@@ -266,15 +240,15 @@ def check_ibkr_contract_validity(symbol, exp_date, strike, right="C", host="127.
 def execute_ibkr_call_order(contract_info, dry_run=False):
     """
     連線 IBKR，建立 Call 期權合約，預查即時市價，
-    送出 Adaptive Patient 限價買入母單，並掛出 Attached 訂單：
-      - Profit Taker: 2倍限價 (2.0 * limit_price)
-      - Stop Loss:    一半限價 (0.5 * limit_price)
+    送出 Adaptive Patient 市價買入母單，並掛出 Attached 訂單：
+      - Profit Taker: 2倍現價 (round(current_price * 2.0, 2))
+      - Stop Loss:    一半現價 (max(0.01, round(current_price * 0.5, 2)))
     下單完成後推播結果至手機 LINE。
     """
     symbol = contract_info["symbol"]
     strike = contract_info["strike"]
     exp_date = contract_info["exp_date"]
-    ref_price = contract_info.get("ref_price", 1.0)
+    ref_price = contract_info.get("ref_price", contract_info.get("ask", 1.0))
 
     print("\n" + "=" * 65)
     print(f"🚀 【IBKR 智能下單模組】執行 {symbol} CALL 買入委託")
@@ -320,7 +294,7 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
             current_price = ref_price
 
         current_price = max(0.05, round(current_price, 2))
-        print(f"  -> 預查即時限價成功: ${current_price:.2f} (即時Bid: {ticker.bid}, Ask: {ticker.ask}, 參考價: {ref_price})")
+        print(f"  -> 預查即時參考價成功: ${current_price:.2f} (即時Bid: {ticker.bid}, Ask: {ticker.ask}, 參考價: {ref_price})")
 
         # 計算 Attached Order 價格：
         # BUY CALL: Profit Taker 現價 2 倍，Stop Loss 現價 0.5 倍
@@ -373,7 +347,7 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
 
         # 推播下單詳情報告至 LINE
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line_msg = f"""🚀【IBKR 內部人期權自動下單回報】
+        line_msg = f"""🚀【IBKR Long Call 選擇權自動下單回報】
 🕒 時間：{now_str}
 ⚙️ 模式：{'模擬測試 (Dry-Run)' if dry_run else '正式送單 (Live)'}
 📋 合約：{contract.localSymbol} (conId: {contract.conId})
@@ -413,7 +387,7 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
 # ==============================================================================
 # 4. 主控管線入口 (Pipeline Orchestrator with Skills)
 # ==============================================================================
-def run_insider_pipeline(
+def run_long_call_pipeline(
     headless=False,
     dry_run=False,
     skip_download=False,
@@ -426,157 +400,152 @@ def run_insider_pipeline(
     global send_push_message
     if no_line:
         send_push_message = None
-    """
-    以模組化 Agentic Skills 流程執行內部人選股、大單解讀與期權下單：
-      Step 0: 初始化 Memory Skill，讀取歷史標的與排除名單
-      Step 1: 下載/定位全市場內部人交易表格
-      Step 2: 呼叫 Selection Skill 進行籌碼清洗、物理過濾、AI 深度選股
-      Step 3: 下載/定位所選標的之期權大單流向表格
-      Step 4: 呼叫 Flow Skill 進行大單清洗、AI 挑選最佳 CALL 合約
-      Step 5: 記錄選中標的至 Memory Skill 記憶庫 (防止近期再次重複推薦)
-      Step 6: 連線 IBKR 預查現價並發送 Adaptive Bracket 限價單
-    """
+
     start_time = time.time()
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print("\n" + "=" * 70)
-    print(f"🌟 Barchart 內部人交易 & 期權大單 Skills 自動化系統啟動 ({now_str})")
+    print(f"🌟 Barchart Long Call 選擇權量化選股 & 下單系統啟動 ({now_str})")
     print("=" * 70)
 
-    # 1. 初始化 Memory Skill
+    # 1. 步驟 0: 初始化 Memory Skill (讀取專屬歷史記錄與 14 天冷卻期過濾)
     print("\n🧠 【步驟 0】初始化 Memory Skill (歷史記錄與排除過濾)")
     print("-" * 70)
-    memory = SelectionMemory(cooldown_days=cooldown_days)
+    memory = SelectionMemory(file_path=HISTORY_FILE, cooldown_days=cooldown_days)
     excluded_symbols = memory.get_excluded_symbols()
+    print(f"[MemorySkill] 記憶庫檔案位置: {HISTORY_FILE}")
     print(f"[MemorySkill] 當前冷卻天數設定: {cooldown_days} 天")
     print(f"[MemorySkill] 歷史排除/黑名單標的 ({len(excluded_symbols)} 檔): {sorted(excluded_symbols) if excluded_symbols else '無'}")
 
     driver = None
-    insider_csv = None
-    options_flow_csv = None
-    selected_symbol = symbol_override
-    company_name = ""
-    net_buy_total = 0.0
+    screener_csv = None
+    contract_info = None
+    report_text = ""
 
     try:
-        # 2. 步驟 1: 下載全市場內部人交易數據
-        print("\n📥 【步驟 1】取得全市場內部人交易 CSV (Insider Trading Activity)")
+        # 2. 步驟 1: 下載 Long Call Options Screener 官方數據
+        print("\n📥 【步驟 1】取得 Long Call Options Screener CSV 表格")
         print("-" * 70)
         if not skip_download:
             account, password = load_credentials_from_env(ENV_FILE)
             driver = init_driver(download_dir=BARCHART_DIR, profile_dir=PROFILE_DIR, headless=headless)
             login_if_needed(driver, account, password)
-            insider_csv = download_insider_activity_csv(driver, target_dir=BARCHART_DIR)
+            screener_csv = download_long_call_screener_csv(driver, target_dir=BARCHART_DIR)
         else:
-            candidates = glob.glob(os.path.join(BARCHART_DIR, "*insider*.csv"))
+            candidates = glob.glob(os.path.join(BARCHART_DIR, "*long-call*.csv"))
             if not candidates:
-                candidates = glob.glob(os.path.join(OLD_DIR, "*insider*.csv"))
+                candidates = glob.glob(os.path.join(OLD_DIR, "*long-call*.csv"))
             if candidates:
                 candidates.sort(key=os.path.getmtime, reverse=True)
-                insider_csv = candidates[0]
-                print(f"[INFO] (跳過下載) 使用現存內部人交易 CSV: {insider_csv}")
+                screener_csv = candidates[0]
+                print(f"[INFO] (跳過下載) 使用現存 Long Call Screener CSV: {screener_csv}")
             else:
-                raise FileNotFoundError("未找到任何現存的內部人交易 CSV 檔案。")
+                raise FileNotFoundError("未找到任何現存的 Long Call Screener CSV 檔案。")
 
-        # 3. 步驟 2: Selection Skill 內部人籌碼分析與 AI 選股
-        print("\n🎯 【步驟 2】呼叫 Selection Skill 進行數據清洗、防重過濾與 AI 選股")
+        # 3. 步驟 2: Selection Skill 籌碼清洗、雙重防重複過濾與 Gemini AI 量化分析
+        print("\n🎯 【步驟 2】呼叫 Selection Skill 進行數據清洗、防重過濾與 AI 選約")
         print("-" * 70)
         api_key = load_gemini_api_key(ENV_FILE) if load_gemini_api_key else None
-        selection_skill = InsiderSelectionSkill(api_key=api_key, env_path=ENV_FILE)
+        selection_skill = LongCallSelectionSkill(api_key=api_key, env_path=ENV_FILE)
 
-        if not selected_symbol:
-            selection_result = selection_skill.select_best_symbol(
-                csv_path=insider_csv,
-                memory_skill=memory,
-                max_retries=retries
-            )
-            selected_symbol = selection_result["symbol"]
-            company_name = selection_result.get("company_name", "")
-            net_buy_total = selection_result.get("insider_net_buy", 0.0)
-            insider_report = selection_result["report_text"]
-        else:
-            print(f"[INFO] 使用手動指定標的: {selected_symbol}")
-            insider_report = f"手動指定分析標的: {selected_symbol}"
+        selection_result = selection_skill.select_best_contract(
+            csv_path=screener_csv,
+            memory_skill=memory,
+            symbol_override=symbol_override,
+            max_retries=retries,
+        )
 
-        print(f"\n✨ 【Selection Skill 選定成果】: 標的 {selected_symbol} ({company_name}), 內部人淨增持: ${net_buy_total:,.2f}")
-        save_report_and_notify(insider_report, "latest_insider", f"Barchart 內部人交易 AI 最佳推薦 ({selected_symbol})")
+        if selection_result.get("status") != "ok" or not selection_result.get("contract"):
+            msg = f"⚠️ [Selection Skill] 未能成功挑選出合法 Long Call 合約: {selection_result.get('message', '未知原因')}"
+            print(msg)
+            save_report_and_notify(msg, "latest_long_call", "Long Call Screener 無合適標的提醒")
+            return False
 
-        # 4. 步驟 3 & 4: 下載與解讀期權大單 (具備候選標的自動備援機制)
-        candidates_to_try = [selected_symbol]
-        if not symbol_override and "top_candidates" in selection_result:
-            for c in selection_result["top_candidates"]:
-                if c not in candidates_to_try and c not in memory.get_excluded_symbols():
-                    candidates_to_try.append(c)
+        contract_info = selection_result["contract"]
+        report_text = selection_result["report_text"]
+        top_candidates = selection_result.get("top_candidates", [])
 
-        flow_skill = OptionsFlowSkill(api_key=api_key, env_path=ENV_FILE)
-        active_symbol = selected_symbol
-        contract_info = None
-        call_report = None
+        # 4. 步驟 3: 實時向 IBKR 驗證合約有效性 (具備自動備援替換機制)
+        print("\n🔍 【步驟 3】驗證期權合約在 IBKR 是否有效且存在")
+        print("-" * 70)
+        cfg = load_env_settings(ENV_FILE)
+        host = cfg.get("IB_HOST", "127.0.0.1")
+        port = cfg.get("IB_PORT", 4001)
 
-        for sym in candidates_to_try:
-            print(f"\n📥 【步驟 3】取得 {sym} 期權大單流向 CSV (Options Flow)")
-            print("-" * 70)
-            cur_csv = None
-            try:
-                if not skip_download:
-                    if not driver:
-                        account, password = load_credentials_from_env(ENV_FILE)
-                        driver = init_driver(download_dir=BARCHART_DIR, profile_dir=PROFILE_DIR, headless=headless)
-                        login_if_needed(driver, account, password)
-                    cur_csv = download_options_flow_csv(driver, sym, target_dir=BARCHART_DIR)
-                else:
-                    candidates = glob.glob(os.path.join(BARCHART_DIR, f"*{sym.lower()}*options-flow*.csv"))
-                    if not candidates:
-                        candidates = glob.glob(os.path.join(OLD_DIR, f"*{sym.lower()}*options-flow*.csv"))
-                    if candidates:
-                        candidates.sort(key=os.path.getmtime, reverse=True)
-                        cur_csv = candidates[0]
-                        print(f"[INFO] (跳過下載) 使用現存 {sym} Options Flow CSV: {cur_csv}")
-                    else:
-                        print(f"[WARN] 未找到任何現存的 {sym} Options Flow CSV 檔案，嘗試下一候選標的...")
-                        continue
-            except Exception as dl_err:
-                print(f"[WARN] 下載或尋找 {sym} Options Flow 異常: {dl_err}")
-                continue
+        is_valid, q_contract = check_ibkr_contract_validity(
+            symbol=contract_info["symbol"],
+            exp_date=contract_info["exp_date"],
+            strike=contract_info["strike"],
+            right="C",
+            host=host,
+            port=port,
+        )
 
-            if not cur_csv or not os.path.exists(cur_csv):
-                continue
-
-            print(f"\n🐋 【步驟 4】呼叫 Flow Skill 解讀 {sym} 期權大單並挑選最佳 CALL")
-            print("-" * 70)
-            flow_result = flow_skill.select_best_call(
-                csv_path=cur_csv,
-                symbol=sym,
-                max_retries=retries
-            )
-
-            if flow_result.get("status") == "ok" and flow_result.get("contract"):
-                c_info = flow_result["contract"]
-                # 實時向 IBKR 驗證合約是否真實存在 (避免非標準履約價或無期權合約標的)
-                cfg = load_env_settings(ENV_FILE)
-                host = cfg.get("IB_HOST", "127.0.0.1")
-                port = cfg.get("IB_PORT", 4001)
-                is_valid, q_contract = check_ibkr_contract_validity(
-                    symbol=c_info["symbol"],
-                    exp_date=c_info["exp_date"],
-                    strike=c_info["strike"],
+        if not is_valid:
+            print(f"[WARN] ⚠️ 首選合約 ({contract_info['symbol']} {contract_info['exp_date']} C{contract_info['strike']}) 在 IBKR 查無定義！啟動備援候選名單輪詢...")
+            found_backup = False
+            for cand in top_candidates:
+                cand_sym = cand["symbol"]
+                if cand_sym in memory.get_excluded_symbols():
+                    continue
+                v, qc = check_ibkr_contract_validity(
+                    symbol=cand["symbol"],
+                    exp_date=cand["exp_date"],
+                    strike=cand["strike"],
                     right="C",
                     host=host,
-                    port=port
+                    port=port,
                 )
-                if not is_valid:
-                    print(f"[WARN] ⚠️ 標的 {sym} 之期權合約 ({c_info['symbol']} {c_info['exp_date']} C{c_info['strike']}) 在 IBKR 查無定義，合約無效！切換至下一位候選標的...")
-                    continue
+                if v:
+                    contract_info = cand
+                    q_contract = qc
+                    found_backup = True
+                    print(f"[SUCCESS] ✅ 成功切換至 IBKR 有效備援合約: {contract_info['symbol']} {contract_info['exp_date']} C{contract_info['strike']}")
+                    break
 
-                active_symbol = sym
-                contract_info = c_info
-                call_report = flow_result["report_text"]
-                con_id_str = f" (conId: {q_contract.conId})" if (q_contract and getattr(q_contract, "conId", 0)) else ""
-                print(f"[SUCCESS] ✅ 成功鎖定具備主力 CALL 大單且通過 IBKR 驗證之標的: {active_symbol}{con_id_str}")
-                break
+            if not found_backup:
+                print("[WARN] ⚠️ 候選清單中皆無可被 IBKR 驗證之有效合約 (可能合約已過期或查無定義)，將略過下單步驟。")
+                contract_valid_for_order = False
             else:
-                print(f"[WARN] 標的 {sym} 無任何 CALL 買權大單 (可能無期權合約或無大單)，嘗試下一候選標的...")
+                contract_valid_for_order = True
+        else:
+            contract_valid_for_order = True
+            con_id_str = f" (conId: {q_contract.conId})" if (q_contract and getattr(q_contract, "conId", 0)) else ""
+            print(f"[SUCCESS] ✅ 首選期權合約通過 IBKR 驗證: {contract_info['symbol']} {contract_info['exp_date']} C{contract_info['strike']}{con_id_str}")
 
-        # 關閉瀏覽器釋放資源
+        print(f"\n✨ 【精選 Long Call 合約】: {contract_info['symbol']} Strike=${contract_info['strike']} Exp={contract_info['exp_date']} Ask=${contract_info.get('ask', contract_info.get('ref_price'))} Delta={contract_info.get('delta')}")
+
+        # 5. 步驟 4: 儲存報告並推播至 LINE
+        print("\n📊 【步驟 4】儲存分析報告並推播至 LINE")
+        print("-" * 70)
+        save_report_and_notify(
+            report_text,
+            "latest_long_call",
+            f"Barchart Long Call 選擇權 AI 最佳推薦 ({contract_info['symbol']})"
+        )
+
+        # 6. 步驟 5: 寫入 Memory Skill (記錄本次推薦與合約，納入 14 天冷卻名單)
+        print("\n💾 【步驟 5】更新 Memory Skill 歷史推薦記憶庫")
+        print("-" * 70)
+        memory.record_selection(
+            symbol=contract_info["symbol"],
+            company_name=contract_info.get("company_name", ""),
+            contract=contract_info,
+            reason=f"Selected by Long Call Pipeline on {now_str}"
+        )
+        print(f"[SUCCESS] [MemorySkill] 已成功將標的 {contract_info['symbol']} 記錄至 {HISTORY_FILE} (納入 {cooldown_days} 天冷卻名單)")
+
+        # 7. 步驟 6: 連線 IBKR 下單 (預查現價 + 市價 Adaptive Patient + 2倍TP + 0.5倍SL)
+        print("\n⚡ 【步驟 6】連線 IBKR 執行自動化期權委託")
+        print("-" * 70)
+        if not skip_order and contract_valid_for_order:
+            order_res = execute_ibkr_call_order(contract_info, dry_run=dry_run)
+            print(f"[INFO] 下單處理結果: {order_res.get('status')} - {order_res.get('desc', order_res.get('message'))}")
+        elif not contract_valid_for_order:
+            print("[INFO] 因期權合約在 IBKR 驗證無效或已過期，已自動略過下單程序以確保交易安全。")
+        else:
+            print("[INFO] 已略過 IBKR 下單步驟 (--skip-order)")
+
+    finally:
         if driver:
             try:
                 driver.quit()
@@ -584,77 +553,27 @@ def run_insider_pipeline(
             except Exception:
                 pass
 
-        if contract_info:
-            selected_symbol = active_symbol
-            c_meta = selection_result.get("candidates_meta", {}).get(active_symbol, {})
-            if c_meta:
-                company_name = c_meta.get("Company_Name", company_name)
-                net_buy_total = float(c_meta.get("Net_Buy_Total", net_buy_total))
-
-            save_report_and_notify(call_report, "latest_insider_call", f"{selected_symbol} 期權大單 AI 最佳 CALL 推薦")
-            print(f"\n✨ 【Flow Skill 精選合約】: {contract_info['symbol']} Strike=${contract_info['strike']} Exp={contract_info['exp_date']} RefPrice=${contract_info['ref_price']}")
-
-            # 6. 步驟 5: 寫入 Memory Skill (記錄本次推薦與合約，納入冷卻名單)
-            print("\n💾 【步驟 5】更新 Memory Skill 歷史推薦記憶庫")
-            print("-" * 70)
-            memory.record_selection(
-                symbol=selected_symbol,
-                company_name=company_name,
-                net_buy_total=net_buy_total,
-                contract=contract_info,
-                reason=f"Selected by Skills Pipeline on {now_str}"
-            )
-
-            # 7. 步驟 6: 連線 IBKR 下單 (預查限價 + Bracket Adaptive Patient)
-            print("\n⚡ 【步驟 6】連線 IBKR 執行自動化期權委託")
-            print("-" * 70)
-            if not skip_order:
-                order_res = execute_ibkr_call_order(contract_info, dry_run=dry_run)
-                print(f"[INFO] 下單處理結果: {order_res.get('status')} - {order_res.get('desc', order_res.get('message'))}")
-            else:
-                print("[INFO] 已略過 IBKR 下單步驟 (--skip-order)")
-        else:
-            msg = f"⚠️ 內部人推薦標的 ({', '.join(candidates_to_try)}) 均無足夠之期權 CALL 大單數據，已跳過期權下單程序。"
-            print(f"\n{msg}")
-            save_report_and_notify(msg, "latest_insider_call", f"{selected_symbol} 期權大單無數據提醒")
-            # 仍記錄選股標的至記憶庫
-            memory.record_selection(
-                symbol=selected_symbol,
-                company_name=company_name,
-                net_buy_total=net_buy_total,
-                contract={},
-                status="no_options_flow",
-                reason=f"Selected by Skills Pipeline on {now_str} (no options flow)"
-            )
-
-    finally:
-        if driver:
-            try:
-                driver.quit()
-            except Exception:
-                pass
-
     elapsed = time.time() - start_time
     print("\n" + "#" * 70)
-    print(f"# ✅ Barchart Skills 內部人 & 期權大單自動化流程完成！(總耗時: {elapsed:.1f} 秒)")
+    print(f"# ✅ Barchart Long Call 選擇權自動化流程完成！(總耗時: {elapsed:.1f} 秒)")
     print("#" * 70 + "\n")
     return True
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Barchart 內部人交易與期權大單 AI 自動化選股與下單流水線 (Skills 架構版)")
+    parser = argparse.ArgumentParser(description="Barchart Long Call 選擇權 AI 自動化量化選股與下單流水線 (Skills 架構版)")
     parser.add_argument("--headless", action="store_true", help="以無瀏覽器視窗模式執行")
     parser.add_argument("--dry-run", action="store_true", help="以模擬模式執行下單（預查市價並計算附屬單，不實際送單至 IBKR）")
     parser.add_argument("--skip-download", action="store_true", help="跳過下載步驟，使用現存 CSV")
     parser.add_argument("--skip-order", action="store_true", help="跳過向 IBKR 下單步驟")
-    parser.add_argument("--symbol", type=str, default=None, help="手動指定分析標的（覆蓋 Gemini 自內部人選出之標的）")
+    parser.add_argument("--symbol", type=str, default=None, help="手動指定分析標的（覆蓋篩選清單之首選標的）")
     parser.add_argument("--cooldown-days", type=int, default=14, help="標的冷卻天數（在此天數內不重複推薦同一標的，預設: 14天）")
     parser.add_argument("--retries", type=int, default=3, help="Gemini 請求最大重試次數")
     parser.add_argument("--no-line", action="store_true", help="不發送 LINE 通知")
     parser.add_argument("--no-sleep", action="store_true", help="執行完畢後直接退出，不常駐 sleep")
     args = parser.parse_args()
 
-    run_insider_pipeline(
+    run_long_call_pipeline(
         headless=args.headless,
         dry_run=args.dry_run,
         skip_download=args.skip_download,
@@ -665,8 +584,7 @@ if __name__ == "__main__":
         no_line=args.no_line,
     )
 
-    import sys
-    if not args.no_sleep and not args.dry_run and sys.stdin and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
+    if not args.no_sleep and not args.dry_run and sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
         try:
             time.sleep(60 * 60 * 20)
         except KeyboardInterrupt:

@@ -18,6 +18,7 @@ from .flow_skill import OptionsFlowSkill
 from .uoa_skill import UoaAnalysisSkill
 from .call_put_flow_skill import CallPutFlowSkill
 from .scale_in_order_skill import ScaleInOrderSkill
+from .long_call_skill import LongCallSelectionSkill
 from .gemini_helper import call_gemini_for_skill, load_gemini_api_key
 
 __all__ = [
@@ -27,6 +28,7 @@ __all__ = [
     "UoaAnalysisSkill",
     "CallPutFlowSkill",
     "ScaleInOrderSkill",
+    "LongCallSelectionSkill",
     "call_gemini_for_skill",
     "load_gemini_api_key",
 ]

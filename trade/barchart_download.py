@@ -533,16 +533,12 @@ def download_options_flow_csv(driver, symbol, target_dir=TARGET_DIR):
     if not downloaded_file or not os.path.exists(downloaded_file):
         candidates = glob.glob(os.path.join(target_dir, f"*{sym_clean.lower()}*options-flow*.csv"))
         old_dir = os.path.join(target_dir, "old")
-        if not candidates:
+        if not candidates and os.path.exists(old_dir):
             candidates = glob.glob(os.path.join(old_dir, f"*{sym_clean.lower()}*options-flow*.csv"))
-        if not candidates:
-            candidates = glob.glob(os.path.join(target_dir, "*options-flow*.csv"))
-        if not candidates:
-            candidates = glob.glob(os.path.join(old_dir, "*options-flow*.csv"))
         if candidates:
             candidates.sort(key=os.path.getmtime, reverse=True)
             downloaded_file = candidates[0]
-            print(f"[INFO] 沿用現存 Options Flow CSV: {downloaded_file}")
+            print(f"[INFO] 沿用現存 {sym_clean} Options Flow CSV: {downloaded_file}")
 
     if downloaded_file and os.path.exists(downloaded_file):
         print(f"[SUCCESS] ✅ {sym_clean} Options Flow CSV 準備就緒: {downloaded_file} (大小: {os.path.getsize(downloaded_file):,} 位元組)")
