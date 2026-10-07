@@ -29,13 +29,17 @@ except ImportError:
     pass
 
 try:
-    from barchart_download import init_driver, dismiss_popups, login_if_needed, load_credentials_from_env, ENV_FILE
+    from trade.skills.download_skill import init_driver, dismiss_popups, login_if_needed, load_credentials_from_env
 except ImportError:
-    init_driver = None
-    dismiss_popups = None
-    login_if_needed = None
-    load_credentials_from_env = None
-    ENV_FILE = os.path.join(BASE_DIR, ".env")
+    try:
+        from skills.download_skill import init_driver, dismiss_popups, login_if_needed, load_credentials_from_env
+    except ImportError:
+        init_driver = None
+        dismiss_popups = None
+        login_if_needed = None
+        load_credentials_from_env = None
+
+ENV_FILE = os.path.join(BASE_DIR, ".env")
 
 
 class BarchartOpinionSkill:
@@ -93,7 +97,7 @@ class BarchartOpinionSkill:
         """
         if self.driver is None:
             if init_driver is None:
-                raise RuntimeError("無法匯入 barchart_download.init_driver，請確認 selenium 與 undetected_chromedriver 已安裝。")
+                raise RuntimeError("無法匯入 download_skill.init_driver，請確認 selenium 與 undetected_chromedriver 已安裝。")
             print("[INFO] [OpinionSkill] 正在啟動瀏覽器驅動...")
             self.driver = init_driver(headless=False)
             self.owns_driver = True

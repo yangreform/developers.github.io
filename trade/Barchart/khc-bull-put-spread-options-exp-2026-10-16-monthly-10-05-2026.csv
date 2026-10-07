@@ -1,0 +1,5 @@
+Price~,"Exp Date",DTE,"Leg1 Strike",Type,Bid1,"Leg2 Strike",Type,Ask2,BE,BE%,"Max Profit","Max Loss","Max Profit%",Risk/Reward,"Net Delta","Loss Prob"
+21.87,2026-10-16,11,21.50,Put,0.22,21.00,Put,0.11,21.39,-2.19%,0.11,0.39,+28.21%,"3.55 to 1",0.163797,31.9%
+21.87,2026-10-16,11,22.00,Put,0.43,20.50,Put,0.06,21.63,-1.10%,0.37,1.13,+32.74%,"3.05 to 1",0.461299,40.7%
+21.87,2026-10-16,11,22.00,Put,0.43,21.00,Put,0.11,21.68,-0.87%,0.32,0.68,+47.06%,"2.13 to 1",0.36913,42.6%
+"Downloaded from Barchart.com as of 10-05-2026 02:34pm CDT"

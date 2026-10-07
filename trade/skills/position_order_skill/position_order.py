@@ -39,9 +39,12 @@ except ImportError:
     TagValue = None
 
 try:
-    from barchart_placeOrder import create_fast_ib_connection, load_env_settings
+    from trade.skills.ibkr_skill import create_fast_ib_connection, load_env_settings
 except ImportError:
-    create_fast_ib_connection = None
+    try:
+        from skills.ibkr_skill import create_fast_ib_connection, load_env_settings
+    except ImportError:
+        create_fast_ib_connection = None
 
     def load_env_settings(env_path=None):
         return {
@@ -54,6 +57,15 @@ try:
     from notifier import send_push_message
 except ImportError:
     send_push_message = None
+
+try:
+    from skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+except ImportError:
+    try:
+        from trade.skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+    except ImportError:
+        walk_up_limit_price = None
+        execute_walk_up_order = None
 
 ENV_FILE = os.path.join(BASE_DIR, ".env")
 
@@ -208,6 +220,17 @@ class PositionOrderSkill:
                 print(f"[SUCCESS] ✅ 期貨合約驗證成功: {c_fut.localSymbol} (conId: {c_fut.conId})")
                 return c_fut
 
+        # 1.5 嘗試直接作為期貨 Root 代號 (如 MGC, GC, MES 等) 尋找主力期貨合約
+        if sym in BARCHART_TO_IBKR_FUTURES:
+            try:
+                from trade.q import get_target_future_contract as _gtfc
+                c_fut_auto = _gtfc(ib, sym)
+                if c_fut_auto and c_fut_auto.conId:
+                    print(f"[SUCCESS] ✅ 期貨 Root 代碼自動鎖定主力期貨合約: {c_fut_auto.localSymbol} (conId: {c_fut_auto.conId})")
+                    return c_fut_auto
+            except Exception:
+                pass
+
         # 2. 嘗試直接以 localSymbol 驗證期貨
         try:
             c_local = Contract(secType="FUT", localSymbol=sym, exchange="SMART", currency="USD")
@@ -356,36 +379,44 @@ class PositionOrderSkill:
             elif ticker.close and not math.isnan(ticker.close) and ticker.close > 0:
                 market_price = ticker.close
 
-        # 6. 組裝市價 Adaptive Patient 委託
-        order = MarketOrder(order_action, order_qty)
-        order.algoStrategy = "Adaptive"
-        order.algoParams = [TagValue("adaptivePriority", "Patient")]
-        order.tif = "DAY"
-        if target_account:
-            order.account = target_account
-
-        if market_price and market_price > 0:
-            if min_tick < 0.001:
-                ref_p_str = f"${market_price:.6f}"
-            elif min_tick < 0.01:
-                ref_p_str = f"${market_price:.4f}"
-            elif min_tick >= 1.0:
-                ref_p_str = f"${market_price:.0f}"
-            else:
-                ref_p_str = f"${market_price:.2f}"
-            price_desc = f"市價 (Adaptive Patient, 參考現價: {ref_p_str})"
-        else:
-            price_desc = "市價 (Adaptive Patient)"
-
+        # 6. 自適應步進修單 (Custom Walk-Up)
+        step_val = max(0.05, min_tick) if min_tick else 0.05
+        max_slip = max(0.15, step_val * 3)
+        price_desc = f"Custom Walk-Up (起始限價: ${market_price:.2f})"
         order_desc = f"{order_action} {order_qty} 口 {contract.localSymbol} @ {price_desc}"
 
         # 7. 執行下單
         order_status = "DryRun"
         if not dry_run:
-            trade = ib.placeOrder(contract, order)
-            ib.sleep(1)
-            order_status = trade.orderStatus.status if hasattr(trade, "orderStatus") else "Submitted"
-            print(f"[SUCCESS] ✅ [已送單至 IBKR] 委託狀態: {order_status} | {order_desc}")
+            if execute_walk_up_order:
+                filled, trade, avg_price = execute_walk_up_order(
+                    ib=ib,
+                    contract=contract,
+                    action=order_action,
+                    quantity=order_qty,
+                    current_mid=market_price or 0.05,
+                    max_slippage=max_slip,
+                    step=step_val,
+                    step_time=3.0,
+                    max_steps=3,
+                    symbol=f"{symbol}-Opinion",
+                    account=target_account,
+                    tif="DAY",
+                    outside_rth=False,
+                    min_tick=min_tick
+                )
+                order_status = "Filled" if filled else (trade.orderStatus.status if trade else "Cancelled")
+                if filled:
+                    order_desc = f"{order_action} {order_qty} 口 {contract.localSymbol} @ Walk-Up 成交均價 ${avg_price:.2f}"
+            else:
+                order = LimitOrder(order_action, order_qty, market_price or 0.05)
+                order.tif = "DAY"
+                if target_account:
+                    order.account = target_account
+                trade = ib.placeOrder(contract, order)
+                ib.sleep(1)
+                order_status = trade.orderStatus.status if hasattr(trade, "orderStatus") else "Submitted"
+            print(f"[SUCCESS] ✅ [已執行自適應步進修單] 委託狀態: {order_status} | {order_desc}")
         else:
             print(f"[INFO] 🔍 [模擬模式 (Dry-Run)] 未實際送單至 IBKR | {order_desc}")
 

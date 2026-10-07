@@ -46,6 +46,34 @@ except Exception:
             load_gemini_api_key = None
 
 
+def normalize_exp_date(date_val):
+    """將到期日統一轉換為 IBKR 格式之 YYYYMMDD 字串 (如 20261016)"""
+    if not date_val or pd.isna(date_val):
+        return ""
+    s = str(date_val).strip()
+    if " " in s:
+        s = s.split(" ")[0]
+    s = s.replace("/", "-")
+    parts = s.split("-")
+    if len(parts) == 3:
+        if len(parts[0]) == 4:
+            return f"{parts[0]}{parts[1].zfill(2)}{parts[2].zfill(2)}"
+        elif len(parts[2]) == 4:
+            return f"{parts[2]}{parts[0].zfill(2)}{parts[1].zfill(2)}"
+        elif len(parts[2]) == 2:
+            return f"20{parts[2]}{parts[0].zfill(2)}{parts[1].zfill(2)}"
+    cleaned = re.sub(r"\D", "", s)
+    return cleaned if len(cleaned) == 8 else s
+
+
+def format_exp_date_display(exp_date_val):
+    """將 YYYYMMDD 格式化為 YYYY-MM-DD"""
+    s = normalize_exp_date(exp_date_val)
+    if len(s) == 8 and s.isdigit():
+        return f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+    return str(exp_date_val)
+
+
 class CallPutFlowSkill:
     """
     雙向期權大單流向分析與最佳 Put/Call 決選技能
@@ -245,15 +273,15 @@ class CallPutFlowSkill:
         strategy = f"Buy {'Put' if is_put else 'Call'}"
 
         # 4. 履約價
-        strike_match = re.search(r'(?:履約價|Strike)[^\n:]*[：:]\s*[\*\$]*\s*(\d+\.?\d*)', report_text, re.IGNORECASE)
+        strike_match = re.search(r'(?:履約價|Strike)[^\d\n]*\$?\s*([0-9]+\.?[0-9]*)', report_text, re.IGNORECASE)
         strike = float(strike_match.group(1)) if strike_match else base_cand.get("strike")
 
         # 5. 到期日
-        exp_match = re.search(r'到期日[^\d]*(\d{4}[-/]\d{2}[-/]\d{2})', report_text)
-        exp_date = exp_match.group(1).replace("-", "").replace("/", "") if exp_match else base_cand.get("exp_date")
+        exp_match = re.search(r'(?:到期日|Exp(?:iration)?\s*(?:Date)?)[^\d\n]*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2}|[0-9]{8})', report_text, re.IGNORECASE)
+        exp_date = normalize_exp_date(exp_match.group(1)) if exp_match else base_cand.get("exp_date")
 
         # 6. 參考價格
-        ref_match = re.search(r'(?:參考價格|權利金|Reference Price)[^\$\d\n]*\$?(\d+\.?\d*)', report_text, re.IGNORECASE)
+        ref_match = re.search(r'(?:參考價格|權利金|Reference Price)[^\d\n]*\$?\s*([0-9]+\.?[0-9]*)', report_text, re.IGNORECASE)
         ref_price = float(ref_match.group(1)) if ref_match else (base_cand.get("ref_price") or 1.0)
 
         # 7. Delta
@@ -504,7 +532,7 @@ class CallPutFlowSkill:
             print(f"[INFO] [CallPutFlowSkill] 正在向 Gemini 請求 {sym} 最佳期權分析 (嘗試第 {attempt}/{max_retries} 次)...")
             try:
                 if call_gemini_for_skill:
-                    res = call_gemini_for_skill(prompt, self.api_key, min_chars=300, max_output_tokens=4096)
+                    res = call_gemini_for_skill(prompt, self.api_key, min_chars=300, max_output_tokens=40906)
                     if res and len(res.strip()) > 100:
                         report_text = res
                         print(f"[SUCCESS] [CallPutFlowSkill] ✅ 第 {attempt} 次成功獲得 {sym} 期權大單精選報告！")
@@ -523,7 +551,8 @@ class CallPutFlowSkill:
             ref_p = float(best_trade.get("Price~", init_ref or 1.0))
             delta_val = float(best_trade.get("Delta", 0.5)) if "Delta" in best_trade and not pd.isna(best_trade["Delta"]) else 0.5
 
-            upgraded = {
+            upgraded = dict(candidate)
+            upgraded.update({
                 "id": cand_id,
                 "symbol": sym,
                 "strategy": f"Buy {'Put' if is_put else 'Call'}",
@@ -531,13 +560,14 @@ class CallPutFlowSkill:
                 "right": "P" if is_put else "C",
                 "strike": strike,
                 "exp_date": exp_raw,
+                "exp_date_disp": format_exp_date_display(exp_raw),
                 "ref_price": ref_p,
                 "delta": delta_val,
                 "type": "single_option",
                 "flow_upgraded": True,
                 "report_text": f"【量化規則選取】自 {sym} 期權大單依權利金與主動性直接選定第一大單: {trade_type} Strike ${strike} 到期 {exp_raw}",
                 "original_suggestion": candidate,
-            }
+            })
             return upgraded
 
         # 解析 AI 報告
@@ -552,13 +582,13 @@ class CallPutFlowSkill:
             else:
                 is_put = "PUT" in initial_strat.upper()
 
-        strike_match = re.search(r'(?:履約價|Strike)[^\n:]*[：:]\s*[\*\$]*\s*(\d+\.?\d*)', report_text, re.IGNORECASE)
+        strike_match = re.search(r'(?:履約價|Strike)[^\d\n]*\$?\s*([0-9]+\.?[0-9]*)', report_text, re.IGNORECASE)
         strike = float(strike_match.group(1)) if strike_match else init_strike
 
-        exp_match = re.search(r'到期日[^\d]*(\d{4}[-/]\d{2}[-/]\d{2})', report_text)
-        exp_date = exp_match.group(1).replace("-", "").replace("/", "") if exp_match else init_exp
+        exp_match = re.search(r'(?:到期日|Exp(?:iration)?\s*(?:Date)?)[^\d\n]*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2}|[0-9]{8})', report_text, re.IGNORECASE)
+        exp_date = normalize_exp_date(exp_match.group(1)) if exp_match else init_exp
 
-        ref_match = re.search(r'(?:參考價格|權利金|Reference Price)[^\$\d\n]*\$?(\d+\.?\d*)', report_text, re.IGNORECASE)
+        ref_match = re.search(r'(?:參考價格|權利金|Reference Price)[^\d\n]*\$?\s*([0-9]+\.?[0-9]*)', report_text, re.IGNORECASE)
         ref_price = float(ref_match.group(1)) if ref_match else (init_ref or 1.0)
 
         delta_match = re.search(r'Delta[^\d\n\-+]*([+-]?\d+\.?\d*)', report_text, re.IGNORECASE)
@@ -567,7 +597,8 @@ class CallPutFlowSkill:
         strategy_name = f"Buy {'Put' if is_put else 'Call'}"
         right_letter = "P" if is_put else "C"
 
-        upgraded = {
+        upgraded = dict(candidate)
+        upgraded.update({
             "id": cand_id,
             "symbol": sym,
             "strategy": strategy_name,
@@ -575,15 +606,34 @@ class CallPutFlowSkill:
             "right": right_letter,
             "strike": strike,
             "exp_date": exp_date,
+            "exp_date_disp": format_exp_date_display(exp_date),
             "ref_price": ref_price,
             "delta": delta,
             "type": "single_option",
             "flow_upgraded": True,
             "report_text": report_text,
             "original_suggestion": candidate,
-        }
+        })
         print(f"[SUCCESS] [CallPutFlowSkill] ✅ 標的 {sym} 成功鎖定最賺錢合約: {strategy_name} Strike ${strike} (到期: {exp_date}, 參考價: ${ref_price})")
         return upgraded
+
+    def refine_all_4_targets(self, targets, csv_map, max_retries=3):
+        """
+        將 4 檔預選 CALL/PUT 標的與其期權大單流向 CSV 結合，
+        逐一呼叫 Gemini AI 進行深度量化分析，精選出最佳合約規格，產出共 4 檔決選 CALL 或 PUT！
+        """
+        final_contracts = []
+        print("\n" + "=" * 70)
+        print("🐋 [CallPutFlowSkill] 開始對 4 檔預選標的逐一進行期權大單決選...")
+        print("=" * 70)
+        for target in targets:
+            sym = target.get("symbol", "").upper()
+            flow_csv = csv_map.get(sym)
+            refined = self.analyze_and_pick_best_option(target, flow_csv, max_retries=max_retries)
+            final_contracts.append(refined)
+        return final_contracts
+
+    refine_single_suggestion = analyze_and_pick_best_option
 
 
 if __name__ == "__main__":

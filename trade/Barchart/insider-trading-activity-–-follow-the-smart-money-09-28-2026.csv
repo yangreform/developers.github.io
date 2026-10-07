@@ -1,0 +1,399 @@
+Symbol,Name,"Insider Name",Title,Transaction,Shares,@Price,"Trans Total","Shares After",Date
+IEP,"Icahn Enterprises","Carl Celian Icahn",Chair,"Div Re",40531194,7.0118,284196626,658924537,2026-09-23
+AVGO,"Broadcom Ltd","Dr Hon Henry Samueli",Chair,Sell,702190,356.0378,250006183,82593840,2026-09-23
+LEN,"Lennar Corp","American Shareholder",N/A,Buy,1659025,81.2151,134737881,25378134,2026-09-25
+CRWD,"Crowdstrike Holdings","Burt W Podbere",CFO,Sell,480000,261.4404,125491392,1341328,2026-09-24
+RBRK,"Rubrik Inc Cl A","Bipul Sinha","Chair & CEO","Transfer In",555000,0,63159000,611652,2026-09-24
+ASPN,"Aspen Aerogels Inc","American Shareholder",N/A,Sell,12280426,4.73,58086415,0,2026-09-23
+ONEN,"One Nuclear Energy Inc","Thomas D Hennessy",COO,Exercise,5994999,0,54434591,6494999,2026-09-23
+BPYPO,"Brookfield Property Partners L.P. 6.375% Prf P","Canadian Shareholder",N/A,Buy,9320747,5.15,48001847,302113365,2026-09-24
+ONEN,"One Nuclear Energy Inc","American Shareholder",N/A,Exercise,5244999,0,47624591,5744999,2026-09-23
+ONEN,"One Nuclear Energy Inc","Daniel J Hennessy",CEO,Exercise,5244999,0,47624591,5744999,2026-09-23
+MEDP,"Medpace Holdings Inc","Dr August J Troendle","Chair & CEO",Sell,43916,624.0071,27403896,5122475,2026-09-24
+AVGO,"Broadcom Ltd","Dr Hon Henry Samueli",Chair,"Given Away",72474,0,25727545,82593840,2026-09-23
+P,"Everpure Inc","John (Coz) Colgrove","Chf Off.",Sell,200000,113.2613,22652260,11091003,2026-09-24
+WDAY,"Workday Inc","David A Duffield",CEOE,"Transfer In",99613,0,19163549,105049,2026-09-23
+WDAY,"Workday Inc","David A Duffield",CEOE,Sell,99613,192.14,19139641,105049,2026-09-23
+SNOW,"Snowflake Cl A","Benoit Dageville","Chf Architect",Sell,50000,339.08,16953999,4112222,2026-09-23
+CRGY,"Crescent Energy Company Cl A","David C Rockecharlie",CEO,Award,900000,0,11861999,1107341,2026-09-23
+FSLY,"Fastly Inc","Artur Bergman",CTO,Sell,379602,30.1577,11447923,4984298,2026-09-23
+DDOG,"Datadog Cl A","Alexis Le-Quoc",CTO,Sell,43224,252.1744,10899986,488202,2026-09-23
+DDOG,"Datadog Cl A","Alexis Le-Quoc",CTO,"Transfer In",43224,0,10870404,488202,2026-09-23
+BBY,"Best Buy Company","Kathleen M Scarlett",CHRO,"Sale Post-exercise",116062,92.1522,10695369,116173,2026-09-23
+RDW,"Redwire Corp","Michael Robert Greene",N/A,Sell,929435,11.34,10539793,147984,2026-09-23
+BLSH,"Bullish Ord Shs","Andrew Bliss",N/A,Sell,239252,40.4707,9682696,4804889,2026-09-23
+WRDIF,"Weride Inc","Jennifer Xuan Li",CFO,Award,4662342,0,9324684,18162342,2026-09-23
+CLS,"Celestica Inc","Robert Mionis","Chair & CEO",Sell,23396,364.2168,8521216,664142,2026-09-23
+CRBG,"Corebridge Financial Inc","American Shareholder",N/A,Buy,219273,34.134,7484664,124336154,2026-09-23
+CLS,"Celestica Inc","Todd Christopher Cooper","Div. Pres.",Sell,20118,360,7242480,73252,2026-09-23
+NTRA,"Natera Inc","Jonathan Sheena",N/A,Sell,18064,388.0078,7008972,239314,2026-09-23
+BNTX,"Biontech Se ADR","Ugur Sahin",CEO,Sell,69000,99.1702,6842744,39559320,2026-09-24
+BBY,"Best Buy Company","Kathleen M Scarlett",CHRO,Exercise,96166,70.5,6779703,116173,2026-09-23
+RBRK,"Rubrik Inc Cl A","Bipul Sinha","Chair & CEO","Given Away",55000,0,6259000,556652,2026-09-25
+SHOP,"Shopify Inc","Tobias Albin Lütke",CEO,Sell,40500,143.1289,5796721,526500,2026-09-23
+SNOW,"Snowflake Cl A","Benoit Dageville","Chf Architect","Given Away",16668,0,5580614,4112222,2026-09-23
+ABT,"Abbott Laboratories","Kevin T Conroy",N/A,"Sale Post-exercise*",52507,103.99,5460203,81230,2026-09-23
+CRDO,"Credo Technology Group Holding","Chi Fung (Lawrence) Cheng",CTO,Sell,27500,193.1185,5310759,5826465,2026-09-23
+CRWD,"Crowdstrike Holdings","George R Kurtz",CEO,Sell,20000,253.1702,5063404,8011504,2026-09-23
+HSY,"Hershey Foods Corp","American Shareholder",N/A,Sell,30000,168.4057,5052171,775749,2026-09-23
+EVI,"Evi Industries Inc","Henry M Nahmad","Chair & CEO",Award,248352,0,4899985,4665903,2026-09-23
+NTNX,"Nutanix Inc","Tarkan Maner",Pre./CCO,Sell,69778,68.2332,4761176,33647,2026-09-24
+UTHR,"United Therapeutic","Dr. Martine A Rothblatt","Chair & CEO","Sale Post-exercise",9500,491.5703,4669918,668728,2026-09-23
+NYAX,"Nayax Ltd","Yair Nechmad","Chair & CEO",Buy,104511,134.3373,4619935,7433558,2026-09-24
+UTHR,"United Therapeutic","Dr. Martine A Rothblatt","Chair & CEO","Sale Post-exercise",9500,473.5529,4498752,668728,2026-09-24
+BZFD,"Buzzfeed Inc","Byron Allen","Chair & CEO",Award,4300000,0,4429000,50000000,2026-09-23
+CLX,"Clorox Company","Linda J Rendle","Chair & CEO",Award,50988,0,4279932,252149,2026-09-23
+CRGY,"Crescent Energy Company Cl A","Brandi Kendall",CFO,Award,300000,0,3954000,356023,2026-09-23
+CRGY,"Crescent Energy Company Cl A","John Clayton Rynd",EVP,Award,300000,0,3954000,339684,2026-09-23
+BPRE,"Bluerock Private Real Estate Fund","Robert Ramin Kamfar",Chair,Buy,301007,12.4461,3746364,482705,2026-09-25
+DSGX,"Descartes Sys Group","Edward J Ryan",CEO,Sell,44539,80.259,3574654,0,2026-09-23
+KNTK,"Kinetik Holdings Inc","American Shareholder",N/A,Sell,64131,53.6571,3441083,384142,2026-09-23
+ORMP,"Oramed Pharma","Nadav Kidron","CEO & Chair",Award,718262,0,3440475,4266505,2026-09-24
+WHLR,"Wheeler Real Estate","Joseph David Stilwell",N/A,"Transfer In",566670,0,3082684,566677,2026-09-23
+BEAM,"Beam Therapeutics Inc","Dr Giuseppe Ciaramella",Pres.,"Given Away",123407,0,3043216,253911,2026-09-24
+GD,"General Dynamics Corp","Robert King Steel",N/A,"Sale Post-exercise",7440,346.051,2574620,3096,2026-09-23
+BWMN,"Bowman Consulting Group Ltd","Gary Bowman",CEO,Sell,60000,42.553,2553180,2053786,2026-09-23
+RGEN,"Repligen Corp","Olivier Loeillot",CEO,"Sale Post-exercise",12946,190,2459740,48369,2026-09-24
+ONEN,"One Nuclear Energy Inc","Nicholas Geeza",CFO,Exercise,250000,0,2270000,250000,2026-09-23
+RGEN,"Repligen Corp","Olivier Loeillot",CEO,Exercise,12946,155.1074,2008020,48369,2026-09-24
+QCOM,"Qualcomm Inc","Cristiano R Amon",CEO,Sell,10000,200,1999999,177568,2026-09-25
+ORMP,"Oramed Pharma","Dr Miriam Kidron",CSO,Award,417416,0,1999423,1550554,2026-09-24
+COHU,"Cohu Inc","Luis Antonio Müller",CEO,Sell,27236,65,1770340,844589,2026-09-25
+PINS,"Pinterest Inc","Benjamin Silbermann",Chair,Sell,93750,18.8518,1767357,13996,2026-09-23
+PINS,"Pinterest Inc","Benjamin Silbermann",Chair,"Transfer In",93750,0,1724063,13996,2026-09-23
+HHH,"Howard Hughes Holdings Inc","Marc Grandisson",N/A,Buy,25000,64.1175,1602937,96943,2026-09-23
+GD,"General Dynamics Corp","Robert King Steel",N/A,Exercise,7440,211.5876,1574212,3096,2026-09-23
+AFL,"Aflac Inc","American Shareholder",N/A,Sell,13500,115.2029,1555240,50493590,2026-09-23
+KBDC,"Kayne Anderson Bdc Inc","Nada James L Robo",Chair,Buy,114961,13.0892,1504747,2253135,2026-09-23
+LITE,"Lumentum Holdings","Dr Wupen Yuen","Div. Pres.",Sell,1500,947.1267,1420690,110127,2026-09-23
+XYZ,"Block Inc","Anthony Mathew Eisen",N/A,Sell,18000,77.9333,1402800,1362672,2026-09-23
+MCS,"Marcus Corp","Diane Marcus Gershowitz",N/A,Sell,50000,27.61,1380500,163046,2026-09-23
+KBDC,"Kayne Anderson Bdc Inc","Nada James L Robo",Chair,Buy,105000,13.046,1369831,2358135,2026-09-24
+ORMP,"Oramed Pharma","Joshua Hexter",COO,Award,284746,0,1363933,1358130,2026-09-24
+CIEN,"Ciena Corp","Prof Thomas Michael Nevens",N/A,Sell,3738,359.04,1342091,6289,2026-09-23
+VIAV,"Viavi Solutions","Luke M Scrivanich",GM,"Sale Post-exercise",35866,36.24,1299783,39598,2026-09-23
+CLX,"Clorox Company","Chris T Hyder",COO,Award,13342,0,1119928,90202,2026-09-23
+UTHR,"United Therapeutic","Dr. Martine A Rothblatt","Chair & CEO",Exercise,9500,117.76,1118721,668728,2026-09-23
+UTHR,"United Therapeutic","Dr. Martine A Rothblatt","Chair & CEO",Exercise,9500,117.76,1118719,668728,2026-09-24
+LDI,"Loandepot Inc Cl A","Jeffrey Michael Dergurahian","Chf Invest Off.","Transfer In",1598390,0,1075397,8759043,2026-09-23
+CLX,"Clorox Company","Kirsten Marriner","Chf Adm Off",Award,12389,0,1039932,76683,2026-09-23
+DELL,"Dell Technologies","Egon P Durban",N/A,Sell,1850,548.4,1014540,1735395,2026-09-23
+HGTY,"Hagerty Inc","Robert I Kauffman",N/A,"Given Away",74000,0,1004920,753270,2026-09-24
+CIEN,"Ciena Corp","Prof Thomas Michael Nevens",N/A,"Given Away",2797,0,1002528,3492,2026-09-24
+ORMP,"Oramed Pharma","Avraham Gabay","CFO, Treas & Sec",Award,209291,0,1002504,881076,2026-09-24
+AASP,"Agassi Sports Entertmt","James M Askew",N/A,"Given Away",200000,0,1000000,1597860,2026-09-23
+CLX,"Clorox Company","Luc Bellet",CFO,Award,11913,0,999977,74669,2026-09-23
+UXIN,"Uxin Ltd ADR","Bin (William) Li",N/A,Subscribe,349772,2.85,996850,44495823,2026-09-23
+GCT,"Gigacloud Technology Inc Cl A","Marshall Bernes","Div. Head",Sell,18297,54.1292,990401,7150,2026-09-25
+WRDIF,"Weride Inc","Hua Zhong",SVP.,Award,493434,0,986868,17066876,2026-09-23
+WRDIF,"Weride Inc","Yan Li",CTO,Award,493434,0,986868,27623100,2026-09-23
+WRDIF,"Weride Inc","Tony Xu Han","Chair & CEO",Award,493434,0,986868,493434,2026-09-23
+CELZ,"Creative Medical Technology Holdings Inc","Timothy Warbington",CEO,"Contract Buy",1000000,0,970000,1034904,2026-09-24
+CLX,"Clorox Company","Angela Hilt",CLO,Award,11436,0,959938,68216,2026-09-23
+SRTA,"Strata Critical Medical Inc","Melissa M Tomkiel","Co CEO",Award,177858,0,937311,2153678,2026-09-24
+SRTA,"Strata Critical Medical Inc","William A Heyburn","Co CEO & CFO",Award,177858,0,937311,1757850,2026-09-24
+PUBM,"Pubmatic Inc Cl A","Rajeev K Goel",CEO,Sell,50453,18.4455,930630,0,2026-09-24
+LITE,"Lumentum Holdings","Dr Wupen Yuen","Div. Pres.",Sell,1000,928.41,928410,109127,2026-09-25
+MAMA,"Mama's Creations Inc","Adam L Michaels","Chair & CEO","Sale Post-exercise",69683,13.3068,927258,722719,2026-09-23
+TWST,"Twist Bioscience Corp","Emily M Leproust","Chair & CEO",Sell,5203,177.3797,922906,613699,2026-09-24
+CLX,"Clorox Company","Nina Barton","EVP - Strategy",Award,10721,0,899920,37164,2026-09-23
+SMWB,"Similarweb Ltd","Or Offer",CEO,Sell,114300,7.6912,879104,3930481,2026-09-24
+JBI,"Janus International Group Inc","Anselm Wong",CFO,Award,176056,0,749999,601693,2026-09-23
+JBI,"Janus International Group Inc","Norman Nettie v","Div. VP.",Award,176056,0,749999,1129781,2026-09-23
+JBI,"Janus International Group Inc","Morgan Hodges",VP.,Award,176056,0,749999,920108,2026-09-23
+FDX,"Fedex Corp","Joshua Cooper Ramo",N/A,"Sale Post-exercise*",2436,285.405,695247,11123,2026-09-24
+FDX,"Fedex Corp","Joshua Cooper Ramo",N/A,Exercise,5042,137.85,695039,11123,2026-09-24
+CYPH,"Cypherpunk Technologies Inc","Khing Djien Oei",Chair,"Sale Post-exercise",168750,3.92,661500,0,2026-09-25
+OKE,"Oneok Inc","Walter S Hulse iii","CFO & Treas",Award,7238,0,655329,198049,2026-09-23
+PUBM,"Pubmatic Inc Cl A","Rajeev K Goel",CEO,"Transfer In",34370,0,637564,0,2026-09-24
+MGY,"Magnolia Oil & Gas Corp","Christopher G Stavros","Chair & CEO",Award,25044,0,619588,898781,2026-09-24
+MXF,"Mexico Fund","American Shareholder",N/A,Buy,28574,21.0195,600612,2341186,2026-09-23
+MTG,"Mgic Investment Corp","Nathaniel H Colson",CFO,Sell,20000,29.48,589599,321226,2026-09-24
+OKE,"Oneok Inc","Lyndon C Taylor","CLO & Sec.",Award,6369,0,576649,9389,2026-09-23
+PINS,"Pinterest Inc","Julia Brau Donnelly","CFO & PAO",Sell,29548,18.6084,549841,751921,2026-09-24
+PI,"Impinj Inc","Chris Diorio","V.Chair & CEO",Exercise,3041,0,538865,555627,2026-09-23
+SMWB,"Similarweb Ltd","Or Offer",CEO,Sell,62900,8.4489,531436,4044781,2026-09-23
+SRTA,"Strata Critical Medical Inc","William A Heyburn","Co CEO & CFO","Sale Post-exercise*",98356,5.27,518336,1757850,2026-09-24
+INBX,"Inhibrx Biosciences Inc","Dr Jon Faiz Kayyem",N/A,Buy,5000,100,500000,1074046,2026-09-23
+SRTA,"Strata Critical Medical Inc","Melissa M Tomkiel","Co CEO","Sale Post-exercise*",90797,5.27,478500,2153678,2026-09-24
+PRLB,"Proto Labs Inc","Daniel Schumacher",CFO,Sell,5000,95.3209,476605,35019,2026-09-24
+NXST,"Nexstar Media Group Inc","Andrew Alford","Div. Pres.",Sell,2823,165.69,467743,11726,2026-09-23
+CLBT,"Cellebrite Di Ltd","Shiven Ramji",CEO,Award,38505,0,437802,462055,2026-09-24
+FIVE,"Five Below Inc","Kenneth R Bull",COO,Award,1866,0,424348,76930,2026-09-23
+OMER,"Omeros Corp","David J. Borges","Fin & Treas.","Sale Post-exercise",20000,20.95,419001,0,2026-09-23
+BABAF,"Alibaba Group Holding Ltd","Ling (Martello) Wan",N/A,Award,32000,0,409520,392000,2026-09-23
+BABAF,"Alibaba Group Holding Ltd","Yun Lien (Irene) Lee",N/A,Award,32000,0,409520,170600,2026-09-23
+BABAF,"Alibaba Group Holding Ltd","Kong Ping (Albert) Ng",N/A,Award,32000,0,409520,165600,2026-09-23
+BABAF,"Alibaba Group Holding Ltd","Chih Yuan (Jerry) Yang",N/A,Award,32000,0,409520,517072,2026-09-23
+BABAF,"Alibaba Group Holding Ltd","Wei (Maggie) Wu",N/A,Award,32000,0,409520,10886160,2026-09-23
+BABAF,"Alibaba Group Holding Ltd","Weijian Shan",N/A,Award,32000,0,409520,176800,2026-09-23
+BABAF,"Alibaba Group Holding Ltd","Kabir Misra",N/A,Award,32000,0,409520,560800,2026-09-23
+EVI,"Evi Industries Inc","Thomas Marks","EVP Bus Dev",Award,20273,0,399986,1169406,2026-09-23
+GPOR,"Gulfport Energy Corp","Timothy J Cutt",Chair,Sell,2500,158.98,397450,27013,2026-09-24
+PHVS,"Pharvaris N.V.","Viviane Monges",N/A,"Sale Post-exercise",11969,33.0457,395524,5500,2026-09-23
+OSBC,"Old Second Bancorp","Gary S Collins",V.Chair,Sell,16000,24.6925,395080,74367,2026-09-23
+OKE,"Oneok Inc","Sheridan C Swords",EVP/CCO,Award,4343,0,393216,238811,2026-09-23
+CBL,"Cbl & Associates Properties Inc","Jennifer Cope","Div. EVP",Sell,6763,52.0012,351684,24009,2026-09-24
+WRLD,"World Acceptance Corp","John L Calmes Jr",CEO,Award,1960,0,334669,50294,2026-09-24
+MGY,"Magnolia Oil & Gas Corp","Timothy D Yang",CLO,Award,13392,0,331318,534783,2026-09-24
+MX,"Magnachip Semiconductor Corp","Chae Lee",CEO/PEO,Buy,100000,3.1849,318490,388750,2026-09-24
+MGY,"Magnolia Oil & Gas Corp","Brian M. Corales",CFO,Award,12193,0,301655,191573,2026-09-24
+KFY,"Korn/Ferry International","Russell Hagey",N/A,Award,4100,0,295199,11970,2026-09-24
+OKE,"Oneok Inc","Walter S Hulse iii","CFO & Treas","Sale Post-exercise*",3174,90.09,285946,198049,2026-09-23
+MASS,"908 Devices Inc","American Shareholder",N/A,Sell,25000,11.355,283875,4754773,2026-09-24
+AVO,"Mission Produce Inc","Stephen J Barnard",Chair,Sell,21646,13,281398,3657047,2026-09-24
+KFY,"Korn/Ferry International","Robert P Rozek",CFO,Sell,3709,75.029,278282,155254,2026-09-23
+ONEN,"One Nuclear Energy Inc","Poonam Sharma Mathis",N/A,Exercise,30000,0,272400,30000,2026-09-23
+ATRC,"Atricure Inc","Salvatore Privitera",CTO,Sell,4519,60,271140,142745,2026-09-23
+TTAN,"Servicetitan Inc Cl A","Michele O'connor",CAO,Sell,4380,61.35,268713,61715,2026-09-23
+JDCMF,"Jd.com Inc","Yun Yau (Carol) Li",N/A,Award,18658,0,265877,54826,2026-09-23
+OKE,"Oneok Inc","Kevin L Burdick",EVP,Award,2895,0,262113,172029,2026-09-23
+AKTS,"Aktis Oncology Inc","Akos Czibere","Chf Med Off.","Sale Post-exercise",12500,20.6897,258621,0,2026-09-23
+PINS,"Pinterest Inc","Wanjiku Juanita Walcott",CLO,Sell,14103,18.207,256774,658902,2026-09-23
+SNOW,"Snowflake Cl A","Jonathan Mead Beaulier","Chf Revenue Of",Sell,755,336.362,253954,211619,2026-09-23
+OKE,"Oneok Inc","Lyndon C Taylor","CLO & Sec.","Sale Post-exercise*",2793,90.09,251622,9389,2026-09-23
+EVI,"Evi Industries Inc","Robert H Lazar","CFO & CAO",Award,12671,0,249998,103059,2026-09-23
+TILE,"Interface Inc","Laurel M Hurd",CEO,Sell,7000,34.99,244929,499978,2026-09-24
+SE,"Sea Ltd ADR","Yanjun Wang",CCGO/Secy,Sell,2400,102.0467,244912,1127622,2026-09-24
+DKS,"Dick's Sporting Goods Inc","Larry Fitzgerald jr",N/A,Buy,1860,131.67,244906,15199,2026-09-23
+MGY,"Magnolia Oil & Gas Corp","Christopher G Stavros","Chair & CEO","Sale Post-exercise*",9855,24.74,243813,898781,2026-09-24
+SKYE,"Skye Bioscience Inc","Andrew Schwab",N/A,Sell,148079,1.6178,239563,981269,2026-09-23
+FLS,"Flowserve Corp","Matthew Klopfer","Div. Pres.",Award,3049,0,231694,8694,2026-09-23
+ONEN,"One Nuclear Energy Inc","Brian Bonner",N/A,Exercise,25000,0,227000,25000,2026-09-23
+ONEN,"One Nuclear Energy Inc","Grant R Allen",N/A,Exercise,25000,0,227000,25000,2026-09-23
+ONEN,"One Nuclear Energy Inc","Anna Brunelle",N/A,Exercise,25000,0,227000,25000,2026-09-23
+ONEN,"One Nuclear Energy Inc","Javier Saade",N/A,Exercise,25000,0,227000,25000,2026-09-23
+KURA,"Kura Oncology","Francis Burrows",CSO,"Sale Post-exercise",20726,10.8325,224515,42327,2026-09-24
+LYFT,"Lyft Inc Cl A","Erin M Brewer",CFO,Sell,15000,14.6421,219632,1694444,2026-09-24
+PMA,"Pma Graphene Technology Group Inc","Chi Ming Lam",N/A,Sell,167865,1.301,218392,1431886,2026-09-25
+WOR,"Worthington Enterprises Inc","John B Blystone",Chair,Award,3600,0,217189,176610,2026-09-24
+WOR,"Worthington Enterprises Inc","David P Blom",N/A,Award,3600,0,217189,30534,2026-09-24
+PI,"Impinj Inc","Chris Diorio","V.Chair & CEO","Sale Post-exercise*",1197,177.2,212108,555627,2026-09-23
+OKE,"Oneok Inc","Mary M Spears",CAO,Award,2316,0,209691,37162,2026-09-23
+MSC,"Studio City Intl Holdings Ltd ADR","Yau Lung (Lawrence) Ho",N/A,Buy,260900,0.7908,206320,116034798,2026-09-23
+FLEX,"Flextronics Intl Ltd","George R Oliver",N/A,Award,1802,0,202544,1802,2026-09-24
+FLEX,"Flextronics Intl Ltd","Mark Eubanks",N/A,Award,1802,0,202544,1802,2026-09-24
+KFY,"Korn/Ferry International","Lori J Robinson",N/A,Award,2780,0,200160,25320,2026-09-24
+KFY,"Korn/Ferry International","Laura M Bishop",N/A,Award,2780,0,200160,17840,2026-09-24
+KFY,"Korn/Ferry International","Peter Shimer",N/A,Award,2780,0,200160,4440,2026-09-24
+KFY,"Korn/Ferry International","Matthew J Espe",N/A,Award,2780,0,200160,11940,2026-09-24
+KFY,"Korn/Ferry International","Doyle N Beneby",N/A,Award,2780,0,200160,45440,2026-09-24
+KFY,"Korn/Ferry International","Angel R Martinez",N/A,Award,2780,0,200160,31040,2026-09-24
+KFY,"Korn/Ferry International","Jerry Leamon",Chair,Award,2780,0,200160,24852,2026-09-24
+CFFN,"Capitol Fed Finl Inc","William Joseph Skrobacz jr",VP.,Award,22500,0,195525,63349,2026-09-23
+CYPH,"Cypherpunk Technologies Inc","Patricia A Martin",N/A,"Sale Post-exercise",50000,3.86,192999,118750,2026-09-23
+ACIC,"American Coastal Insurance Corp","Brook Adler","Gen Cou",Sell,21196,9.06,192036,100175,2026-09-24
+PI,"Impinj Inc","Cary Baker",CFO,Exercise,1075,0,190490,81039,2026-09-23
+OMER,"Omeros Corp","David J. Borges","Fin & Treas.",Exercise,20000,9.5075,190150,0,2026-09-23
+KURA,"Kura Oncology","Francis Burrows",CSO,Exercise,30000,6.15,184500,42327,2026-09-24
+CLX,"Clorox Company","Laura Peck",CAO,Award,2192,0,183996,9260,2026-09-23
+ABX,"Abacus Global Management Inc","Matthew Ganovsky",Advisor,Sell,22800,7.74,176472,8651148,2026-09-23
+ABX,"Abacus Global Management Inc","Kevin Scott Kirby",Advisor,Sell,22745,7.74,176047,12592267,2026-09-23
+ABX,"Abacus Global Management Inc","Sean Mcnealy",Advisor,Sell,22700,7.74,175698,12593159,2026-09-23
+OKE,"Oneok Inc","Sheridan C Swords",EVP/CCO,"Sale Post-exercise*",1905,90.09,171622,238811,2026-09-23
+PMA,"Pma Graphene Technology Group Inc","Chi Ming Lam",N/A,Sell,126000,1.3002,163825,192751,2026-09-23
+NN,"Nextnav Inc","Timothy Gray",CFO,"Sale Post-exercise",11099,14.6444,162538,120687,2026-09-23
+ACIW,"Aci Worldwide Inc","Robert William Leibrock","CFO & CAO","Sale Post-exercise*",3176,49.62,157593,200725,2026-09-24
+WLY,"John Wiley Sons Cl A","William J Pesce",N/A,Exercise,3275,47.75,156381,91384,2026-09-23
+FIVE,"Five Below Inc","Eric M Specter","Chf Admin Off.",Award,672,0,152819,36154,2026-09-23
+WOR,"Worthington Enterprises Inc","Brantley J Standridge",N/A,Award,2510,0,151429,6975,2026-09-24
+WOR,"Worthington Enterprises Inc","Paul G Heller",N/A,Award,2510,0,151429,11625,2026-09-24
+WOR,"Worthington Enterprises Inc","John H Mcconnell ii",N/A,Award,2510,0,151429,40795,2026-09-24
+WOR,"Worthington Enterprises Inc","Billy R Vickers",N/A,Award,2510,0,151429,11625,2026-09-24
+WOR,"Worthington Enterprises Inc","Mark C. Davis",N/A,Award,2510,0,151429,49804,2026-09-24
+WOR,"Worthington Enterprises Inc","Kerrii B Anderson",N/A,Award,2510,0,151429,79937,2026-09-24
+WOR,"Worthington Enterprises Inc","William Bradley Southern",N/A,Award,2510,0,151429,3215,2026-09-24
+WOR,"Worthington Enterprises Inc","Charles M Chiappone",N/A,Award,2510,0,151429,4620,2026-09-24
+PGEN,"Precigen Inc","Harry Thomasian",CFO,Exercise,53665,2.8084,150712,311914,2026-09-23
+SVRA,"Savara Inc","Braden C Parker","Chf Com Off.","Sale Post-exercise*",29323,5.07,148668,75677,2026-09-24
+PKOH,"Park Ohio Holdings Corp","James W Wert","Lead Dir.",Sell,3000,47.5,142500,85456,2026-09-24
+TLPPF,"Telix Pharm Ltd","David N Gill",Chair,Buy,11800,11.31,133458,22000,2026-09-24
+LINE,"Lineage Inc","Paul Beiboer",N/A,Award,3672,0,133368,3672,2026-09-23
+ANIX,"Anixa Biosciences Inc","Lewis H Titterton jr","Lead Indpdt. Dir",Buy,49036,2.69,131907,1046003,2026-09-23
+AVPT,"Avepoint Inc Cl A","Brian Michael Brown",CLO/CCO/Secy,Sell,10000,13.07,130700,374604,2026-09-23
+MGY,"Magnolia Oil & Gas Corp","Timothy D Yang",CLO,"Sale Post-exercise*",5270,24.74,130379,534783,2026-09-24
+DLY,"Doubleline Yield Opportunities Fund","Jeffrey J Sherman",VP.,Buy,10000,13.03,130300,10000,2026-09-24
+SCHL,"Scholastic Corp","Lole Lucchese","Chair & EVP","Sale Post-exercise*",3565,35.09,125096,341220,2026-09-23
+FIVE,"Five Below Inc","Amit Jhunjhunwala",CIO,Award,522,0,118709,20783,2026-09-23
+MGY,"Magnolia Oil & Gas Corp","Brian M. Corales",CFO,"Sale Post-exercise*",4798,24.74,118702,191573,2026-09-24
+NKTR,"Nektar Therapeutics","Robert B Chess",Chair,Award,2000,0,115320,19439,2026-09-23
+NKTR,"Nektar Therapeutics","Diana Brainard",N/A,Award,2000,0,115320,3904,2026-09-23
+NKTR,"Nektar Therapeutics","Jeffrey Robert Ajer",N/A,Award,2000,0,115320,4277,2026-09-23
+NKTR,"Nektar Therapeutics","Roy A Whitfield",N/A,Award,2000,0,115320,21185,2026-09-23
+NKTR,"Nektar Therapeutics","R Scott Greer",N/A,Award,2000,0,115320,22239,2026-09-23
+OKE,"Oneok Inc","Kevin L Burdick",EVP,"Sale Post-exercise*",1270,90.09,114414,172029,2026-09-23
+URG,"Ur Energy Inc","Jade Walle",Finance,Buy,96556,1.14,110074,424037,2026-09-24
+DIS,"Walt Disney Company","Brent A Woodford","Div. EVP",Award,1060,0,109667,63389,2026-09-23
+TOL,"Toll Brothers Inc","Stephen F East",N/A,Sell,800,135.99,108792,12642,2026-09-24
+KTB,"Kontoor Brands Inc","Michael J Skipworth",N/A,Award,1611,0,105827,1611,2026-09-23
+IMVT,"Immunovant Inc","Tuyl Christopher Van",CLO,"Sale Post-exercise*",2846,36.36,103480,176545,2026-09-23
+NEGG,"Newegg Commerce Inc","Faching (Fred) Chang",V.Chair,Sell,7164,14.341,102739,3791148,2026-09-23
+NYAX,"Nayax Ltd","David Ben Avi",CTO,Buy,2354,130.0957,100774,6592502,2026-09-24
+BIP-PR-E.TO,"Brookfield Infra Partners LP Pref Ser 9","American Shareholder",N/A,"Transfer Out",500,200.4374,100219,1738,2026-09-23
+MDAI,"Spectral AI Inc","John Michael Dimaio",N/A,Buy,60000,1.67,100200,2890847,2026-09-23
+SPAI,"Safe Pro Group Inc","Christopher Michael Todd","Subs Pres",Sell,25000,4,100000,695000,2026-09-24
+PWRL,"Powerlaw Corp","Michael Dinsdale",CEO,Buy,8726,11.4599,99999,1267979,2026-09-23
+ANNX,"Annexon Inc","Douglas Love",CEO,Buy,26065,3.83,99829,390476,2026-09-24
+DY,"Dycom Industries","Carmen M Sabater",N/A,Buy,350,280.62,98216,7154,2026-09-23
+SCHL,"Scholastic Corp","Sasha Quinton","Div. Pres.","Sale Post-exercise*",2786,35.09,97761,51042,2026-09-23
+PHVS,"Pharvaris N.V.","Viviane Monges",N/A,Exercise,11969,8.05,96351,5500,2026-09-23
+NAVI,"Navient Corp","Diane E Offereins",N/A,Award,10035,0,93325,10035,2026-09-24
+AFCG,"Advanced Flower Capital Inc","Leonard M Tannenbaum",Chair,Buy,26543,3.49,92635,7396296,2026-09-23
+ONDS,"Ondas Inc","Neil J Laird","CFO, Treas & Sec",Award,12500,0,92500,47415,2026-09-24
+SCHL,"Scholastic Corp","Haji L Glover",CFO,"Sale Post-exercise*",2626,35.09,92146,22696,2026-09-23
+OKE,"Oneok Inc","Mary M Spears",CAO,"Sale Post-exercise*",1016,90.09,91531,37162,2026-09-23
+ALGT,"Allegiant Travel Com","Robert James Neal",CFO,"Sale Post-exercise*",1173,77.26,90626,34816,2026-09-23
+FLS,"Flowserve Corp","Matthew Klopfer","Div. Pres.","Sale Post-exercise*",1200,74.67,89604,8694,2026-09-23
+CHAD,"DeFi Development Corp Sr C","Parker White",N/A,Buy,10000,8.9568,89568,14500,2026-09-25
+CATY,"Cathay Genl Bncp","Albert Sun",CCO,Exercise,1417,0,86621,960,2026-09-25
+RAPP,"Rapport Therapeutics Inc","Abraham Ceesay",CEO,Sell,2210,39.1698,86566,559225,2026-09-23
+SMTC,"Semtech Corp","Paul V Walsh Jr",N/A,Sell,500,172.61,86305,26600,2026-09-23
+ALGT,"Allegiant Travel Com","Drew Allen Wells",EVP/CCO,"Sale Post-exercise*",1113,77.26,85991,34078,2026-09-23
+AUGO,"Aura Minerals Inc","Bruno Mauad",N/A,Buy,1000,85.4826,85483,4002100,2026-09-23
+YB,"Yuanbao Inc ADR","Ying Yue",VP.,Exercise,7000,0,84910,7819,2026-09-24
+ALK,"Alaska Air Group","Jason M Berry",COO,Exercise,2010,0,79797,15103,2026-09-23
+UUU,"Universal Safety Products Inc","Milton (Todd) C. Ault iii",V.Chair,Buy,15434,5.0892,78547,1187696,2026-09-23
+CLPR,"Clipper Realty Inc","Sam Levinson",Co-Chair,Buy,22923,3.378,77433,2095201,2026-09-24
+PB,"Prosperity Bancshares","Ned S Holmes",N/A,Sell,1100,68.4645,75311,275118,2026-09-23
+PI,"Impinj Inc","Cary Baker",CFO,"Sale Post-exercise*",424,177.2,75132,81039,2026-09-23
+SCHL,"Scholastic Corp","Jeffrey Mathews","Div. Pres.","Sale Post-exercise*",2110,35.09,74040,63574,2026-09-23
+KEYS,"Keysight Technologies","Lisa Poole",CAO,Sell,200,348.01,69602,6134,2026-09-23
+HDSN,"Hudson Tech Inc","American Shareholder",N/A,Buy,13515,5.0998,68923,5229968,2026-09-23
+FTHY,"FT High Yield Opportunities 2027","William A Housey JR","Port Mngr",Buy,5241,12.9486,67864,16841,2026-09-23
+SKIL,"Skillsoft Corp","Ronald W Hovsepian","Chair & CEO",Buy,11196,5.932,66414,382267,2026-09-23
+OXM,"Oxford Industries","Thomas Caldecot Chubb","Chair & CEO",Buy,2500,26.1499,65375,177166,2026-09-24
+FTHY,"FT High Yield Opportunities 2027","William A Housey JR","Port Mngr",Buy,5000,12.9,64501,21841,2026-09-24
+HHH,"Howard Hughes Holdings Inc","Andrew D Davis",COO,Buy,1000,64.49,64490,32530,2026-09-23
+AKTS,"Aktis Oncology Inc","Akos Czibere","Chf Med Off.",Exercise,12500,4.95,61875,0,2026-09-23
+SCHW,"The Charles Schwab Corp","Stephen A Ellis",N/A,Exercise,1918,31.48,60378,111655,2026-09-23
+IRMD,"Iradimed Corp","Joe E Kiani",N/A,Exercise,698,0,60272,698,2026-09-23
+BFLY,"Butterfly Network Inc","Joseph Devivo","Chair & CEO",Sell,5980,10.0111,59867,7347720,2026-09-23
+CBNK,"Capital Bancorp Inc","Randall James Levitt",N/A,Exercise,2250,26.41,59423,967325,2026-09-23
+CBNK,"Capital Bancorp Inc","Charles Scott Brannan",N/A,Exercise,2250,26.41,59422,8814,2026-09-24
+RGCO,"Rgc Resources Inc","John B Williamson Iii",Chair,Buy,2703,20.9288,56571,182634,2026-09-24
+VTOL,"Bristow Group Inc","Christopher Pucillo",N/A,Sell,1274,43,54781,2840436,2026-09-23
+CULP,"Culp Inc","Fred A Jackson",N/A,Award,14389,0,51513,105462,2026-09-23
+HNNA,"Hennessy Advisors","Daniel B Steadman",EVP,"Sale Post-exercise",5000,10.2626,51313,40018,2026-09-24
+FIVE,"Five Below Inc","Maureen Marie Gellerman",CHRO,Award,224,0,50940,9028,2026-09-23
+FIVE,"Five Below Inc","Graham Poliner","Chf Strategy Ofc",Award,224,0,50940,15758,2026-09-23
+GF,"New Germany Fund","American Shareholder",N/A,Buy,4657,10.85,50528,3698458,2026-09-23
+EMYB,"Embassy Bancorp Inc","Geoffrey F Boyer",N/A,Sell,2200,21.8023,47965,107538,2026-09-23
+CULP,"Culp Inc","John Douglas Collier",N/A,Award,13190,0,47221,18190,2026-09-23
+CULP,"Culp Inc","Lynn D Heatherton",N/A,Award,13190,0,47221,13190,2026-09-23
+CULP,"Culp Inc","William L Tyson",N/A,Award,13190,0,47221,13990,2026-09-24
+CULP,"Culp Inc","Kimberly Bullock Gatling",N/A,Award,13190,0,47221,62592,2026-09-24
+TTGT,"Techtarget Inc.","Gary John Nugent",CEO,"Sale Post-exercise",12608,3.74,47154,25758,2026-09-23
+EQB-PR-C.TO,"Equitable Group Inc Pref Ser 3","Rajeev K Goel",CEO,Exercise,21870,2.15,47021,2359064,2026-09-24
+EDRY,"Eurodry Ltd","Aristides P. Pittas",V.Chair,Buy,900,51.3324,46199,109133,2026-09-24
+DHF,"Dreyfus High Yield Strategies Fund","Joseph S Dimartino",Chair,Buy,20000,2.22,44400,240000,2026-09-24
+AEF,"Abrdn Emerging Markets Ex-China Fund Inc","Anthony S Clark",N/A,Buy,4500,9.63,43335,6000,2026-09-24
+ZEPP,"Zepp Health Corp ADR","Pengtao Yu","Div. Off.",Sell,10000,4.211,42110,98491,2026-09-24
+STKE,"Sol Strategies Inc","Antanas (Tony) Guoga","Strategic Adv",Buy,25000,1.6519,41298,6476851,2026-09-25
+DIS,"Walt Disney Company","Brent A Woodford","Div. EVP","Sale Post-exercise*",393,103.66,40738,63389,2026-09-23
+ALNT,"Allient Inc","Michael R Winter",N/A,"Given Away",374,0,40414,40458,2026-09-23
+SCHL,"Scholastic Corp","Chris Lick",EVP/GC/Secy,"Sale Post-exercise*",1119,35.09,39266,11455,2026-09-23
+ONDS,"Ondas Inc","Neil J Laird","CFO, Treas & Sec","Sale Post-exercise",4952,7.74,38329,47415,2026-09-24
+SLNH,"Soluna Hldgs Inc","Jessica L Thomas",CAO,Sell,30000,1.26,37800,1481417,2026-09-23
+YB,"Yuanbao Inc ADR","Ying Yue",VP.,"Sale Post-exercise*",2866,12.11,34708,7819,2026-09-24
+NN,"Nextnav Inc","Susan Brasse Insley",COO,"Sale Post-exercise",2370,14.2202,33702,163835,2026-09-24
+SBDS,"Solo Brands Inc","John P Larson",CEO,Award,11201,0,33603,103135,2026-09-23
+TTGT,"Techtarget Inc.","Steve Niemiec","Chf Revenue Of","Sale Post-exercise",8950,3.74,33473,137875,2026-09-23
+YB,"Yuanbao Inc ADR","Rui Fang",CEO,Exercise,2616,0,31732,116322,2026-09-24
+GRCE,"Grace Therapeutics Inc","American Shareholder",N/A,Buy,15089,2.1,31687,2855318,2026-09-23
+ALK,"Alaska Air Group","Jason M Berry",COO,"Sale Post-exercise*",792,39.7,31442,15103,2026-09-23
+ASAN,"Asana Inc Cl A","Aziz Megji","CFO & PAO","Sale Post-exercise",3224,9.2637,29866,726721,2026-09-23
+RSI,"Rush Street Interactive Inc","Jack A Markell",N/A,Buy,1500,19.35,29025,18883,2026-09-25
+PK,"Park Hotels & Resorts Inc","Patricia M Bedient",N/A,Award,1923,0,28980,159885,2026-09-23
+MAX,"Mediaalpha Inc Cl A","Kuanling (Amy) Yeh",CTO,"Sale Post-exercise",3000,9.4,28199,546091,2026-09-25
+CATY,"Cathay Genl Bncp","Albert Sun",CCO,"Sale Post-exercise*",457,61.45,28083,960,2026-09-25
+NEA,"Nuveen Insured Tax-Free Advantage Fund","Michael S Hamilton",N/A,Sell,2676,9.93,26573,0,2026-09-24
+PK,"Park Hotels & Resorts Inc","Thomas A Natelli",N/A,Award,1756,0,26463,267829,2026-09-23
+PK,"Park Hotels & Resorts Inc","Timothy J Naughton",N/A,Award,1756,0,26463,163064,2026-09-23
+ALGT,"Allegiant Travel Com","Tyler Hollingsworth",COO,"Sale Post-exercise*",330,77.26,25496,19766,2026-09-23
+BNED,"Barnes & Noble Education Inc C","Gary Luster",CAO,Sell,2267,11.2,25390,29667,2026-09-23
+SCHL,"Scholastic Corp","Paul Hukkanen",CAO,"Sale Post-exercise*",710,35.09,24914,12910,2026-09-23
+RGCO,"Rgc Resources Inc","Robert Johnston",N/A,Buy,1070,20.7415,22194,67070,2026-09-23
+KVYO,"Klaviyo Inc Series A","Ed Hallen","Chf Strategy Ofc",Sell,1300,17.02,22126,540903,2026-09-24
+COHU,"Cohu Inc","Andrew M Caggia",N/A,Award,326,0,21842,65104,2026-09-25
+CBNK,"Capital Bancorp Inc","Marc H Mcconnell",N/A,Exercise,1021,21.3863,21836,225755,2026-09-23
+ALGT,"Allegiant Travel Com","Rebecca Aretos",PAO,"Sale Post-exercise*",264,77.26,20397,10404,2026-09-23
+JCTC,"Jewett-Cameron Trading Company Ltd","Melinda Hodges Bradley",N/A,Buy,6887,2.9203,20112,509069,2026-09-25
+SCCO,"Southern Copper Corp","Dr Luis Miguel Palomino Bonilla",N/A,Sell,100,200,20000,1503,2026-09-24
+UMH,"Umh Properties","William Edward Mitchell",N/A,Buy,1300,15.3,19890,36828,2026-09-25
+GPUS,"Hyperscale Data Inc","Milton (Todd) C. Ault iii",Chair,Buy,104700,0.1782,18658,3884892,2026-09-23
+TTGT,"Techtarget Inc.","Daniel T Noreck",CFO,"Sale Post-exercise",4889,3.74,18284,96626,2026-09-23
+STKS,"The One Group","Emanuel N. Hilario",CEO,"Sale Post-exercise*",10936,1.65,18045,2002493,2026-09-24
+YB,"Yuanbao Inc ADR","Rui Fang",CEO,"Sale Post-exercise*",1444,12.15,17545,116322,2026-09-24
+CINT,"CI&T Inc Cl A","Neto Bruno Guicardi","Reg. CEO",Buy,5526,3.0997,17129,96790,2026-09-23
+AROW,"Arrow Financial Corp","Gregory J Champion",N/A,"Contract Buy",423,36.97,15638,12505,2026-09-23
+LUMN,"Lumen Technologies Inc","Donald Leroy Holt",CAO,"Sale Post-exercise*",2538,6.13,15557,164019,2026-09-23
+TTGT,"Techtarget Inc.","Charles D Rennick","VP/Gen Co/Secy","Sale Post-exercise",4146,3.74,15506,41028,2026-09-23
+GFS,"Globalfoundries Inc","Samak L Azar",CLO,Sell,335,45.72,15317,9129,2026-09-24
+PCT,"Purecycle Technologies Inc","Brad S Kalter","Gen Cou & Co Sec","Sale Post-exercise*",2830,5.15,14574,300497,2026-09-23
+AROW,"Arrow Financial Corp","James M Dawsey",N/A,"Contract Buy",389,36.97,14382,21137,2026-09-23
+KG,"Kestrel Group Ltd","Steven Harold Nigro",N/A,Buy,2500,5.34,13350,24555,2026-09-24
+TSBK,"Timberland Bancorp","Dean J Brydon",CEO,"Sale Post-exercise*",281,44.9525,12632,35640,2026-09-24
+AROW,"Arrow Financial Corp","Tenee R Casaccio",Chair,"Contract Buy",304,36.97,11239,29169,2026-09-23
+AROW,"Arrow Financial Corp","Darrin Jahnel",N/A,"Contract Buy",298,36.97,11017,1124,2026-09-23
+BKKT,"Bakkt Inc","Marc D'annunzio","Gen Cou","Sale Post-exercise",1272,8.61,10952,107006,2026-09-23
+BKKT,"Bakkt Inc","Nicholas Baes",COO,"Sale Post-exercise",1272,8.61,10952,104103,2026-09-23
+TSBK,"Timberland Bancorp","Jonathan Arthur Fischer",COO,"Sale Post-exercise*",243,44.9525,10923,6307,2026-09-24
+CIVB,"Civista Bncshrs","Charles A Parcher",CEO,Buy,400,26.75,10701,30064,2026-09-23
+TSBK,"Timberland Bancorp","Marci A Basich",CFO,"Sale Post-exercise*",235,44.9391,10561,4565,2026-09-24
+TTGT,"Techtarget Inc.","William Thomas Morelli",Pres.,"Sale Post-exercise",2809,3.74,10506,8288,2026-09-23
+SBDS,"Solo Brands Inc","John P Larson",CEO,"Sale Post-exercise*",3221,3.06,9856,103135,2026-09-23
+STKS,"The One Group","Nicole Thaung",CFO,"Sale Post-exercise*",5384,1.64,8830,197012,2026-09-24
+FTNT,"Fortinet Inc","Christiane Ohlgart",CFO,Sell,48,180,8640,10345,2026-09-24
+AROW,"Arrow Financial Corp","David G Kruczlnicki",N/A,"Contract Buy",228,36.97,8429,60847,2026-09-23
+AROW,"Arrow Financial Corp","Daniel James White",N/A,"Contract Buy",228,36.97,8429,8478,2026-09-23
+ORIC,"Oric Pharmaceuticals Inc","Dominic Piscitelli",CFO,"Sale Post-exercise",600,13.5042,8103,69828,2026-09-24
+YI,"111 Inc ADR","Yang (Luke) Chen",N/A,Sell,2200,3.6,7920,22573,2026-09-23
+CWEN,"Clearway Energy Inc Cl C","American Shareholder",N/A,"Transfer In",5535,1.4149,7832,84473,2026-09-23
+AROW,"Arrow Financial Corp","Mark Behan",V.Chair,"Contract Buy",211,36.97,7801,11112,2026-09-23
+AROW,"Arrow Financial Corp","Kristine D Duffy",N/A,"Contract Buy",203,36.97,7504,7670,2026-09-23
+AROW,"Arrow Financial Corp","Philip C Morris",N/A,"Contract Buy",203,36.97,7504,9006,2026-09-23
+AROW,"Arrow Financial Corp","Raymond F O'conor",N/A,"Contract Buy",203,36.97,7504,31148,2026-09-23
+ORC,"Orchid Island Capital Inc","Robert E Cauley","Chair & CEO",Award,1276,0,7363,228260,2026-09-25
+TSBK,"Timberland Bancorp","Breanne D Antich",CTO,"Sale Post-exercise*",163,44.9334,7325,7901,2026-09-24
+KSS,"Kohl's Corp","Wendy C Arlin",Chair,"Div Re",423,0,7208,64171,2026-09-23
+AROW,"Arrow Financial Corp","Colin L Read",N/A,"Contract Buy",194,36.97,7172,33777,2026-09-23
+TSBK,"Timberland Bancorp","Michael John Stoney",Chair,"Sale Post-exercise*",155,44.9555,6968,8885,2026-09-24
+AROW,"Arrow Financial Corp","Rocco F. Arcuri sr.",N/A,"Contract Buy",186,36.97,6876,16066,2026-09-23
+ORC,"Orchid Island Capital Inc","George Hunter Haas Iv","CFO & CIO",Award,1189,0,6861,138243,2026-09-25
+PHIO,"Phio Pharmaceuticals Corp","Patricia A Bradford",N/A,Buy,6500,1.0127,6582,64151,2026-09-24
+RGCO,"Rgc Resources Inc","Paul W Nester",CEO,Buy,300,21.08,6324,134513,2026-09-23
+TSBK,"Timberland Bancorp","Matthew Douglas Seath",CRO,"Sale Post-exercise*",135,44.9444,6068,3020,2026-09-24
+ADAG,"Adagene Inc ADR","Man Kin (Raymond) Tam",CFO,Buy,2000,3,6000,12000,2026-09-23
+CUEN,"Cuentas Inc","Shalom Arik Maimon","Chair & CEO",Buy,10000,0.5863,5863,916663,2026-09-25
+NPCE,"Neuropace Inc","Martha Morrell","Chf Med Off.","Sale Post-exercise*",335,13.97,4681,51357,2026-09-24
+FMAO,"Farmers & Merch Banc","Gregory R Allen",N/A,Award,133,0,4659,433,2026-09-25
+KSS,"Kohl's Corp","Robbin Mitchell",N/A,"Div Re",273,0,4651,52948,2026-09-23
+NMAX,"Newsmax Inc Cl B","American Shareholder",N/A,Sell,350,11.03,3860,21965289,2026-09-23
+KSS,"Kohl's Corp","H Charles Floyd",N/A,"Div Re",225,0,3834,64728,2026-09-23
+ACH,"Accendra Health Inc","Jonathan A Leon",CFO,"Sale Post-exercise*",4265,0.85,3626,286268,2026-09-23
+VRT,"Vertiv Holdings","Giordano Albertazzi",CEO,Award,13,0,3071,47600,2026-09-24
+CMPX,"Compass Therapeutics Inc","Neil Lerner",PAO,Buy,2500,1.14,2850,400000,2026-09-24
+ORC,"Orchid Island Capital Inc","George Hunter Haas Iv","CFO & CIO","Sale Post-exercise*",468,5.77,2701,138243,2026-09-25
+KSS,"Kohl's Corp","Yael Cosset",N/A,"Div Re",158,0,2693,70876,2026-09-23
+TSBK,"Timberland Bancorp","Parul Bhandari",N/A,"Sale Post-exercise*",58,45.1,2616,1836,2026-09-24
+ORIC,"Oric Pharmaceuticals Inc","Dominic Piscitelli",CFO,Exercise,600,4.36,2616,69828,2026-09-24
+IDKFF,"Threed Capital Inc","Lynn Factor",N/A,Buy,25000,0.101,2525,6146000,2026-09-24
+BKKT,"Bakkt Inc","Joe Henderson",CAO,"Sale Post-exercise",282,8.61,2428,12672,2026-09-23
+RCG,"Renaissance Capital Growth & Income Fund III","American Shareholder",N/A,Buy,756,3.05,2306,972732,2026-09-23
+RCG,"Renaissance Capital Growth & Income Fund III","American Shareholder",N/A,Buy,756,3.04,2298,973488,2026-09-24
+BCDA,"Biocardia Inc","Dr, Peter Altman",CEO,Buy,1900,1.05,1995,383885,2026-09-23
+KSS,"Kohl's Corp","Jonas Prising",N/A,"Div Re",103,0,1755,113291,2026-09-23
+KSS,"Kohl's Corp","Adolfo Villagomez",N/A,"Div Re",99,0,1687,44066,2026-09-23
+IBO,"Impact Biomedical Inc","American Shareholder",N/A,Sell,906,1.8614,1687,589518,2026-09-24
+VRT,"Vertiv Holdings","Stephanie L Gill","CLO & Co Sec",Award,6,0,1479,36482,2026-09-24
+VRT,"Vertiv Holdings","Scott Armul","CTO & CPO",Award,6,0,1464,34206,2026-09-24
+VRT,"Vertiv Holdings","Anders Karlborg",Ops,Award,5,0,1143,34681,2026-09-24
+VRT,"Vertiv Holdings","Anand Sanghi","Div. Pres.",Award,4,0,1092,36631,2026-09-24
+VRT,"Vertiv Holdings","Frank Poncheri",CHRO,Award,4,0,885,14481,2026-09-24
+KSS,"Kohl's Corp","Steven E Dee",CTO,Award,47,0,810,66005,2026-09-24
+VRT,"Vertiv Holdings","Paul Ryan","Reg. CEO",Award,3,0,777,18635,2026-09-24
+VRT,"Vertiv Holdings","Craig Chamberlin",CFO,Award,1,0,361,5693,2026-09-24
+VRT,"Vertiv Holdings","Wei Shen","Reg. CEO",Award,1,0,135,3344,2026-09-24
+VRT,"Vertiv Holdings","Eric M Johnson",CAO,Award,1,0,126,2156,2026-09-24
+GOW,"Gowell Energy Technology","Kevin George Shannon",N/A,Award,1105312,0,1,1105312,2026-09-25
+"Downloaded from Barchart.com as of 09-28-2026 11:24am CDT"

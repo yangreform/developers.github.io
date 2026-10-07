@@ -55,17 +55,31 @@ os.makedirs(MEMORY_DIR, exist_ok=True)
 
 # 載入現有基礎輔助模組
 try:
-    from barchart_download import (
+    from trade.skills import (
         init_driver,
         dismiss_popups,
         login_if_needed,
         load_credentials_from_env,
         wait_for_file_download,
         PROFILE_DIR,
+        create_fast_ib_connection,
+        load_env_settings,
     )
-except ImportError as e:
-    print(f"[WARN] 無法自 barchart_download 載入函式: {e}")
-    init_driver = None
+except ImportError:
+    try:
+        from skills.download_skill import (
+            init_driver,
+            dismiss_popups,
+            login_if_needed,
+            load_credentials_from_env,
+            wait_for_file_download,
+            PROFILE_DIR,
+        )
+        from skills.ibkr_skill import create_fast_ib_connection, load_env_settings
+    except ImportError as e:
+        print(f"[WARN] 無法自 skills 載入下載或下單輔助模組: {e}")
+        init_driver = None
+        create_fast_ib_connection = None
 
 try:
     from trade.skills.gemini_helper import load_gemini_api_key
@@ -73,17 +87,7 @@ except Exception:
     try:
         from skills.gemini_helper import load_gemini_api_key
     except Exception:
-        try:
-            from barchart_analysis import load_gemini_api_key
-        except Exception as e:
-            print(f"[WARN] 無法載入 load_gemini_api_key: {e}")
-            load_gemini_api_key = None
-
-try:
-    from barchart_placeOrder import create_fast_ib_connection, load_env_settings
-except ImportError as e:
-    print(f"[WARN] 無法自 barchart_placeOrder 載入函式: {e}")
-    create_fast_ib_connection = None
+        load_gemini_api_key = None
 
 try:
     from notifier import send_push_message
@@ -94,6 +98,15 @@ try:
     from ib_insync import IB, Option, LimitOrder, StopOrder, TagValue
 except ImportError:
     IB = None
+
+try:
+    from skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+except ImportError:
+    try:
+        from trade.skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+    except ImportError:
+        walk_up_limit_price = None
+        execute_walk_up_order = None
 
 # 載入模組化 Skills
 try:
@@ -314,11 +327,9 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
             stopLossPrice=stop_loss_price,
         )
 
-        # 母單設定為市價 Adaptive Patient 演算法
-        bracket.parent.orderType = "MKT"
-        bracket.parent.lmtPrice = 0
-        bracket.parent.algoStrategy = "Adaptive"
-        bracket.parent.algoParams = [TagValue("adaptivePriority", "Patient")]
+        # 母單設定為限價單並套用 Custom Walk-Up 步進修單
+        bracket.parent.orderType = "LMT"
+        bracket.parent.lmtPrice = current_price
         bracket.parent.tif = "DAY"
         bracket.takeProfit.tif = "GTC"
         bracket.stopLoss.tif = "GTC"
@@ -331,16 +342,37 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
         order_list = [bracket.parent, bracket.takeProfit, bracket.stopLoss]
         desc = (
             f"Buy Call {contract.localSymbol}\n"
-            f"     委託: BUY 1口 @ 市價 (Adaptive Patient, 參考現價 ${current_price:.2f})\n"
+            f"     委託: BUY 1口 @ Custom Walk-Up (起始限價 ${current_price:.2f})\n"
             f"     🎯 停利 (2倍): ${take_profit_price:.2f} | 🛑 停損 (一半): ${stop_loss_price:.2f}"
         )
 
         if not dry_run:
+            parent_trade = None
             for o in order_list:
-                ib.placeOrder(contract, o)
-            ib.sleep(1)
-            status = bracket.parent.orderStatus.status if hasattr(bracket.parent, "orderStatus") else "Submitted"
-            print(f"  -> ✅ [已送出委託至 IBKR] 母單狀態: {status}")
+                tr = ib.placeOrder(contract, o)
+                if o == bracket.parent:
+                    parent_trade = tr
+            ib.sleep(0.5)
+
+            if walk_up_limit_price:
+                print(f"⏳ [自適應步進修單] 啟動 Custom Walk-Up 步進調整 {contract.localSymbol} 括號母單...")
+                is_filled = walk_up_limit_price(
+                    ib=ib,
+                    contract=contract,
+                    order=bracket.parent,
+                    current_mid=current_price,
+                    max_slippage=0.15,
+                    step=0.05,
+                    step_time=3.0,
+                    max_steps=3,
+                    symbol=f"{contract.localSymbol}-Bracket",
+                    trade=parent_trade
+                )
+                status = "Filled" if is_filled else (parent_trade.orderStatus.status if parent_trade else "Cancelled")
+            else:
+                ib.sleep(1)
+                status = parent_trade.orderStatus.status if (parent_trade and hasattr(parent_trade, "orderStatus")) else "Submitted"
+            print(f"  -> ✅ [已送出自適應步進委託至 IBKR] 母單狀態: {status}")
         else:
             print(f"  -> 🔍 [模擬模式 (Dry-Run)] 不實際送單至交易所")
             status = "DryRun"
@@ -354,7 +386,7 @@ def execute_ibkr_call_order(contract_info, dry_run=False):
 💵 參考現價：${current_price:.2f}
 🎯 停利單 (2倍)：${take_profit_price:.2f}
 🛑 停損單 (一半)：${stop_loss_price:.2f}
-⚡ 委託方式：市價 Adaptive Patient
+⚡ 委託方式：自適應步進修單 Custom Walk-Up
 📊 委託狀態：{status}"""
 
         if send_push_message:
@@ -395,7 +427,8 @@ def run_long_call_pipeline(
     symbol_override=None,
     cooldown_days=14,
     retries=3,
-    no_line=False,
+    #no_line=False,
+    no_line=True,
 ):
     global send_push_message
     if no_line:

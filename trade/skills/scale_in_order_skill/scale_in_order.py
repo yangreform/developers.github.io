@@ -48,6 +48,15 @@ try:
 except ImportError:
     send_push_message = None
 
+try:
+    from skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+except ImportError:
+    try:
+        from trade.skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+    except ImportError:
+        walk_up_limit_price = None
+        execute_walk_up_order = None
+
 
 class ScaleInOrderSkill:
     """
@@ -304,43 +313,61 @@ class ScaleInOrderSkill:
     def step2_place_parent_order(self, contract, symbol, action="SELL", quantity=1.0, limit_price=0.0, target_account=None, dry_run=False, timeout_seconds=60):
         """
         [步驟 2: 送出加碼母單 (SELL)]
-        送出新的單純加碼母單 (SELL 市價 Adaptive Patient，不帶附屬單)，並等待完全成交 (Filled)
+        送出新的單純加碼母單 (SELL 自適應步進修單 Custom Walk-Up，不帶附屬單)，並步進撮合成交
         """
         print(f"\n" + "=" * 65)
-        print(f"🚀 [ScaleInSkill - 步驟 2] 送出 {symbol} 加碼母單 ({action} {quantity:g}口 @ 市價 Adaptive Patient)...")
+        print(f"🚀 [ScaleInSkill - 步驟 2] 送出 {symbol} 加碼母單 ({action} {quantity:g}口 @ 自適應步進修單 Custom Walk-Up)...")
         print("=" * 65)
-
-        order = MarketOrder(action=action, totalQuantity=quantity)
-        order.algoStrategy = "Adaptive"
-        order.algoParams = [TagValue("adaptivePriority", "Patient")]
-        order.tif = "DAY"
-        if target_account:
-            order.account = target_account
 
         if dry_run:
             print(f"  -> 🔍 [模擬模式 (Dry-Run)] 模擬加碼母單成交: {action} {quantity:g}口")
             return True, None, (limit_price or 1.0)
 
-        trade = self.ib.placeOrder(contract, order)
-        print(f"  -> 母單已送出 (OrderId: {trade.order.orderId})，等待確定完全成交 (Filled)...")
+        current_mid = limit_price
+        if not current_mid or current_mid <= 0:
+            ticker = self.ib.reqMktData(contract, '', False, False)
+            self.ib.sleep(0.8)
+            mid = ticker.midpoint()
+            if not mid or math.isnan(mid) or mid <= 0:
+                mid = ticker.marketPrice() or ticker.last or ticker.close or 1.0
+            current_mid = float(mid)
+            try:
+                self.ib.cancelMktData(contract)
+            except Exception:
+                pass
 
-        start_time = time.time()
-        while time.time() - start_time < timeout_seconds:
-            self.ib.sleep(1)
-            status = trade.orderStatus.status
-            if status == 'Filled':
-                avg_price = trade.orderStatus.avgFillPrice
+        if execute_walk_up_order:
+            filled, trade, avg_price = execute_walk_up_order(
+                ib=self.ib,
+                contract=contract,
+                action=action,
+                quantity=quantity,
+                current_mid=current_mid,
+                max_slippage=0.15,
+                step=0.05,
+                step_time=3.0,
+                max_steps=3,
+                symbol=f"{symbol}-ScaleIn",
+                account=target_account,
+                tif="DAY",
+                min_tick=0.05
+            )
+            if filled:
                 print(f"  -> ✅ [步驟 2 完成] 加碼母單已完全成交！均價: ${avg_price:.2f}")
                 return True, trade, avg_price
-            elif status in ('Cancelled', 'Inactive'):
-                print(f"  -> ❌ [步驟 2 異常] 加碼母單狀態為 {status}")
+            else:
+                status = getattr(trade.orderStatus, 'status', 'Cancelled') if trade else 'Cancelled'
+                print(f"  -> ⚠️ 加碼母單步進超時已徹底撤單，目前狀態: {status}")
                 return False, trade, 0.0
-
-        status = trade.orderStatus.status
-        print(f"  -> ⚠️ 加碼母單等待逾時 ({timeout_seconds}秒)，目前狀態: {status}")
-        if status in ('PreSubmitted', 'Submitted'):
-            return True, trade, (trade.orderStatus.avgFillPrice or limit_price or 0.0)
-        return False, trade, 0.0
+        else:
+            order = LimitOrder(action=action, totalQuantity=quantity, lmtPrice=current_mid)
+            order.tif = "DAY"
+            if target_account:
+                order.account = target_account
+            trade = self.ib.placeOrder(contract, order)
+            self.ib.sleep(1)
+            status = trade.orderStatus.status
+            return (status == 'Filled'), trade, (trade.orderStatus.avgFillPrice or current_mid)
 
     def step3_calculate_total_position(self, contract, symbol, parent_trade=None, previous_qty=1.0, added_qty=1.0):
         """

@@ -2,5 +2,102 @@
   "version": "1.0",
   "cooldown_days": 14,
   "blacklist": [],
-  "history": []
+  "history": [
+    {
+      "symbol": "INTC",
+      "recommended_at": "2026-09-29 03:15:20",
+      "company_name": "",
+      "insider_net_buy": 0.0,
+      "selected_call": {
+        "symbol": "INTC",
+        "strike": 90.0,
+        "exp_date": "20261023",
+        "exp_date_disp": "2026-10-23",
+        "ref_price": 26.25,
+        "ask": 26.25,
+        "delta": 0.918358,
+        "dte": 25,
+        "underlying_price": 115.13,
+        "volume": 1004,
+        "open_int": 1374,
+        "right": "C",
+        "action": "BUY",
+        "strategy": "Long Call"
+      },
+      "status": "recommended",
+      "notes": "Selected by Long Call Pipeline on 2026-09-29 03:14:35"
+    },
+    {
+      "symbol": "NVDA",
+      "recommended_at": "2026-09-30 01:32:58",
+      "company_name": "",
+      "insider_net_buy": 0.0,
+      "selected_call": {
+        "symbol": "NVDA",
+        "strike": 210.0,
+        "exp_date": "20261023",
+        "exp_date_disp": "2026-10-23",
+        "ref_price": 22.05,
+        "ask": 22.05,
+        "delta": 0.84,
+        "dte": 24,
+        "underlying_price": 229.64,
+        "volume": 280,
+        "open_int": 1323,
+        "right": "C",
+        "action": "BUY",
+        "strategy": "Long Call"
+      },
+      "status": "recommended",
+      "notes": "Selected by Long Call Pipeline on 2026-09-30 01:32:12"
+    },
+    {
+      "symbol": "RXRX",
+      "recommended_at": "2026-10-02 02:33:05",
+      "company_name": "",
+      "insider_net_buy": 0.0,
+      "selected_call": {
+        "symbol": "RXRX",
+        "strike": 0.5,
+        "exp_date": "20261023",
+        "exp_date_disp": "2026-10-23",
+        "ref_price": 5.35,
+        "ask": 5.35,
+        "delta": 0.9894,
+        "dte": 22,
+        "underlying_price": 4.07,
+        "volume": 168,
+        "open_int": 908,
+        "right": "C",
+        "action": "BUY",
+        "strategy": "Long Call"
+      },
+      "status": "recommended",
+      "notes": "Selected by Long Call Pipeline on 2026-10-02 02:32:05"
+    },
+    {
+      "symbol": "MSFT",
+      "recommended_at": "2026-10-03 02:33:01",
+      "company_name": "",
+      "insider_net_buy": 0.0,
+      "selected_call": {
+        "symbol": "MSFT",
+        "strike": 430.0,
+        "exp_date": "20261030",
+        "exp_date_disp": "2026-10-30",
+        "ref_price": 88.35,
+        "ask": 88.35,
+        "delta": 0.9479,
+        "dte": 28,
+        "underlying_price": 514.8,
+        "volume": 201,
+        "open_int": 851,
+        "right": "C",
+        "action": "BUY",
+        "strategy": "Long Call"
+      },
+      "status": "recommended",
+      "notes": "Selected by Long Call Pipeline on 2026-10-03 02:32:10"
+    }
+  ]
 }

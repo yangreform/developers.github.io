@@ -1,0 +1,5 @@
+Symbol,Price~,"Exp Date",Type,Strike,DTE,"Bid x Size","Ask x Size",Trade,Size,Side,Premium,Volume,"Open Int",IV,Delta,Code,*,Time
+HHH,71.08,2027-01-15,Put,60,109,"0.80 x 1","1.80 x 13",1.32,965,mid,127300,965,85,36.70%,-0.1587019719,MLET,ToOpen,"10:02:35 ET"
+HHH,71.06,2027-01-15,Call,55,109,"16.60 x 90","19.00 x 5",17.26,49,mid,84500,50,107,45.64%,0.88535785422935,AUTO,N/A,"12:04:10 ET"
+HHH,71.08,2026-10-16,Put,60,18,"0.05 x 31","0.35 x 111",0.2,965,mid,19300,971,2992,50.42%,-0.0564507133,MLET,N/A,"10:02:35 ET"
+"Downloaded from Barchart.com as of 09-28-2026 11:25am CDT"

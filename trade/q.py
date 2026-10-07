@@ -27,6 +27,36 @@ import shioaji as sj
 from notifier import send_push_message, send_trade_notification
 from vxm_config import load_vxm_config, save_vxm_config
 
+try:
+    from skills.walk_up_skill import (
+        walk_up_limit_price,
+        execute_walk_up_order,
+        round_to_tick,
+        is_valid_price,
+        extract_valid_price,
+        determine_min_tick_and_step,
+        fmt_price,
+    )
+except ImportError:
+    try:
+        from trade.skills.walk_up_skill import (
+            walk_up_limit_price,
+            execute_walk_up_order,
+            round_to_tick,
+            is_valid_price,
+            extract_valid_price,
+            determine_min_tick_and_step,
+            fmt_price,
+        )
+    except ImportError:
+        walk_up_limit_price = None
+        execute_walk_up_order = None
+        round_to_tick = lambda p, t=None: round(p, 2)
+        is_valid_price = lambda p: p is not None and not math.isnan(float(p)) and float(p) > 0
+        extract_valid_price = lambda *args: next((float(x) for x in args if x is not None and not math.isnan(float(x)) and float(x) > 0), None)
+        determine_min_tick_and_step = lambda c, p=None: (0.25, 0.25, 1.5) if getattr(c, 'secType', '') == 'FUT' or (getattr(c, 'secType', '') == 'FOP' and float(p or 0) >= 5.0) else (0.05, 0.05, 0.15)
+        fmt_price = lambda p, t=None: f"{float(p):.2f}"
+
 # ==============================================================================
 # 🔐 Load .env
 # ==============================================================================
@@ -708,7 +738,7 @@ DASHBOARD_HTML = """
             <span>🧭 Barchart Opinion 方向調倉 (TAV26)</span>
             <span style="font-size:11px; color:#8b949e; font-family:monospace;">(opinion.py)</span>
           </div>
-          <div class="muted" style="font-size:11px; margin-top:2px;">7 Day Average Directional Indicator 方向分析 + IBKR Adaptive Patient 調倉 (+1 / -1)</div>
+          <div class="muted" style="font-size:11px; margin-top:2px;">7 Day Average Directional Indicator 方向分析 + IBKR Custom Walk-Up 調倉 (+1 / -1)</div>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="action-btn" style="background-color:#1f6feb; font-size:12px; padding:6px 14px; display:flex; align-items:center; gap:4px;" onclick="runTMFScript(this, 'opinion', 'dry_run')">
@@ -792,7 +822,7 @@ DASHBOARD_HTML = """
     <div style="display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap; align-items:center; background:#161b22; padding:12px 16px; border-radius:8px; border:1px solid #30363d;">
         <span style="font-size:13px; font-weight:600; color:#8b949e;">⚡ 腳本操作：</span>
         <button class="action-btn" id="btn_run_download" style="background-color:#1f6feb; display:flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px;" onclick="runBarchartDownload()">
-            <span>📥</span> <span>執行 barchart_download.py</span>
+            <span>📥</span> <span>執行 uoa.py (下載數據)</span>
         </button>
         <button class="action-btn" id="btn_run_analysis" style="background-color:#238636; display:flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px;" onclick="runBarchartAnalysis()">
             <span>🧠</span> <span>執行 barchart_analysis.py</span>
@@ -1037,7 +1067,7 @@ function renderGroup(g) {
   if (g.name !== '台指(TMF)') {
     const hasPositions = g.positions && g.positions.length > 0;
     if (hasPositions) {
-      closeBtnHtml = `<button class="danger-btn" data-group="${encodeURIComponent(g.name)}" onclick="confirmCloseGroup(decodeURIComponent(this.dataset.group), this)" style="padding: 3px 10px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer;" title="平倉 ${g.name} 的所有部位 (Adaptive Patient)">
+      closeBtnHtml = `<button class="danger-btn" data-group="${encodeURIComponent(g.name)}" onclick="confirmCloseGroup(decodeURIComponent(this.dataset.group), this)" style="padding: 3px 10px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer;" title="平倉 ${g.name} 的所有部位 (Custom Walk-Up 步進修單)">
         <span>🧹</span><span>平倉 (${g.positions.length})</span>
       </button>`;
     } else {
@@ -1090,8 +1120,7 @@ async function confirmCloseGroup(groupName, btn) {
     const pnlVal = Number(p.pnl) || 0;
     const pnlSign = pnlVal > 0 ? '+' : '';
     const mkt = (p.market_price !== undefined && p.market_price !== null) ? fmt(p.market_price, p.decimals ?? 2) : '-';
-    const isFop = p.secType === 'FOP' || (p.symbol && p.symbol.includes(' ') && (p.symbol.includes(' C') || p.symbol.includes(' P')));
-    const algoText = isFop ? '市價 Market' : 'Adaptive Patient';
+    const algoText = 'Custom Walk-Up 步進修單';
     return `  ${idx + 1}. ${p.symbol}
      • 目前持有: ${pos} 口
      • 平倉動作: ${closeAction} ${qty} 口 (${algoText})
@@ -1105,7 +1134,7 @@ async function confirmCloseGroup(groupName, btn) {
 ` + lines + `
 ==================================================
 
-⚠️ 注意：期貨/個股以 Adaptive Patient 平倉，期貨選擇權以市價單 (Market) 平倉。
+⚠️ 注意：所有部位均採用 Custom Walk-Up 自適應步進限價修單 (3秒讓步，逾時撤單) 平倉。
 按下確定後將立即向 IBKR 送出真實委託！
 確定送出嗎？`;
 
@@ -1535,7 +1564,7 @@ async function runBarchartDownload() {
     statusBox.style.background = '#161b22';
     statusBox.style.color = '#58a6ff';
     statusBox.style.borderColor = '#1f6feb';
-    statusBox.innerHTML = '⏳ 正在背景執行 <code>py barchart_download.py</code>，瀏覽器自動連線 Barchart 下載個股與 ETF 異常期權 CSV，請稍候...';
+    statusBox.innerHTML = '⏳ 正在背景執行 <code>py uoa.py --skip-order</code>，瀏覽器自動連線 Barchart 下載個股與 ETF 異常期權 CSV，請稍候...';
 
     try {
         const resp = await fetch('/api/barchart/run_download', { method: 'POST' });
@@ -1544,7 +1573,7 @@ async function runBarchartDownload() {
             statusBox.style.background = '#13231b';
             statusBox.style.color = '#3fb950';
             statusBox.style.borderColor = '#238636';
-            statusBox.innerHTML = `✅ <strong>barchart_download.py 執行成功！</strong> 最新期權異動 CSV 已下載完成！`;
+            statusBox.innerHTML = `✅ <strong>uoa.py 下載成功！</strong> 最新期權異動 CSV 已下載完成！`;
         } else {
             statusBox.style.background = '#2c1517';
             statusBox.style.color = '#f85149';
@@ -2480,7 +2509,85 @@ FUTURE_SYMBOL_ALIAS = {
     "MNG": "MHNG",
 }
 
+# 🌟 各期貨主力流動性月份 (Active / Benchmark Months)
+# CME/COMEX 月份代號:
+# F(1), G(2), H(3), J(4), K(5), M(6), N(7), Q(8), U(9), V(10), X(11), Z(12)
+FUTURE_ACTIVE_MONTHS = {
+    # 黃金 (MGC, GC)：流動性核心為偶數月中的 G, J, M, Q, Z (2, 4, 6, 8, 12月)，排除 10月(V)
+    "MGC": [2, 4, 6, 8, 12],
+    "GC": [2, 4, 6, 8, 12],
+    # 銅 (MHG, HG)：3, 5, 7, 9, 12 (H, K, N, U, Z)
+    "MHG": [3, 5, 7, 9, 12],
+    "HG": [3, 5, 7, 9, 12],
+    # 白銀 (MSI, SI, SIL)：3, 5, 7, 9, 12 (H, K, N, U, Z)
+    "MSI": [3, 5, 7, 9, 12],
+    "SI": [3, 5, 7, 9, 12],
+    "SIL": [3, 5, 7, 9, 12],
+    # 股指期貨 (MES, ES, MNQ, NQ, M2K, RTY, MYM, YM)：季月 3, 6, 9, 12 (H, M, U, Z)
+    "MES": [3, 6, 9, 12],
+    "ES": [3, 6, 9, 12],
+    "MNQ": [3, 6, 9, 12],
+    "NQ": [3, 6, 9, 12],
+    "M2K": [3, 6, 9, 12],
+    "RTY": [3, 6, 9, 12],
+    "MYM": [3, 6, 9, 12],
+    "YM": [3, 6, 9, 12],
+    # 外匯期貨 (M6E, EUR, MJY, JPY)：季月 3, 6, 9, 12 (H, M, U, Z)
+    "M6E": [3, 6, 9, 12],
+    "EUR": [3, 6, 9, 12],
+    "MJY": [3, 6, 9, 12],
+    "JPY": [3, 6, 9, 12],
+    # 玉米 (ZC, XC, YC)：3, 5, 7, 9, 12 (H, K, N, U, Z)
+    "ZC": [3, 5, 7, 9, 12],
+    "XC": [3, 5, 7, 9, 12],
+    "YC": [3, 5, 7, 9, 12],
+}
+
+# 實物交割期貨品類 (需提防 First Notice Date 交割風控視窗，合約前一個月下旬起即不可新開倉)
+PHYSICAL_DELIVERY_SYMBOLS = {"MGC", "GC", "MHG", "HG", "MSI", "SI", "SIL", "MCL", "CL", "XC", "YC", "ZC"}
+
+# 被 IBKR 拒單 (如 Error 201 臨期/實物交割政策) 之合約黑名單，避免短時間內重複被拒
+FUTURE_REJECTED_CONTRACTS = {}
+
 FUTURE_CONTRACT_CACHE = {}
+
+
+def is_physical_delivery_safe(contract, today_date: datetime.date | None = None) -> bool:
+    """
+    檢查實物交割期貨是否已進入 IBKR 第一通知日 (First Notice Date, FND) 或交割風控限制視窗。
+    例如 202610 (10月合約)，FND 在 9 月底，IBKR 通常在 9 月下旬 (約 20 號後) 即禁止新開倉 (Error 201)。
+    因此在合約月份前一個月下旬或合約當月，均不可再開新倉。
+    """
+    today_date = today_date or datetime.date.today()
+    exp_str = getattr(contract, 'lastTradeDateOrContractMonth', '')
+    if not exp_str or len(exp_str) < 6:
+        return True
+    try:
+        c_year = int(exp_str[:4])
+        c_month = int(exp_str[4:6])
+        if c_month == 1:
+            safe_year = c_year - 1
+            safe_month = 12
+        else:
+            safe_year = c_year
+            safe_month = c_month - 1
+        safe_cutoff = datetime.date(safe_year, safe_month, 20)
+        return today_date < safe_cutoff
+    except Exception:
+        return True
+
+
+def is_contract_blacklisted(contract) -> bool:
+    now_ts = time.time()
+    local_sym = getattr(contract, 'localSymbol', '').upper()
+    con_id = str(getattr(contract, 'conId', ''))
+    for k in [local_sym, con_id]:
+        if k and k in FUTURE_REJECTED_CONTRACTS:
+            if now_ts - FUTURE_REJECTED_CONTRACTS[k] < 86400 * 3:  # 排除3天
+                return True
+            else:
+                FUTURE_REJECTED_CONTRACTS.pop(k, None)
+    return False
 
 
 def is_unexpired(exp_str: str, today_str: str, min_days: int = 2) -> bool:
@@ -2520,8 +2627,9 @@ def is_unexpired(exp_str: str, today_str: str, min_days: int = 2) -> bool:
 def get_target_future_contract(ib_instance: IB, symbol: str, min_days_to_expiry: int | None = None):
     """
     自動搜尋並回傳該商品最近可以下單的正確合法期貨合約。
-    支援自動過濾已到期與臨期合約 (DTE >= min_days_to_expiry，預設 2 天，避開 IBKR Error 201 實物交割與臨期風控限制)、
-    按到期日排序取最近可交易月，並自動進行合約資格化 (qualifyContracts)。
+    支援主力流動性月份過濾 (如黃金 MGC/GC 排除 10月V，鎖定偶數月 G,J,M,Q,Z)、
+    實物交割 FND 風控保護、自動過濾已到期與被 IBKR 拒單合約 (Error 201)、
+    按到期日排序取最近可交易主力月，並自動進行合約資格化 (qualifyContracts)。
     """
     if not ib_instance or not ib_instance.isConnected():
         return None
@@ -2531,15 +2639,33 @@ def get_target_future_contract(ib_instance: IB, symbol: str, min_days_to_expiry:
 
     actual_symbol = FUTURE_SYMBOL_ALIAS.get(symbol.upper(), symbol.upper())
     exchange = FUTURE_EXCHANGE_MAP.get(actual_symbol, "CME")
-    today_str = datetime.date.today().strftime('%Y%m%d')
+    today_date = datetime.date.today()
+    today_str = today_date.strftime('%Y%m%d')
     now_ts = time.time()
 
+    # 0. 支援環境變數自訂特定合約 (例如 MGC_TARGET_CONTRACT=MGCZ6)
+    override_sym = os.getenv(f"{actual_symbol}_TARGET_CONTRACT") or os.getenv(f"FUTURE_TARGET_CONTRACT_{actual_symbol}") or os.getenv(f"{symbol.upper()}_TARGET_CONTRACT")
+    if override_sym:
+        override_sym = override_sym.strip().upper()
+        c_over = Future(symbol=actual_symbol, exchange=exchange, localSymbol=override_sym, currency='USD')
+        try:
+            if ib_instance.qualifyContracts(c_over) and c_over.conId:
+                print(f"[INFO] [期貨合約搜尋] 依 .env 指定合約: {override_sym} (conId: {c_over.conId})")
+                return c_over
+        except Exception as o_err:
+            print(f"⚠️ [期貨合約搜尋] 指定合約 {override_sym} 資格化失敗: {o_err}")
+
+    # 快取檢查
     cache_key = f"{actual_symbol}_{exchange}"
     cached = FUTURE_CONTRACT_CACHE.get(cache_key)
     if cached:
         contract, cached_time = cached
-        if (now_ts - cached_time < 1800) and is_unexpired(contract.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry):
-            return contract
+        if (now_ts - cached_time < 1800) and not is_contract_blacklisted(contract) and is_unexpired(contract.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry):
+            if actual_symbol not in PHYSICAL_DELIVERY_SYMBOLS or is_physical_delivery_safe(contract, today_date):
+                allowed = FUTURE_ACTIVE_MONTHS.get(actual_symbol)
+                exp = getattr(contract, 'lastTradeDateOrContractMonth', '')
+                if not allowed or (len(exp) >= 6 and int(exp[4:6]) in allowed):
+                    return contract
 
     details = []
     try:
@@ -2559,19 +2685,46 @@ def get_target_future_contract(ib_instance: IB, symbol: str, min_days_to_expiry:
         except Exception:
             pass
 
-    valid_details = [
-        d for d in details
-        if d.contract.exchange not in ['QBALGO', 'SMART']
-        and is_unexpired(d.contract.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry)
-    ]
+    allowed_months = FUTURE_ACTIVE_MONTHS.get(actual_symbol)
+    is_phys = actual_symbol in PHYSICAL_DELIVERY_SYMBOLS
 
-    if not valid_details:
+    valid_details = []
+    fallback_details = []
+    for d in details:
+        c = d.contract
+        if c.exchange in ['QBALGO', 'SMART']:
+            continue
+        if is_contract_blacklisted(c):
+            continue
+        if not is_unexpired(c.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry):
+            continue
+
+        exp = c.lastTradeDateOrContractMonth
+        fallback_details.append(d)
+
+        # 1. 主力流動性月份過濾 (如 MGC 僅允許 2, 4, 6, 8, 12 月)
+        if allowed_months:
+            try:
+                m_int = int(exp[4:6])
+                if m_int not in allowed_months:
+                    continue
+            except Exception:
+                pass
+
+        # 2. 實物交割 FND 安全檢查 (避開 IBKR 交割限制視窗)
+        if is_phys and not is_physical_delivery_safe(c, today_date):
+            continue
+
+        valid_details.append(d)
+
+    final_candidates = valid_details if valid_details else fallback_details
+    if not final_candidates:
         print(f"⚠️ [期貨合約搜尋] 找不到 {symbol} ({actual_symbol} @ {exchange}) 的可用近月合約！")
         return None
 
-    # 按到期月份升冪排序，取得最接近可下單的有效合約
-    valid_details = sorted(valid_details, key=lambda d: d.contract.lastTradeDateOrContractMonth)
-    target_contract = valid_details[0].contract
+    # 按到期月份升冪排序，取得最接近可下單的有效主力合約
+    final_candidates = sorted(final_candidates, key=lambda d: d.contract.lastTradeDateOrContractMonth)
+    target_contract = final_candidates[0].contract
     try:
         ib_instance.qualifyContracts(target_contract)
     except Exception as q_err:
@@ -2659,12 +2812,15 @@ def evaluate_and_run_vxm(ib_instance, execute_order=True):
     total_unrealized_pnl = 0.0
     held_contract = None
 
+    portfolio_mkt_price = None
     for p in vxm_positions:
         current_pos += int(p.position)
         if p.unrealizedPNL is not None:
             total_unrealized_pnl += p.unrealizedPNL
         if p.position != 0:
             held_contract = p.contract
+            if is_valid_price(p.marketPrice):
+                portfolio_mkt_price = float(p.marketPrice)
 
     trade_contract = held_contract if held_contract else target_contract
     if trade_contract and hasattr(trade_contract, 'conId') and trade_contract.conId:
@@ -2715,16 +2871,80 @@ def evaluate_and_run_vxm(ib_instance, execute_order=True):
     if execute_order and trade_action and trade_qty > 0:
         if now_ts - VXM_CACHE.get("last_trade_time", 0) > 60:
             if SEND_WEBHOOK:
-                from ib_insync import TagValue
-                order = MarketOrder(trade_action, trade_qty)
-                order.tif = 'DAY'
-                order.algoStrategy = 'Adaptive'
-                order.algoParams = [TagValue('adaptivePriority', 'Patient')]
-                if TARGET_ACCOUNT:
-                    order.account = TARGET_ACCOUNT
-                trade = ib_instance.placeOrder(trade_contract, order)
+                # 確保市場資料模式支援即時/延遲資料 (Type 3: 延遲, Type 4: 延遲凍結)
+                try:
+                    ib_instance.reqMarketDataType(3)
+                except Exception:
+                    pass
+
+                ticker = ib_instance.reqMktData(trade_contract, '', False, False)
+                ib_instance.sleep(1.0)
+                current_mid = extract_valid_price(
+                    ticker.midpoint(), ticker.marketPrice(), ticker.last, ticker.close, ticker.bid, ticker.ask, portfolio_mkt_price
+                )
+                try:
+                    ib_instance.cancelMktData(trade_contract)
+                except Exception:
+                    pass
+
+                # 若仍未取得有效報價，向 IBKR 請求 1 天 1 分鐘歷史 K 棒作為備援基準價
+                if not current_mid:
+                    try:
+                        bars = ib_instance.reqHistoricalData(
+                            trade_contract,
+                            endDateTime='',
+                            durationStr='1 D',
+                            barSizeSetting='1 min',
+                            whatToShow='TRADES',
+                            useRTH=False,
+                            formatDate=1
+                        )
+                        if bars and len(bars) > 0 and is_valid_price(bars[-1].close):
+                            current_mid = float(bars[-1].close)
+                    except Exception as h_err:
+                        print(f"⚠️ [VXM 歷史報價獲取異常] {h_err}")
+
+                # 關鍵安全防禦：若價格仍為無效 (None/NaN/<=0)，絕不送單，避免 Error 320 拒絕
+                if not is_valid_price(current_mid):
+                    err_alert = f"⚠️ [VXM 下單中止] 無法取得 {trade_contract.localSymbol} 之有效報價 (current_mid={current_mid})，拒絕送出無效委託！"
+                    print(err_alert)
+                    try:
+                        send_push_message(err_alert)
+                    except Exception:
+                        pass
+                    return VXM_CURRENT_DATA
+
+                current_mid = round(float(current_mid), 2)
+                print(f"🚀 [VXM Walk-Up 下單] 啟動自適應步進修單: {trade_action} {trade_qty} 口 {trade_contract.localSymbol} (參考現價 ${current_mid:.2f})，原因: {reason}")
+                if execute_walk_up_order:
+                    filled, trade, avg_price = execute_walk_up_order(
+                        ib=ib_instance,
+                        contract=trade_contract,
+                        action=trade_action,
+                        quantity=trade_qty,
+                        current_mid=current_mid,
+                        max_slippage=0.15,
+                        step=0.05,
+                        step_time=3.0,
+                        max_steps=3,
+                        symbol=f"VXM-{trade_contract.localSymbol}",
+                        account=TARGET_ACCOUNT,
+                        tif='DAY',
+                        outside_rth=True,
+                        min_tick=0.05
+                    )
+                else:
+                    order = LimitOrder(trade_action, trade_qty, current_mid)
+                    order.tif = 'DAY'
+                    order.outsideRth = True
+                    if TARGET_ACCOUNT:
+                        order.account = TARGET_ACCOUNT
+                    trade = ib_instance.placeOrder(trade_contract, order)
+                    filled = False
+                    avg_price = current_mid
+
                 VXM_CACHE["last_trade_time"] = now_ts
-                print(f"🚀 [VXM 下單成功] 已送出 {trade_action} {trade_qty} 口 {trade_contract.localSymbol}，原因: {reason}")
+                print(f"🚀 [VXM 下單完成] 委託狀態: {'Filled' if filled else getattr(trade.orderStatus, 'status', 'Submitted')} (均價: ${avg_price})")
                 
                 try:
                     payload_dict = {
@@ -3195,23 +3415,72 @@ def close_dash_position():
         contract = Contract(conId=int(conId))
         local_ib.qualifyContracts(contract)
         
-        order = MarketOrder(action, float(qty))
-        if contract.secType == 'FOP':
-            order.tif = 'GTC'
-            order.outsideRth = True
-            strategy_desc = "市價單 Market"
-        else:
-            order.tif = 'DAY'
-            order.algoStrategy = 'Adaptive'
-            order.algoParams = [TagValue('adaptivePriority', 'Patient')]
-            strategy_desc = "Adaptive Patient"
+        try:
+            local_ib.reqMarketDataType(3)
+        except Exception:
+            pass
 
-        if TARGET_ACCOUNT:
-            order.account = TARGET_ACCOUNT
-        
-        trade = local_ib.placeOrder(contract, order)
-        local_ib.sleep(1)
-        res_msg = f'已送出平倉單: {action} {qty} 口 {contract.localSymbol or conId} ({strategy_desc})'
+        ticker = local_ib.reqMktData(contract, '', False, False)
+        local_ib.sleep(0.8)
+        current_mid = extract_valid_price(
+            ticker.midpoint(), ticker.marketPrice(), ticker.last, ticker.close, ticker.bid, ticker.ask
+        )
+        try:
+            local_ib.cancelMktData(contract)
+        except Exception:
+            pass
+
+        if not current_mid:
+            for p in local_ib.portfolio():
+                if p.contract.conId == contract.conId and is_valid_price(p.marketPrice):
+                    current_mid = float(p.marketPrice)
+                    break
+
+        if not current_mid:
+            try:
+                bars = local_ib.reqHistoricalData(
+                    contract, endDateTime='', durationStr='1 D', barSizeSetting='1 min', whatToShow='TRADES', useRTH=False, formatDate=1
+                )
+                if bars and len(bars) > 0 and is_valid_price(bars[-1].close):
+                    current_mid = float(bars[-1].close)
+            except Exception:
+                pass
+
+        if not is_valid_price(current_mid):
+            return jsonify({'status': 'error', 'message': f'無法取得 {contract.localSymbol or conId} 的即時或歷史有效行情價格，平倉中止'})
+
+        min_tick, step_val, max_slip = determine_min_tick_and_step(contract, current_mid)
+        strategy_desc = "Custom Walk-Up 步進修單"
+
+        if execute_walk_up_order:
+            filled, trade, avg_price = execute_walk_up_order(
+                ib=local_ib,
+                contract=contract,
+                action=action,
+                quantity=float(qty),
+                current_mid=current_mid,
+                max_slippage=max_slip,
+                step=step_val,
+                step_time=3.0,
+                max_steps=3,
+                symbol=contract.localSymbol or str(conId),
+                account=TARGET_ACCOUNT,
+                tif='GTC' if contract.secType in ('FOP', 'FUT') else 'DAY',
+                outside_rth=(contract.secType in ('FOP', 'FUT')),
+                min_tick=min_tick
+            )
+            if filled:
+                res_msg = f'已完全平倉成交: {action} {qty} 口 {contract.localSymbol or conId} ({strategy_desc}, 成交均價: ${avg_price:.2f})'
+            else:
+                res_msg = f'平倉單步進超時已徹底撤單: {action} {qty} 口 {contract.localSymbol or conId} (避免死水期被動接刀)'
+        else:
+            order = LimitOrder(action, float(qty), current_mid or 0.05)
+            order.tif = 'GTC' if contract.secType in ('FOP', 'FUT') else 'DAY'
+            if TARGET_ACCOUNT:
+                order.account = TARGET_ACCOUNT
+            trade = local_ib.placeOrder(contract, order)
+            local_ib.sleep(1)
+            res_msg = f'已送出平倉單: {action} {qty} 口 {contract.localSymbol or conId}'
         try:
             send_trade_notification('OPTION', res_msg, {'action': action, 'qty': qty, 'conId': conId})
         except Exception:
@@ -3274,7 +3543,7 @@ def api_group_close():
 
         real_portfolio = {p.contract.conId: p for p in local_ib.portfolio()}
 
-        trades_submitted = []
+        items_to_close = []
         for p_item in positions_to_close:
             con_id = p_item.get("conId")
             pos_qty = float(p_item.get("position", 0.0))
@@ -3299,59 +3568,212 @@ def api_group_close():
                 contract = Contract(symbol=p_item.get("symbol", ""))
 
             local_ib.qualifyContracts(contract)
-
-            order = MarketOrder(action, qty)
-            if contract.secType == 'FOP':
-                # CME/COMEX/NYMEX/CBOT 期貨選擇權不支援 Adaptive 演算法 (會報 Error 442)，使用普通市價/保護市價
-                order.tif = 'GTC'
-                order.outsideRth = True
-                strategy_desc = "市價單 Market"
-            else:
-                order.tif = 'DAY'
-                order.algoStrategy = 'Adaptive'
-                order.algoParams = [TagValue('adaptivePriority', 'Patient')]
-                strategy_desc = "Adaptive Patient"
-
-            if TARGET_ACCOUNT:
-                order.account = TARGET_ACCOUNT
-
-            trade = local_ib.placeOrder(contract, order)
             disp_name = contract.localSymbol or p_item.get("symbol") or str(con_id)
-            trades_submitted.append({
+            items_to_close.append({
                 'contract': contract,
-                'order': order,
-                'trade': trade,
-                'disp_name': disp_name,
                 'action': action,
                 'qty': qty,
-                'strategy_desc': strategy_desc
+                'disp_name': disp_name,
+                'con_id': con_id
             })
 
-        if not trades_submitted:
+        if not items_to_close:
             return jsonify({"status": "ok", "message": f"【{group_name}】部位已處於平倉狀態，無須送單", "details": []})
 
-        # 等待委託狀態回報
+        try:
+            local_ib.reqMarketDataType(3)
+        except Exception:
+            pass
+
+        # 批量訂閱即時報價取得 current_mid
+        for it in items_to_close:
+            it['ticker'] = local_ib.reqMktData(it['contract'], '', False, False)
+        local_ib.sleep(0.8)
+
+        for it in items_to_close:
+            tk = it['ticker']
+            mid = extract_valid_price(
+                tk.midpoint(), tk.marketPrice(), tk.last, tk.close, tk.bid, tk.ask
+            )
+            try:
+                local_ib.cancelMktData(it['contract'])
+            except Exception:
+                pass
+
+            if not mid:
+                con_id_val = it['con_id']
+                if con_id_val and con_id_val in real_portfolio:
+                    pm = real_portfolio[con_id_val].marketPrice
+                    if is_valid_price(pm):
+                        mid = float(pm)
+
+            if not mid:
+                try:
+                    bars = local_ib.reqHistoricalData(
+                        it['contract'], endDateTime='', durationStr='1 D', barSizeSetting='1 min', whatToShow='TRADES', useRTH=False, formatDate=1
+                    )
+                    if bars and len(bars) > 0 and is_valid_price(bars[-1].close):
+                        mid = float(bars[-1].close)
+                except Exception:
+                    pass
+
+            if is_valid_price(mid):
+                min_tick, step_val, max_slip = determine_min_tick_and_step(it['contract'], float(mid))
+                base_p = round_to_tick(float(mid), min_tick)
+                it['min_tick'] = min_tick
+                it['step_val'] = step_val
+                it['max_slippage'] = max_slip
+                it['base_price'] = max(min_tick, base_p)
+                order = LimitOrder(it['action'], it['qty'], it['base_price'])
+                if it['contract'].secType in ('FOP', 'FUT'):
+                    order.tif = 'GTC'
+                    order.outsideRth = True
+                else:
+                    order.tif = 'DAY'
+                if TARGET_ACCOUNT:
+                    order.account = TARGET_ACCOUNT
+                it['order'] = order
+                it['trade'] = None
+            else:
+                it['min_tick'] = 0.05
+                it['step_val'] = 0.05
+                it['max_slippage'] = 0.15
+                it['base_price'] = None
+                it['order'] = None
+                it['trade'] = None
+            it['filled'] = False
+            it['avg_fill_price'] = 0.0
+            it['aborted'] = False
+
+        # 執行自適應步進修單 (Custom Walk-Up: 3 輪讓步，每輪 3 秒)
+        max_steps = 3
+        step_time = 3.0
+        for step_idx in range(max_steps):
+            for it in items_to_close:
+                if it['filled'] or it['order'] is None or it.get('aborted'):
+                    continue
+
+                trade = it.get('trade')
+                # 若已經送出過訂單 (step_idx > 0)，嚴格防禦訂單狀態
+                if step_idx > 0 and trade is not None:
+                    st = getattr(trade.orderStatus, 'status', '')
+                    t_filled = getattr(trade.orderStatus, 'filled', 0.0)
+
+                    # 1. 檢查是否已成交
+                    if st == 'Filled' or (t_filled and t_filled >= it['qty']):
+                        it['filled'] = True
+                        it['avg_fill_price'] = trade.orderStatus.avgFillPrice or it['order'].lmtPrice
+                        continue
+
+                    # 2. 檢查是否已處於終止或取消狀態，嚴格禁止再次 placeOrder 以防 Duplicate order id
+                    if st in ('Cancelled', 'Inactive', 'ApiCancelled'):
+                        print(f"[{it['disp_name']}] ⚠️ 訂單已處於 {st} 狀態，終止步進修單以防 Duplicate order id。")
+                        it['aborted'] = True
+                        continue
+
+                    # 3. 檢查是否仍為 PendingSubmit (TWS 尚未確認登記完成)
+                    if st in ('PendingSubmit', ''):
+                        local_ib.sleep(0.8)
+                        st = getattr(trade.orderStatus, 'status', '')
+                        if st in ('PendingSubmit', ''):
+                            print(f"[{it['disp_name']}] ⏳ 訂單仍為 PendingSubmit，暫緩修改以防 Duplicate order id。")
+                            continue
+                        elif st in ('Cancelled', 'Inactive', 'ApiCancelled'):
+                            it['aborted'] = True
+                            continue
+                        elif st == 'Filled' or getattr(trade.orderStatus, 'filled', 0.0) >= it['qty']:
+                            it['filled'] = True
+                            it['avg_fill_price'] = trade.orderStatus.avgFillPrice or it['order'].lmtPrice
+                            continue
+
+                base = it['base_price']
+                s_val = it['step_val']
+                action = it['action']
+                min_t = it['min_tick']
+                max_slip = it['max_slippage']
+
+                if action == 'SELL':
+                    target_p = round_to_tick(base - (step_idx * s_val), min_t)
+                    slip = round(base - target_p, 4)
+                else:
+                    target_p = round_to_tick(base + (step_idx * s_val), min_t)
+                    slip = round(target_p - base, 4)
+
+                if slip > max_slip + 1e-5:
+                    print(f"[{it['disp_name']}] 第 {step_idx+1} 次讓步已達最大滑價上限 (${slip:.2f} > ${max_slip:.2f})，停止追價。")
+                    continue
+
+                new_lmt = max(min_t, target_p)
+                if step_idx > 0 and getattr(it['order'], 'lmtPrice', None) == new_lmt:
+                    # 價格無變動，無須重複 modify
+                    continue
+
+                it['order'].lmtPrice = new_lmt
+                action_text = "下單" if step_idx == 0 else "修單"
+                print(f"[看板群組平倉 Walk-Up] {it['disp_name']} 第 {step_idx+1} 次{action_text}: {action} {it['qty']}口 @ ${it['order'].lmtPrice:.2f}")
+                new_trade = local_ib.placeOrder(it['contract'], it['order'])
+                if new_trade is not None:
+                    it['trade'] = new_trade
+
+            # 等待 step_time 秒並高頻檢查狀態
+            wait_start = time.time()
+            while time.time() - wait_start < step_time:
+                local_ib.sleep(0.5)
+                for it in items_to_close:
+                    if not it['filled'] and it.get('trade'):
+                        st = it['trade'].orderStatus.status
+                        t_filled = getattr(it['trade'].orderStatus, 'filled', 0.0)
+                        if st == 'Filled' or (t_filled and t_filled >= it['qty']):
+                            it['filled'] = True
+                            it['avg_fill_price'] = it['trade'].orderStatus.avgFillPrice or it['order'].lmtPrice
+                            print(f"✅ [看板群組平倉] {it['disp_name']} 完全成交！均價: ${it['avg_fill_price']:.4f}")
+
+            active_items = [it for it in items_to_close if it.get('order') is not None and not it.get('aborted')]
+            if active_items and all(it['filled'] for it in active_items):
+                print(f"🎉【{group_name}】全數部位已在第 {step_idx+1} 輪步進完全撮合成交！")
+                break
+
+        # 逾時徹底撤銷發呆訂單
+        for it in items_to_close:
+            if not it['filled'] and it.get('trade') is not None and it.get('order') is not None:
+                st = getattr(it['trade'].orderStatus, 'status', '')
+                if st not in ('Cancelled', 'Inactive', 'ApiCancelled', 'Filled'):
+                    print(f"⚠️ [看板群組平倉] {it['disp_name']} 逾時未成交 (目前狀態: {st})，徹底撤銷訂單以防死水期被動接刀。")
+                    try:
+                        local_ib.cancelOrder(it['order'])
+                    except Exception:
+                        pass
+
         local_ib.sleep(0.5)
+        # 最終再次更新 fill 狀態
+        for it in items_to_close:
+            if not it['filled'] and it.get('trade'):
+                st = getattr(it['trade'].orderStatus, 'status', '')
+                t_filled = getattr(it['trade'].orderStatus, 'filled', 0.0)
+                if st == 'Filled' or (t_filled and t_filled >= it['qty']):
+                    it['filled'] = True
+                    it['avg_fill_price'] = it['trade'].orderStatus.avgFillPrice or it['order'].lmtPrice
 
         orders_sent = []
         has_failure = False
-        for item in trades_submitted:
-            trade = item['trade']
-            disp_name = item['disp_name']
-            action = item['action']
-            qty = item['qty']
-            strat = item['strategy_desc']
-
-            order_id = trade.order.orderId
+        for it in items_to_close:
+            trade = it.get('trade')
+            disp_name = it['disp_name']
+            action = it['action']
+            qty = it['qty']
+            order_id = it['order'].orderId if it.get('order') else 0
             specific_errors = [e for e in recent_ib_errors if e[0] == order_id and e[1] not in (10349, 399)]
 
-            status = trade.orderStatus.status
-            if status in ('Cancelled', 'Inactive') or specific_errors:
+            if it['filled']:
+                orders_sent.append(f"✅ {disp_name}: {action} {qty} 口 (Walk-Up 成交均價: ${it['avg_fill_price']:.2f})")
+            elif it.get('order') is None:
                 has_failure = True
-                err_detail = specific_errors[-1][2] if specific_errors else (trade.orderStatus.whyHeld or status)
-                orders_sent.append(f"❌ {disp_name}: 平倉失敗 ({status} - {err_detail})")
+                orders_sent.append(f"❌ {disp_name}: 無法取得即時或歷史有效行情價格，略過平倉委託")
             else:
-                orders_sent.append(f"✅ {disp_name}: {action} {qty} 口 ({strat})")
+                has_failure = True
+                status = trade.orderStatus.status if (trade and hasattr(trade, 'orderStatus')) else "Cancelled"
+                err_detail = specific_errors[-1][2] if specific_errors else ((trade.orderStatus.whyHeld if trade and hasattr(trade, 'orderStatus') else None) or "逾時步進撤單")
+                orders_sent.append(f"⚠️ {disp_name}: 未能完全成交 ({status} - {err_detail})")
 
         summary_text = f"🧹【看板分組一鍵平倉】\n分組: {group_name}\n" + "\n".join(orders_sent)
         try:
@@ -3502,12 +3924,12 @@ def api_run_barchart_download():
         return jsonify({"status": "error", "message": "目前已有背景工作正在執行中，請稍候完成再試。"})
 
     try:
-        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "barchart_download.py")
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uoa.py")
         if not os.path.exists(script_path):
             return jsonify({"status": "error", "message": f"找不到腳本: {script_path}"})
 
         proc = subprocess.run(
-            [sys.executable, script_path],
+            [sys.executable, script_path, "--skip-order", "--no-line"],
             cwd=os.path.dirname(os.path.abspath(__file__)),
             capture_output=True,
             text=True,
@@ -4007,11 +4429,11 @@ SCRIPT_MAP = {
         "timeout": 120
     },
     "barchart_auto": {
-        "filename": "barchart_auto.py",
-        "name": "Barchart 自動化期權 (barchart_auto.py)",
+        "filename": "uoa.py",
+        "name": "Barchart UOA 異常期權 (uoa.py)",
         "dry_args": ["--dry-run", "--no-line"],
         "live_args": [],
-        "timeout": 120
+        "timeout": 180
     },
     "option": {
         "filename": "option.py",
@@ -4154,7 +4576,7 @@ def get_futures_code(prefix: str = "TMF") -> str:
 # ==============================================================================
 # 🌟 Auto Delta Hedge Sender (直接下單至 IBKR / 永豐 Shioaji，不再透過 main.py / Webhook)
 # ==============================================================================
-def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int | float) -> bool:
+def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int | float, is_retry: bool = False) -> bool:
     """
     Delta 對沖自動下單：
     - 國外期貨 (MES, MNQ, M2K, XC, MJY, M6E, MHG, MNG, MCL, MGC 等): 直接透過本地 IB (ib.placeOrder) 下單
@@ -4268,45 +4690,120 @@ def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int
         sym_disp = getattr(target_contract, 'localSymbol', target_contract.symbol)
         print(f"[{symbol} 自動對沖系統] 🎯 鎖定最近可下單期貨合約: {sym_disp} (到期日: {target_contract.lastTradeDateOrContractMonth}, conId: {target_contract.conId})")
 
+        # 始終向 IB 即時取得目標期貨合約 (target_contract) 的實體買賣盤與最新市價
+        # 避免因指數/現貨與期貨的基差 (如 SPX 現貨 7823 vs MES 12月期貨 7879 差距 56 點) 導致限價嚴重偏離市價無法成交
+        future_mkt_price = None
+        try:
+            ib.reqMarketDataType(3)
+            t_ticker = ib.reqMktData(target_contract, '', False, False)
+            ib.sleep(1.2)
+            if action == 'BUY':
+                future_mkt_price = extract_valid_price(
+                    getattr(t_ticker, 'bid', None),
+                    getattr(t_ticker, 'midpoint', lambda: None)(),
+                    getattr(t_ticker, 'marketPrice', lambda: None)(),
+                    t_ticker.last,
+                    t_ticker.close,
+                    getattr(t_ticker, 'ask', None),
+                )
+            else:
+                future_mkt_price = extract_valid_price(
+                    getattr(t_ticker, 'ask', None),
+                    getattr(t_ticker, 'midpoint', lambda: None)(),
+                    getattr(t_ticker, 'marketPrice', lambda: None)(),
+                    t_ticker.last,
+                    t_ticker.close,
+                    getattr(t_ticker, 'bid', None),
+                )
+            try:
+                ib.cancelMktData(target_contract)
+            except Exception:
+                pass
+        except Exception as pe:
+            print(f"[{symbol} 自動對沖系統] ⚠️ 查詢期貨即時價失敗: {pe}")
+
+        if is_valid_price(future_mkt_price):
+            if is_valid_price(current_price) and abs(float(future_mkt_price) - float(current_price)) > 1.0:
+                print(f"[{symbol} 自動對沖系統] ℹ️ 傳入標的現價 (${float(current_price):.2f}) 與目標期貨即時價 (${float(future_mkt_price):.2f}) 存在基差，校正為期貨即時市價。")
+            current_price = float(future_mkt_price)
+        elif not is_valid_price(current_price):
+            # 若即時行情未取得且傳入價格亦無效，嘗試歷史 1 分鐘線收盤價
+            try:
+                bars = ib.reqHistoricalData(
+                    target_contract,
+                    endDateTime='',
+                    durationStr='1 D',
+                    barSizeSetting='1 min',
+                    whatToShow='TRADES',
+                    useRTH=False,
+                    formatDate=1,
+                    keepUpToDate=False
+                )
+                if bars and len(bars) > 0 and is_valid_price(bars[-1].close):
+                    current_price = float(bars[-1].close)
+            except Exception:
+                pass
+
+        if not is_valid_price(current_price):
+            print(f"[{symbol} 自動對沖系統] ❌ 無法取得有效對沖價格 ({current_price})，取消本次委託以防異常報價！")
+            return False
+
+        current_price = float(current_price)
+        min_tick, step_val, max_slip = determine_min_tick_and_step(target_contract, current_price)
         print(f"[{symbol} 自動對沖系統] 🚨 偵測到 Delta 偏移！準備執行 IB 對沖下單...")
-        print(f" -> 動作: {action} {qty_int}口 {sym_disp} @ {current_price}\n")
+        print(f" -> 動作: {action} {qty_int}口 {sym_disp} @ {fmt_price(current_price, min_tick)}\n")
 
         if not SEND_WEBHOOK:
             print(f"[{symbol} 自動對沖系統] 🧪 SEND_WEBHOOK=False，目前為測試模式，未實際送出。")
             return True
 
-        order = MarketOrder(action, qty_int)
-        order.outsideRth = True
-        order.algoStrategy = 'Adaptive'
-        order.algoParams = [TagValue('adaptivePriority', 'Patient')]
-        order.tif = 'GTC'
-        if TARGET_ACCOUNT:
-            order.account = TARGET_ACCOUNT
+        print(f"[{symbol} 自動對沖系統] 🚀 正在啟動 Custom Walk-Up 步進修單: {action} {qty_int}口 {sym_disp} (起始限價 ${fmt_price(current_price, min_tick)})...")
+        if execute_walk_up_order:
+            filled, trade, avg_price = execute_walk_up_order(
+                ib=ib,
+                contract=target_contract,
+                action=action,
+                quantity=qty_int,
+                current_mid=current_price,
+                max_slippage=max_slip,
+                step=step_val,
+                step_time=3.0,
+                max_steps=3,
+                symbol=f"{symbol}-Hedge",
+                account=TARGET_ACCOUNT,
+                tif='DAY',
+                outside_rth=True,
+                min_tick=min_tick
+            )
+        else:
+            order = LimitOrder(action, qty_int, current_price)
+            order.outsideRth = True
+            order.tif = 'DAY'
+            if TARGET_ACCOUNT:
+                order.account = TARGET_ACCOUNT
+            trade = ib.placeOrder(target_contract, order)
+            ib.sleep(3.0)
 
-        print(f"[{symbol} 自動對沖系統] 🚀 正在直接送出本地 IB 委託: {action} {qty_int}口 {sym_disp} (Adaptive Patient)...")
-        trade = ib.placeOrder(target_contract, order)
-
-        # 等待委託確認 (Adaptive Algo 等待至多 5 秒)
-        end_time = time.time() + 5
-        while not trade.isDone() and time.time() < end_time:
-            ib.sleep(0.5)
-
-        ib_status = trade.orderStatus.status
-        filled_qty = trade.orderStatus.filled
-        remain_qty = trade.orderStatus.remaining
-        avg_price = trade.orderStatus.avgFillPrice
+        ib_status = trade.orderStatus.status if (trade and hasattr(trade, 'orderStatus')) else 'Cancelled'
+        filled_qty = trade.orderStatus.filled if (trade and hasattr(trade, 'orderStatus')) else 0.0
+        remain_qty = trade.orderStatus.remaining if (trade and hasattr(trade, 'orderStatus')) else float(qty_int)
+        avg_price = (trade.orderStatus.avgFillPrice if (trade and hasattr(trade, 'orderStatus')) else 0.0) or avg_price
 
         error_msg = ""
-        for log_entry in trade.log:
-            if getattr(log_entry, 'errorCode', 0) != 0 or 'Error' in getattr(log_entry, 'message', '') or 'rejected' in getattr(log_entry, 'message', '').lower():
-                error_msg = getattr(log_entry, 'message', '').replace('<br>', ' ')
-                break
+        if trade and hasattr(trade, 'log'):
+            for log_entry in reversed(trade.log):
+                msg_txt = getattr(log_entry, 'message', '')
+                if getattr(log_entry, 'errorCode', 0) != 0 or 'Error' in msg_txt or 'rejected' in msg_txt.lower() or 'cancelled' in msg_txt.lower() or '拒絕' in msg_txt or '取消' in msg_txt:
+                    error_msg = msg_txt.replace('<br>', ' ')
+                    break
+        if not error_msg and trade and hasattr(trade, 'orderStatus') and getattr(trade.orderStatus, 'whyHeld', None):
+            error_msg = trade.orderStatus.whyHeld
 
         if ib_status == 'Filled':
             msg = f'全數成交 {filled_qty}口 @ {avg_price}'
             result_status = 'success'
         elif ib_status in ('Submitted', 'PreSubmitted'):
-            msg = f'委託已送出 (Adaptive Algo)，目前狀態: {ib_status}，已成交 {filled_qty}口'
+            msg = f'委託已送出 (Custom Walk-Up)，目前狀態: {ib_status}，已成交 {filled_qty}口'
             result_status = 'submitted'
         elif ib_status in ('Cancelled', 'Inactive') and filled_qty > 0:
             msg = f'部分成交 {filled_qty}/{int(filled_qty + remain_qty)}口 @ {avg_price}，剩餘{remain_qty}口因故取消'
@@ -4314,11 +4811,33 @@ def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int
         else:
             if error_msg:
                 msg = f'完全未成交，發生錯誤: {error_msg}'
-                if 'near-expiration' in error_msg.lower() or 'physical delivery' in error_msg.lower() or '201' in error_msg:
+                is_near_exp = (
+                    'near-expiration' in error_msg.lower()
+                    or 'physical delivery' in error_msg.lower()
+                    or '201' in error_msg
+                    or '實物交割' in error_msg
+                    or '交割視窗' in error_msg
+                    or '即將到期' in error_msg
+                )
+                if is_near_exp:
                     act_sym = FUTURE_SYMBOL_ALIAS.get(symbol.upper(), symbol.upper())
                     ex = FUTURE_EXCHANGE_MAP.get(act_sym, "CME")
+                    local_sym = getattr(target_contract, 'localSymbol', sym_disp).upper()
+                    con_id = str(getattr(target_contract, 'conId', ''))
+                    FUTURE_REJECTED_CONTRACTS[local_sym] = time.time()
+                    if con_id:
+                        FUTURE_REJECTED_CONTRACTS[con_id] = time.time()
                     FUTURE_CONTRACT_CACHE.pop(f"{act_sym}_{ex}", None)
-                    print(f"⚠️ [{symbol} 自動對沖系統] 合約 {sym_disp} 因 IBKR 臨期/實物交割風控政策被拒單，已自快取中清除！")
+                    print(f"⚠️ [{symbol} 自動對沖系統] 合約 {sym_disp} (conId: {con_id}) 因 IBKR 臨期/實物交割風控政策被拒單，已加入排除名單並自快取中清除！")
+
+                    # 自動換月並重試對沖委託一次
+                    if not is_retry:
+                        print(f"🔄 [{symbol} 自動對沖系統] 正在自動換月尋找下一個主力期貨合約重試對沖...")
+                        new_contract = get_target_future_contract(ib, symbol)
+                        if new_contract and getattr(new_contract, 'conId', None) != getattr(target_contract, 'conId', None):
+                            new_sym_disp = getattr(new_contract, 'localSymbol', new_contract.symbol)
+                            print(f"🎯 [{symbol} 自動對沖系統] 成功切換至下一個有效主力期貨合約: {new_sym_disp}，立即重送委託！")
+                            return trigger_delta_hedge(action, current_price, symbol, qty, is_retry=True)
             else:
                 msg = f'完全未成交，狀態: {ib_status}（市場未開盤或流動性不足）'
             result_status = 'cancelled'

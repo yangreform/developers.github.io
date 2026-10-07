@@ -1,0 +1,4 @@
+Symbol,Price~,"Exp Date",DTE,Strike,Type,Moneyness,Ask,"%TP Ask","BE (Ask)","%BE (Ask)",Volume,"Open Int","IV Rank",IV,Delta,"Profit Prob"
+RXRX,4.07,2026-10-23,22,0.50,Call,+87.71%,5.35,43.73%,5.85,43.73%,168,908,14.43%,504.75%,0.989435,72.09%
+NVDA,231.01,2026-10-30,29,200.00,Call,+13.42%,32.7,0.73%,232.7,0.73%,159,926,15.08%,40.44%,0.908213,48.50%
+"Downloaded from Barchart.com as of 10-01-2026 01:32pm CDT"

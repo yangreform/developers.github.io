@@ -144,14 +144,34 @@ def close_dash_position():
         contract = Contract(conId=int(conId))
         local_ib.qualifyContracts(contract)
         
-        order = MarketOrder(action, float(qty))
-        order.tif = 'DAY'
-        order.algoStrategy = 'Adaptive'
-        order.algoParams = [TagValue('adaptivePriority', 'Patient')]
-        
-        trade = local_ib.placeOrder(contract, order)
-        local_ib.sleep(1)
-        return jsonify({'status': 'ok', 'message': f'Order placed: {action} {qty}'})
+        from ib_insync import IB, Contract, LimitOrder
+        ticker = local_ib.reqMktData(contract, '', False, False)
+        local_ib.sleep(0.8)
+        current_mid = ticker.midpoint()
+        if not current_mid or current_mid <= 0:
+            current_mid = ticker.marketPrice() or ticker.last or 0.05
+        try:
+            local_ib.cancelMktData(contract)
+        except Exception:
+            pass
+
+        try:
+            from skills.walk_up_skill import execute_walk_up_order
+        except ImportError:
+            try:
+                from trade.skills.walk_up_skill import execute_walk_up_order
+            except ImportError:
+                execute_walk_up_order = None
+
+        if execute_walk_up_order:
+            filled, trade, avg_p = execute_walk_up_order(local_ib, contract, action, float(qty), current_mid)
+            return jsonify({'status': 'ok', 'message': f'Order placed (Custom Walk-Up): {action} {qty} (Filled: {filled})'})
+        else:
+            order = LimitOrder(action, float(qty), current_mid)
+            order.tif = 'DAY'
+            trade = local_ib.placeOrder(contract, order)
+            local_ib.sleep(1)
+            return jsonify({'status': 'ok', 'message': f'Order placed: {action} {qty}'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
     finally:

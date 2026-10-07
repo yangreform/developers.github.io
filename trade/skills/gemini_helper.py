@@ -18,13 +18,13 @@ import requests
 
 # 預設候選模型順序：以回應最為迅速 (~1s) 且具高可用性的 flash-lite 模型優先，依序降級
 CANDIDATE_MODELS = [
+    "gemini-3.1-pro-preview",
     "gemini-3.8-flash",
     "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
-    "gemini-3-flash-preview",
 ]
 
 
@@ -52,9 +52,18 @@ def load_gemini_api_key(env_path=None):
                 if delim in line:
                     k, v = line.split(delim, 1)
                     k = k.strip().lower()
-                    v = v.strip().strip('"').strip("'")
                     if k in ["gemini_api", "gemini_api_key", "gemini_key", "gemini"]:
-                        return v
+                        v_str = v.strip()
+                        # 若值以引號包覆，優先擷取成對引號內的字串 (排除行尾註解如 #...)
+                        if v_str.startswith(('"', "'")):
+                            q = v_str[0]
+                            end_idx = v_str.find(q, 1)
+                            if end_idx != -1:
+                                return v_str[1:end_idx].strip()
+                        # 若無引號或引號未閉合，去除行尾 # 註解後清除兩端引號與空白
+                        if "#" in v_str:
+                            v_str = v_str.split("#", 1)[0].strip()
+                        return v_str.strip().strip('"').strip("'")
     return None
 
 
@@ -65,7 +74,7 @@ def call_gemini_for_skill(
     timeout=50,
     min_chars=50,
     validate_func=None,
-    max_output_tokens=8096,
+    max_output_tokens=80096,
     temperature=0.2,
     retry_on_busy=True,
 ):
@@ -124,6 +133,12 @@ def call_gemini_for_skill(
                     else:
                         print(f"[WARN] [GeminiHelper] 模型 {m_name} 未返回候選內容 (candidates 為空)")
                         break
+
+                elif r.status_code == 401:
+                    err_msg = r.json().get("error", {}).get("message", r.text[:150])
+                    print(f"[ERROR] [GeminiHelper] Gemini API 憑證無效或金鑰錯誤 (HTTP 401): {err_msg}")
+                    print(f"[ERROR] [GeminiHelper] 請檢查 .env 中的 gemini_api 設定是否正確或過期。中斷所有模型嘗試。")
+                    return None
 
                 elif r.status_code in [429, 503]:
                     err_msg = r.json().get("error", {}).get("message", f"HTTP {r.status_code}")

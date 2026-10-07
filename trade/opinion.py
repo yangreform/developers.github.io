@@ -13,8 +13,8 @@ Barchart Opinion Auto Hedge / Position Adjuster (trade/opinion.py)
      欄位右側的 "BUY"、"SELL" 或 "HOLD" 方向訊號。
   3. 第二個 SKILL (trade/skills/position_order_skill):
      依序檢查即時該 symbol 在 IBKR 的未平倉庫存：
-     - 若為 "BUY"：檢查未平倉淨部位是否為 +1。若不是，送出 Adaptive Patient 委託調至 +1。
-     - 若為 "SELL"：檢查未平倉淨部位是否為 -1。若不是，送出 Adaptive Patient 委託調至 -1。
+     - 若為 "BUY"：檢查未平倉淨部位是否為 +1。若不是，送出 Custom Walk-Up 步進限價調倉至 +1。
+     - 若為 "SELL"：檢查未平倉淨部位是否為 -1。若不是，送出 Custom Walk-Up 步進限價調倉至 -1。
      - 若為 "HOLD" / 其他：不執行調倉，維持現有持倉。
      - 若已達標則維持持倉不重複下單。
   4. 自動推播調倉與執行明細至手機 LINE。
@@ -197,7 +197,8 @@ def run_opinion_strategy(
     url: str = None,
     indicator: str = None,
     dry_run: bool = False,
-    send_line: bool = True
+    #send_line: bool = True
+    send_line: bool = False
 ) -> dict:
     """
     執行 Barchart Opinion 多標的方向指標萃取與 IBKR 自動調倉流程
@@ -238,7 +239,7 @@ def run_opinion_strategy(
 
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print("\n" + "=" * 75)
-    print("🚀 【Barchart Opinion 多商品方向指標與 IBKR Adaptive Patient 調倉系統】")
+    print("🚀 【Barchart Opinion 多商品方向指標與 IBKR Custom Walk-Up 調倉系統】")
     print(f"🕒 啟動時間：{now_str}")
     print(f"📋 監控標的清單 (共 {len(targets_to_process)} 檔)：")
     for t in targets_to_process:
@@ -419,7 +420,7 @@ def run_opinion_strategy(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Barchart 多商品多技術指標方向監控與 IBKR Adaptive Patient 自動調倉 (trade/opinion.py)"
+        description="Barchart 多商品多技術指標方向監控與 IBKR Custom Walk-Up 自動調倉 (trade/opinion.py)"
     )
     parser.add_argument(
         "--symbols",

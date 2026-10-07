@@ -1,0 +1,4 @@
+Symbol,Price~,"Exp Date",DTE,Strike,Type,Moneyness,Ask,"%TP Ask","BE (Ask)","%BE (Ask)",Volume,"Open Int","IV Rank",IV,Delta,"Profit Prob"
+MSFT,514.8,2026-10-30,28,430.00,Call,+16.47%,88.35,0.69%,518.35,0.69%,201,851,38.64%,41.87%,0.947905,49.33%
+NVDA,234.29,2026-10-30,28,205.00,Call,+12.50%,32.25,1.26%,237.25,1.26%,110,593,9.39%,40.37%,0.901427,47.63%
+"Downloaded from Barchart.com as of 10-02-2026 01:32pm CDT"

@@ -1,4 +1,12 @@
 
+import sys
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 import threading
 import os
 import time
@@ -11,11 +19,19 @@ import json
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
-# 引入 IB
 from ib_insync import *
 from notifier import send_push_message, send_trade_notification
 
-load_dotenv()
+try:
+    from skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+except ImportError:
+    try:
+        from trade.skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+    except ImportError:
+        walk_up_limit_price = None
+        execute_walk_up_order = None
+
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 # ================= .env 讀取工具 =================
 def env_str(name, default=None, required=False):
@@ -114,7 +130,85 @@ FUTURE_SYMBOL_ALIAS = {
     "MNG": "MHNG",
 }
 
+# 🌟 各期貨主力流動性月份 (Active / Benchmark Months)
+# CME/COMEX 月份代號:
+# F(1), G(2), H(3), J(4), K(5), M(6), N(7), Q(8), U(9), V(10), X(11), Z(12)
+FUTURE_ACTIVE_MONTHS = {
+    # 黃金 (MGC, GC)：流動性核心為偶數月中的 G, J, M, Q, Z (2, 4, 6, 8, 12月)，排除 10月(V)
+    "MGC": [2, 4, 6, 8, 12],
+    "GC": [2, 4, 6, 8, 12],
+    # 銅 (MHG, HG)：3, 5, 7, 9, 12 (H, K, N, U, Z)
+    "MHG": [3, 5, 7, 9, 12],
+    "HG": [3, 5, 7, 9, 12],
+    # 白銀 (MSI, SI, SIL)：3, 5, 7, 9, 12 (H, K, N, U, Z)
+    "MSI": [3, 5, 7, 9, 12],
+    "SI": [3, 5, 7, 9, 12],
+    "SIL": [3, 5, 7, 9, 12],
+    # 股指期貨 (MES, ES, MNQ, NQ, M2K, RTY, MYM, YM)：季月 3, 6, 9, 12 (H, M, U, Z)
+    "MES": [3, 6, 9, 12],
+    "ES": [3, 6, 9, 12],
+    "MNQ": [3, 6, 9, 12],
+    "NQ": [3, 6, 9, 12],
+    "M2K": [3, 6, 9, 12],
+    "RTY": [3, 6, 9, 12],
+    "MYM": [3, 6, 9, 12],
+    "YM": [3, 6, 9, 12],
+    # 外匯期貨 (M6E, EUR, MJY, JPY)：季月 3, 6, 9, 12 (H, M, U, Z)
+    "M6E": [3, 6, 9, 12],
+    "EUR": [3, 6, 9, 12],
+    "MJY": [3, 6, 9, 12],
+    "JPY": [3, 6, 9, 12],
+    # 玉米 (ZC, XC, YC)：3, 5, 7, 9, 12 (H, K, N, U, Z)
+    "ZC": [3, 5, 7, 9, 12],
+    "XC": [3, 5, 7, 9, 12],
+    "YC": [3, 5, 7, 9, 12],
+}
+
+# 實物交割期貨品類 (需提防 First Notice Date 交割風控視窗，合約前一個月下旬起即不可新開倉)
+PHYSICAL_DELIVERY_SYMBOLS = {"MGC", "GC", "MHG", "HG", "MSI", "SI", "SIL", "MCL", "CL", "XC", "YC", "ZC"}
+
+# 被 IBKR 拒單 (如 Error 201 臨期/實物交割政策) 之合約黑名單，避免短時間內重複被拒
+FUTURE_REJECTED_CONTRACTS = {}
+
 FUTURE_CONTRACT_CACHE = {}
+
+
+def is_physical_delivery_safe(contract, today_date: datetime.date | None = None) -> bool:
+    """
+    檢查實物交割期貨是否已進入 IBKR 第一通知日 (First Notice Date, FND) 或交割風控限制視窗。
+    例如 202610 (10月合約)，FND 在 9 月底，IBKR 通常在 9 月下旬 (約 20 號後) 即禁止新開倉 (Error 201)。
+    因此在合約月份前一個月下旬或合約當月，均不可再開新倉。
+    """
+    today_date = today_date or datetime.date.today()
+    exp_str = getattr(contract, 'lastTradeDateOrContractMonth', '')
+    if not exp_str or len(exp_str) < 6:
+        return True
+    try:
+        c_year = int(exp_str[:4])
+        c_month = int(exp_str[4:6])
+        if c_month == 1:
+            safe_year = c_year - 1
+            safe_month = 12
+        else:
+            safe_year = c_year
+            safe_month = c_month - 1
+        safe_cutoff = datetime.date(safe_year, safe_month, 20)
+        return today_date < safe_cutoff
+    except Exception:
+        return True
+
+
+def is_contract_blacklisted(contract) -> bool:
+    now_ts = time.time()
+    local_sym = getattr(contract, 'localSymbol', '').upper()
+    con_id = str(getattr(contract, 'conId', ''))
+    for k in [local_sym, con_id]:
+        if k and k in FUTURE_REJECTED_CONTRACTS:
+            if now_ts - FUTURE_REJECTED_CONTRACTS[k] < 86400 * 3:  # 排除3天
+                return True
+            else:
+                FUTURE_REJECTED_CONTRACTS.pop(k, None)
+    return False
 
 
 def is_unexpired(exp_str: str, today_str: str, min_days: int = 2) -> bool:
@@ -155,7 +249,8 @@ def is_unexpired(exp_str: str, today_str: str, min_days: int = 2) -> bool:
 def get_target_future_contract(ib_instance, symbol: str, min_days_to_expiry: int = 2):
     """
     自動搜尋並回傳該商品最近可以下單的正確合法期貨合約。
-    支援自動過濾已到期與臨期合約 (DTE >= min_days_to_expiry，預設 2 天，避開 IBKR Error 201 實物交割與臨期風控限制)、
+    支援主力流動性月份過濾 (如黃金 MGC/GC 排除 10月V，鎖定偶數月 G,J,M,Q,Z)、
+    實物交割 FND 風控保護、自動過濾已到期與被 IBKR 拒單合約 (Error 201)、
     按到期日排序取最近月，並自動進行合約資格化 (qualifyContracts)。
     """
     if not ib_instance or not ib_instance.isConnected():
@@ -163,15 +258,32 @@ def get_target_future_contract(ib_instance, symbol: str, min_days_to_expiry: int
 
     actual_symbol = FUTURE_SYMBOL_ALIAS.get(symbol.upper(), symbol.upper())
     exchange = FUTURE_EXCHANGE_MAP.get(actual_symbol, "CME")
-    today_str = datetime.date.today().strftime('%Y%m%d')
+    today_date = datetime.date.today()
+    today_str = today_date.strftime('%Y%m%d')
     now_ts = time.time()
+
+    # 0. 支援環境變數自訂特定合約 (例如 MGC_TARGET_CONTRACT=MGCZ6)
+    override_sym = os.getenv(f"{actual_symbol}_TARGET_CONTRACT") or os.getenv(f"FUTURE_TARGET_CONTRACT_{actual_symbol}") or os.getenv(f"{symbol.upper()}_TARGET_CONTRACT")
+    if override_sym:
+        override_sym = override_sym.strip().upper()
+        c_over = Future(symbol=actual_symbol, exchange=exchange, localSymbol=override_sym, currency='USD')
+        try:
+            if ib_instance.qualifyContracts(c_over) and c_over.conId:
+                logger.info(f"[期貨合約搜尋] 依 .env 指定合約: {override_sym} (conId: {c_over.conId})")
+                return c_over
+        except Exception as o_err:
+            logger.warning(f"⚠️ [期貨合約搜尋] 指定合約 {override_sym} 資格化失敗: {o_err}")
 
     cache_key = f"{actual_symbol}_{exchange}"
     cached = FUTURE_CONTRACT_CACHE.get(cache_key)
     if cached:
         contract, cached_time = cached
-        if (now_ts - cached_time < 1800) and is_unexpired(contract.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry):
-            return contract
+        if (now_ts - cached_time < 1800) and not is_contract_blacklisted(contract) and is_unexpired(contract.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry):
+            if actual_symbol not in PHYSICAL_DELIVERY_SYMBOLS or is_physical_delivery_safe(contract, today_date):
+                allowed = FUTURE_ACTIVE_MONTHS.get(actual_symbol)
+                exp = getattr(contract, 'lastTradeDateOrContractMonth', '')
+                if not allowed or (len(exp) >= 6 and int(exp[4:6]) in allowed):
+                    return contract
 
     details = []
     try:
@@ -191,19 +303,46 @@ def get_target_future_contract(ib_instance, symbol: str, min_days_to_expiry: int
         except Exception:
             pass
 
-    valid_details = [
-        d for d in details
-        if d.contract.exchange not in ['QBALGO', 'SMART']
-        and is_unexpired(d.contract.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry)
-    ]
+    allowed_months = FUTURE_ACTIVE_MONTHS.get(actual_symbol)
+    is_phys = actual_symbol in PHYSICAL_DELIVERY_SYMBOLS
 
-    if not valid_details:
+    valid_details = []
+    fallback_details = []
+    for d in details:
+        c = d.contract
+        if c.exchange in ['QBALGO', 'SMART']:
+            continue
+        if is_contract_blacklisted(c):
+            continue
+        if not is_unexpired(c.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry):
+            continue
+
+        exp = c.lastTradeDateOrContractMonth
+        fallback_details.append(d)
+
+        # 1. 主力月份過濾
+        if allowed_months:
+            try:
+                m_int = int(exp[4:6])
+                if m_int not in allowed_months:
+                    continue
+            except Exception:
+                pass
+
+        # 2. 實物交割 FND 安全檢查
+        if is_phys and not is_physical_delivery_safe(c, today_date):
+            continue
+
+        valid_details.append(d)
+
+    final_candidates = valid_details if valid_details else fallback_details
+    if not final_candidates:
         logger.warning(f"⚠️ [期貨合約搜尋] 找不到 {symbol} ({actual_symbol} @ {exchange}) 的可用近月合約！")
         return None
 
     # 按到期月份升冪排序，取得最接近可下單的有效合約
-    valid_details = sorted(valid_details, key=lambda d: d.contract.lastTradeDateOrContractMonth)
-    target_contract = valid_details[0].contract
+    final_candidates = sorted(final_candidates, key=lambda d: d.contract.lastTradeDateOrContractMonth)
+    target_contract = final_candidates[0].contract
     try:
         ib_instance.qualifyContracts(target_contract)
     except Exception as q_err:
@@ -493,50 +632,42 @@ def webhook():
                     raise Exception("無法獲取市價，無法計算 Adaptive Algo 的限價天花板")
                 logger.info(f"[{symbol}] 成功取得 IB 即時市價: {mkt_price}")
 
-            # 統一計算限價天花板 (買單 +1%，賣單 -1%)，並根據 minTick 四捨五入
-            raw_limit_price = mkt_price * (1.01 if action == 'BUY' else 0.99)
-            limit_price = round(round(raw_limit_price / min_tick) * min_tick, 5)
-
-            # 建立市價單
-            order = MarketOrder(action, quantity)
-            order.outsideRth = True
-
             # ==========================================
-            # 核心 2. 套用 IBKR Adaptive Algo 演算法
+            # 核心 2. 套用自適應步進修單 (Custom Walk-Up)
             # ==========================================
-            # 盤前盤後不支援 Adaptive Algo 時退回一般市價單
-            if not is_future and not is_rth:
-                logger.info(f"[{symbol}] 美股盤外時段不支援 Adaptive Algo，使用一般市價單")
-            else:
-                order.algoStrategy = 'Adaptive'
-                order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+            step_val = max(0.05, min_tick) if min_tick else 0.05
+            max_slip = max(0.15, step_val * 3) if is_future else 0.15
+            tif_val = 'GTC' if is_future or not is_rth else 'DAY'
 
-            CBOT_FUTURES = {'YC', 'ZC'}
-            if is_future:
-                if not is_rth and actual_symbol in CBOT_FUTURES:
-                    order.tif = 'GTC'
-                    logger.info(f"[CBOT盤外] 使用 GTC MarketOrder")
-                else:
-                    # Adaptive Algo 不適合 IOC，改用 GTC
-                    order.tif = 'GTC'
-            else:
-                # 股票/其他邏輯
-                if is_rth:
-                    order.tif = 'DAY'
-                else:
-                    order.tif = 'GTC'
+            logger.info(f"[{symbol}] 啟動 Custom Walk-Up 步進修單: {action} {quantity}口 @ 起始限價 ${mkt_price:.2f}")
 
-            # 5. 執行與確認
-            trade = ib.placeOrder(contract, order)
-            
-            end_time = time.time() + 5  # Adaptive Algo 需要較多時間，延長至 5 秒
-            while not trade.isDone() and time.time() < end_time:
-                ib.sleep(0.5)
-            
+            if execute_walk_up_order:
+                filled, trade, avg_price = execute_walk_up_order(
+                    ib=ib,
+                    contract=contract,
+                    action=action,
+                    quantity=quantity,
+                    current_mid=mkt_price,
+                    max_slippage=max_slip,
+                    step=step_val,
+                    step_time=3.0,
+                    max_steps=3,
+                    symbol=symbol,
+                    tif=tif_val,
+                    outside_rth=True,
+                    min_tick=min_tick
+                )
+            else:
+                order = LimitOrder(action, quantity, mkt_price)
+                order.outsideRth = True
+                order.tif = tif_val
+                trade = ib.placeOrder(contract, order)
+                ib.sleep(3.0)
+
             ib_status   = trade.orderStatus.status
             filled_qty  = trade.orderStatus.filled      # 實際成交口數
             remain_qty  = trade.orderStatus.remaining   # 未成交口數
-            avg_price   = trade.orderStatus.avgFillPrice
+            avg_price   = trade.orderStatus.avgFillPrice or avg_price
 
             # ======== 委託結果判斷 ========
             error_msg = ""
@@ -549,7 +680,7 @@ def webhook():
                 msg = f'全數成交 {filled_qty}口 @ {avg_price}'
                 result_status = 'success'
             elif ib_status in ('Submitted', 'PreSubmitted'):
-                msg = f'委託運作中 (Adaptive Algo)，目前狀態: {ib_status}，已成交 {filled_qty}口'
+                msg = f'委託運作中 (Custom Walk-Up)，目前狀態: {ib_status}，已成交 {filled_qty}口'
                 result_status = 'submitted'
             elif ib_status in ('Cancelled', 'Inactive') and filled_qty > 0:
                 msg = f'部分成交 {filled_qty}/{int(filled_qty + remain_qty)}口 @ {avg_price}，剩餘{remain_qty}口因故取消'

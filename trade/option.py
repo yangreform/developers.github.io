@@ -13,6 +13,15 @@ from ib_insync import *
 from notifier import send_push_message, send_trade_notification
 import sys
 
+try:
+    from skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+except ImportError:
+    try:
+        from trade.skills.walk_up_skill import walk_up_limit_price, execute_walk_up_order
+    except ImportError:
+        walk_up_limit_price = None
+        execute_walk_up_order = None
+
 # 確保 Windows 主控台與子行程正確輸出 UTF-8 字符，避免 UnicodeEncodeError
 if sys.platform == 'win32':
     try:
@@ -931,12 +940,10 @@ def execute_butterfly(legs):
     limit_price = round(limit_price, 6)
 
     order_action = 'BUY' if is_long else 'SELL'
-    action_chinese = 'Adaptive 買入' if is_long else 'Adaptive 賣出'
+    action_chinese = 'Walk-Up 買入' if is_long else 'Walk-Up 賣出'
 
-    # 建立 Adaptive Patient 演算法訂單 (iron='long' -> BUY 組合單; iron='short' -> SELL 組合單)
-    order = MarketOrder(order_action, TRADE_QTY)
-    order.algoStrategy = 'Adaptive'
-    order.algoParams = [TagValue('adaptivePriority', 'Patient')]
+    # 建立自適應步進限價訂單 (Custom Walk-Up)
+    order = LimitOrder(order_action, TRADE_QTY, limit_price)
     order.tif = 'DAY'
 
     # 即時查詢 trade/.env 中的 OP_SEND_WEBHOOK 開關與目標帳號
@@ -984,37 +991,36 @@ def execute_butterfly(legs):
         f"  到期日: {legs['expiry']} (DTE: {legs['dte']} 天)\n"
         f"  即時報價與 Greeks:\n"
         f"{legs_quote_str}\n"
-        f"  下單方式: 市價 Adaptive Patient ({action_chinese} {order_action} {TRADE_QTY} 口, 參考限價: ${limit_price})\n"
+        f"  下單方式: 自適應步進修單 Custom Walk-Up ({action_chinese} {order_action} {TRADE_QTY} 口, 起始限價: ${limit_price})\n"
         f"  淨 Delta: {legs['total_delta']:+.3f} | 淨 Theta: {legs['total_theta']:.2f}"
     )
 
     if send_live:
         RECENT_IB_ERRORS.clear()
         trade = ib.placeOrder(combo_contract, order)
-        print(f"=== [已送出 Adaptive Patient 委託單至 IBKR] ===\n{summary_str}")
+        print(f"=== [已送出 Custom Walk-Up 步進委託單至 IBKR] ===\n{summary_str}")
 
-        # 等待 IBKR 接收與回報 (確認是否排入訂單簿或被退回)
-        for _ in range(5):
-            ib.sleep(1)
-            if trade.orderStatus.status not in ('PendingSubmit', ''):
-                break
-
-        order_errors = [e for e in RECENT_IB_ERRORS if e[0] == trade.order.orderId or e[1] in (110, 201, 387, 442, 103, 321, 200)]
-        algo_unsupported = any(e[1] in (201, 387, 442) for e in order_errors)
-        if algo_unsupported:
-            print(f"⚠️ [交易所限制] CME/COMEX/NYMEX 對此期權組合單未開放 Adaptive 演算法，自動無縫切換為 Patient Bid Limit (買價耐心限價單) 重新送單...")
-            fallback_order = LimitOrder(order_action, TRADE_QTY, limit_price)
-            fallback_order.tif = 'DAY'
-            if target_acct:
-                fallback_order.account = target_acct
-            RECENT_IB_ERRORS.clear()
-            trade = ib.placeOrder(combo_contract, fallback_order)
+        if walk_up_limit_price:
+            print(f"⏳ [自適應步進修單] 啟動 Custom Walk-Up 引擎監控與步進調整 {symbol} ({strategy_name})...")
+            is_filled = walk_up_limit_price(
+                ib=ib,
+                contract=combo_contract,
+                order=order,
+                current_mid=limit_price,
+                max_slippage=0.15,
+                step=0.05,
+                step_time=3.0,
+                max_steps=3,
+                symbol=f"{symbol}-{strategy_name}",
+                trade=trade
+            )
+        else:
             for _ in range(5):
                 ib.sleep(1)
                 if trade.orderStatus.status not in ('PendingSubmit', ''):
                     break
-            order_errors = [e for e in RECENT_IB_ERRORS if e[0] == trade.order.orderId or e[1] in (110, 201, 103, 321, 200)]
 
+        order_errors = [e for e in RECENT_IB_ERRORS if e[0] == trade.order.orderId or e[1] in (110, 201, 387, 442, 103, 321, 200)]
         if order_errors and trade.orderStatus.status not in ('Submitted', 'PreSubmitted', 'Filled'):
             err_code, err_msg = order_errors[-1][1], order_errors[-1][2]
             print(f"❌ [下單被拒絕] IBKR 回報錯誤 {err_code}: {err_msg}")
@@ -1024,15 +1030,15 @@ def execute_butterfly(legs):
                 f"策略: {strategy_name} [{iron.upper()}]\n"
                 f"錯誤代碼: {err_code}\n"
                 f"錯誤訊息: {err_msg}\n"
-                f"委託動作: {action_chinese} {order_action} (Adaptive Patient)"
+                f"委託動作: {action_chinese} {order_action} (Custom Walk-Up)"
             )
             try:
                 send_trade_notification(symbol, reject_msg, {"error_code": err_code, "error_msg": err_msg})
                 print(f"-> 📲 已發送下單被拒絕警示至 LINE")
             except Exception as e:
                 print(f"❌ [LINE 推播異常] {e}")
-        elif trade.orderStatus.status in ('PreSubmitted', 'Submitted'):
-            print(f"✅ [委託成功確認] IBKR 已成功接收並排入市場 (狀態: {trade.orderStatus.status}, Adaptive Patient)")
+        elif trade.orderStatus.status in ('PreSubmitted', 'Submitted', 'Filled'):
+            print(f"✅ [委託狀態確認] IBKR 目前狀態: {trade.orderStatus.status} (Custom Walk-Up)")
             submit_msg = (
                 f"【IBKR 下單成功通知】\n"
                 f"商品: {symbol} (掛鉤: {und_name})\n"
@@ -1042,7 +1048,7 @@ def execute_butterfly(legs):
                 f"{strike_summary_line}"
                 f"報價詳情:\n"
                 f"{line_legs_quote_str}\n"
-                f"委託方式: Adaptive Patient ({action_chinese} {order_action} {TRADE_QTY} 口)\n"
+                f"委託方式: Custom Walk-Up ({action_chinese} {order_action} {TRADE_QTY} 口)\n"
                 f"排單狀態: {trade.orderStatus.status}\n"
                 f"淨 Delta: {legs['total_delta']:+.3f} | 淨 Theta: {legs['total_theta']:.2f}"
             )

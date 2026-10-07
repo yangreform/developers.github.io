@@ -78,9 +78,18 @@ def load_gemini_api_key(env_path=ENV_FILE):
                 if delim in line:
                     k, v = line.split(delim, 1)
                     k = k.strip().lower()
-                    v = v.strip().strip('"').strip("'")
                     if k in ["gemini_api", "gemini_api_key", "gemini_key", "gemini"]:
-                        return v
+                        v_str = v.strip()
+                        # 若值以引號包覆，優先擷取成對引號內的字串 (排除行尾註解如 #...)
+                        if v_str.startswith(('"', "'")):
+                            q = v_str[0]
+                            end_idx = v_str.find(q, 1)
+                            if end_idx != -1:
+                                return v_str[1:end_idx].strip()
+                        # 若無引號或引號未閉合，去除行尾 # 註解後清除兩端引號與空白
+                        if "#" in v_str:
+                            v_str = v_str.split("#", 1)[0].strip()
+                        return v_str.strip().strip('"').strip("'")
     return None
 
 
@@ -266,7 +275,7 @@ def call_gemini_rest(prompt, api_key):
             timeout=50,
             min_chars=1000,
             validate_func=is_report_complete,
-            max_output_tokens=8096,
+            max_output_tokens=80096,
             temperature=0.3,
         )
         if res and is_report_complete(res):
