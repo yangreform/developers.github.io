@@ -87,36 +87,86 @@ def load_credentials_from_env(env_path=ENV_FILE):
     return account, password
 
 
+def kill_stale_chrome_for_profile(profile_dir):
+    """清理佔用特定 profile_dir 的殘留 Chrome 殭屍行程與鎖定檔"""
+    if not profile_dir or not os.path.exists(profile_dir):
+        return
+    norm_profile = os.path.normpath(os.path.abspath(profile_dir)).lower()
+    escaped_profile = norm_profile.replace("\\", "\\\\")
+    try:
+        import subprocess
+        ps_cmd = (
+            f"Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
+            f"Where-Object {{ $_.CommandLine -and ($_.CommandLine.ToLower().Contains('{escaped_profile}')) }} | "
+            f"ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
+        )
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True, timeout=10)
+    except Exception:
+        pass
+
+    lock_file = os.path.join(profile_dir, "lockfile")
+    if os.path.exists(lock_file):
+        try:
+            os.remove(lock_file)
+        except Exception:
+            pass
+
+
 def init_driver(download_dir=TARGET_DIR, profile_dir=PROFILE_DIR, headless=False):
     """啟動 undetected Chrome Driver 並設定自動下載目錄"""
     if uc is None:
         raise RuntimeError("請確保 undetected_chromedriver 與 selenium 已安裝。")
 
-    options = uc.ChromeOptions()
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument(f"--user-data-dir={profile_dir}")
+    # 啟動前先清理佔用 profile 的孤兒行程與 lockfile
+    kill_stale_chrome_for_profile(profile_dir)
 
-    if headless:
-        options.add_argument("--headless=new")
+    def _create_options():
+        opts = uc.ChromeOptions()
+        opts.add_argument("--no-sandbox")
+        opts.add_argument("--disable-dev-shm-usage")
+        if profile_dir:
+            opts.add_argument(f"--user-data-dir={os.path.abspath(profile_dir)}")
+        if headless:
+            opts.add_argument("--headless=new")
+        return opts
 
-    kwargs = {"options": options}
     major_v = get_chrome_major_version()
-    if major_v:
-        kwargs["version_main"] = major_v
+    driver = None
 
-    try:
-        driver = uc.Chrome(**kwargs)
-    except Exception as e:
-        print(f"[WARN] [DownloadSkill] Chrome version_main={major_v} 啟動異常: {e}，改用預設 uc.Chrome")
-        driver = uc.Chrome(options=options)
+    # 嘗試 1: 使用偵測到的 version_main 啟動 (每次建立全新 ChromeOptions)
+    if major_v:
+        try:
+            driver = uc.Chrome(options=_create_options(), version_main=major_v)
+        except Exception as e:
+            print(f"[WARN] [DownloadSkill] Chrome version_main={major_v} 啟動異常: {e}，重置後改用預設 uc.Chrome")
+            kill_stale_chrome_for_profile(profile_dir)
+            time.sleep(1)
+
+    # 嘗試 2: 若未指定版本或嘗試 1 失敗，改用預設 uc.Chrome (使用全新 ChromeOptions，永不重用)
+    if driver is None:
+        try:
+            driver = uc.Chrome(options=_create_options())
+        except Exception as e2:
+            print(f"[WARN] [DownloadSkill] 預設 uc.Chrome 啟動亦失敗: {e2}，嘗試不帶 profile_dir 啟動備援...")
+            kill_stale_chrome_for_profile(profile_dir)
+            time.sleep(1)
+            # 嘗試 3: 極限備援，使用全新臨時 profile 啟動
+            backup_opts = uc.ChromeOptions()
+            backup_opts.add_argument("--no-sandbox")
+            backup_opts.add_argument("--disable-dev-shm-usage")
+            if headless:
+                backup_opts.add_argument("--headless=new")
+            driver = uc.Chrome(options=backup_opts)
 
     driver.set_page_load_timeout(45)
 
-    driver.execute_cdp_cmd("Page.setDownloadBehavior", {
-        "behavior": "allow",
-        "downloadPath": os.path.abspath(download_dir)
-    })
+    try:
+        driver.execute_cdp_cmd("Page.setDownloadBehavior", {
+            "behavior": "allow",
+            "downloadPath": os.path.abspath(download_dir)
+        })
+    except Exception:
+        pass
 
     return driver
 
@@ -457,19 +507,31 @@ def download_options_flow_csv(driver, symbol, target_dir=TARGET_DIR):
     raise RuntimeError(f"無法下載或取得 {sym_clean} Options Flow CSV。")
 
 
-def download_stock_vertical_spread_csv(driver, symbol, target_dir=TARGET_DIR, prefer_monthly=True):
+def download_stock_vertical_spread_csv(driver, symbol, spread_type="bull-put-spread", target_dir=TARGET_DIR, prefer_monthly=True):
     """
-    下載指定標的之官方 Bull Put 垂直價差數據：
-      - 連線至:
+    下載指定標的之官方垂直價差數據 (支援 Bull Put Spread 與 Bear Call Spread)：
+      - 若 UOA 為多頭掃盤 (BUY CALL) -> 啟動 Bull Put Spread:
         https://www.barchart.com/stocks/quotes/{symbol}/vertical-spreads/bull-put-spread
+      - 若 UOA 為空頭大單 (BUY PUT)  -> 切換為 Bear Call Spread:
+        https://www.barchart.com/stocks/quotes/{symbol}/vertical-spreads/bear-call-spread
       - 於 Expiration 下拉選單中切換至月到期 (Monthly 'm')，避開週到期 ('w') 以獲取更多 OI 與流動性
       - 點擊官方下載按鈕下載 CSV 並存至 target_dir (trade/Barchart/)
-      - 若無下載按鈕或檔案為空，且本地亦無該標的專屬 bull-put CSV，回傳 None (放棄該預選標的，不進行全域備援)
+      - 若無下載按鈕或檔案為空，且本地亦無該標的專屬價差 CSV，回傳 None (依風控規則放棄該預選標的，不進行跨標的備援)
     """
     sym_clean = symbol.strip().upper()
-    url = f"https://www.barchart.com/stocks/quotes/{sym_clean}/vertical-spreads/bull-put-spread"
+    s_clean = (spread_type or "bull-put-spread").strip().lower().replace("_", "-")
+    if "bear" in s_clean and "call" in s_clean:
+        spread_slug = "bear-call-spread"
+        spread_name = "Bear Call"
+        exclude_keyword = "bear-put"
+    else:
+        spread_slug = "bull-put-spread"
+        spread_name = "Bull Put"
+        exclude_keyword = "bull-call"
 
-    print(f"\n[INFO] [DownloadSkill] 導航至 {sym_clean} Bull Put 垂直價差頁面: {url} ...")
+    url = f"https://www.barchart.com/stocks/quotes/{sym_clean}/vertical-spreads/{spread_slug}"
+
+    print(f"\n[INFO] [DownloadSkill] 導航至 {sym_clean} {spread_name} 垂直價差頁面: {url} ...")
     try:
         driver.get(url)
         time.sleep(7)
@@ -537,35 +599,147 @@ def download_stock_vertical_spread_csv(driver, symbol, target_dir=TARGET_DIR, pr
 
         if dl_buttons:
             btn = dl_buttons[0]
-            print(f"[INFO] [DownloadSkill] 找到下載按鈕 (text='{btn.text.strip()}'), 點擊下載 {sym_clean} Bull Put 垂直價差 CSV ...")
+            print(f"[INFO] [DownloadSkill] 找到下載按鈕 (text='{btn.text.strip()}'), 點擊下載 {sym_clean} {spread_name} 垂直價差 CSV ...")
             driver.execute_script("arguments[0].click();", btn)
             downloaded_file = wait_for_file_download(target_dir, before_snapshot, timeout=18)
             if downloaded_file and os.path.exists(downloaded_file) and os.path.getsize(downloaded_file) > 350:
-                print(f"[SUCCESS] [DownloadSkill] {sym_clean} Bull Put 垂直價差 CSV 準備就緒: {downloaded_file} ({os.path.getsize(downloaded_file):,} 位元組)")
+                print(f"[SUCCESS] [DownloadSkill] {sym_clean} {spread_name} 垂直價差 CSV 準備就緒: {downloaded_file} ({os.path.getsize(downloaded_file):,} 位元組)")
                 return downloaded_file
             else:
                 print(f"[WARN] [DownloadSkill] {sym_clean} 下載之檔案為空或無有效數據。")
         else:
-            print(f"[WARN] [DownloadSkill] {sym_clean} Bull Put 垂直價差頁面未找到下載按鈕 (可能無價差數據)。")
+            print(f"[WARN] [DownloadSkill] {sym_clean} {spread_name} 垂直價差頁面未找到下載按鈕 (可能無價差數據)。")
     except Exception as e:
         print(f"[WARN] [DownloadSkill] 下載 {url} 異常: {e}")
 
-    # 檢查本地是否有現存的專屬 bull-put-spread 檔案 (嚴格排除 bull-call-spread，優先採用 monthly 檔)
-    candidates = glob.glob(os.path.join(target_dir, f"*{sym_clean.lower()}*bull-put*.csv"))
+    # 檢查本地是否有現存的專屬價差檔案 (排除相反方向價差，優先採用 monthly 檔)
+    file_pattern = f"*{sym_clean.lower()}*{spread_slug}*.csv"
+    candidates = glob.glob(os.path.join(target_dir, file_pattern))
     if not candidates:
         old_dir = os.path.join(target_dir, "old")
         if os.path.exists(old_dir):
-            candidates = glob.glob(os.path.join(old_dir, f"*{sym_clean.lower()}*bull-put*.csv"))
+            candidates = glob.glob(os.path.join(old_dir, file_pattern))
     if candidates:
         candidates.sort(key=os.path.getmtime, reverse=True)
-        valid_cands = [c for c in candidates if os.path.getsize(c) > 350 and "bull-call" not in os.path.basename(c).lower()]
+        valid_cands = [c for c in candidates if os.path.getsize(c) > 350 and exclude_keyword not in os.path.basename(c).lower()]
         if valid_cands:
             # 優先挑選 monthly 檔案
             monthly_cands = [c for c in valid_cands if "monthly" in os.path.basename(c).lower()]
             selected_cand = monthly_cands[0] if monthly_cands else valid_cands[0]
-            print(f"[INFO] [DownloadSkill] 沿用現存 {sym_clean} Bull Put 垂直價差 CSV: {selected_cand}")
+            print(f"[INFO] [DownloadSkill] 沿用現存 {sym_clean} {spread_name} 垂直價差 CSV: {selected_cand}")
             return selected_cand
 
-    print(f"[WARN] [DownloadSkill] 標的 {sym_clean} 查無專屬 Bull Put 垂直價差數據，放棄此標的。")
+    print(f"[WARN] [DownloadSkill] 標的 {sym_clean} 查無專屬 {spread_name} 垂直價差數據，放棄此標的。")
     return None
+
+
+def download_options_prices_csv(driver, symbol="$SPX", expiration=None, target_dir=None):
+    """
+    下載指定標的之特定到期日期權價格報價表 (Options Prices CSV)：
+      - 預設標的: $SPX
+      - 預設到期日: 當天日期-w (例如 2026-10-09-w)
+      - 官方網址: https://www.barchart.com/stocks/quotes/{symbol}/options?expiration={expiration}
+      - 儲存目錄: 預設為 trade/Barchart/Options_Prices/
+      - 儲存檔名: {symbol_clean}_{當天日期}.csv (例如 SPX_2026-10-09.csv)
+    """
+    sym_clean = symbol.strip()
+    sym_filename = sym_clean.replace("$", "").upper()
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    exp_code = expiration or f"{today_str}-w"
+    url = f"https://www.barchart.com/stocks/quotes/{sym_clean}/options?expiration={exp_code}"
+
+    if target_dir is None:
+        target_dir = os.path.join(TARGET_DIR, "Options_Prices")
+    os.makedirs(target_dir, exist_ok=True)
+
+    staging_dir = os.path.join(target_dir, "_staging")
+    os.makedirs(staging_dir, exist_ok=True)
+
+    target_csv_path = os.path.join(target_dir, f"{sym_filename}_{today_str}.csv")
+
+    print(f"\n[INFO] [DownloadSkill] 導航至 {sym_clean} Options Prices 頁面 (exp={exp_code}): {url} ...")
+    try:
+        driver.get(url)
+        time.sleep(7)
+        dismiss_popups(driver)
+
+        # 設定 Chrome CDP 下載目錄至 staging_dir
+        try:
+            driver.execute_cdp_cmd("Page.setDownloadBehavior", {
+                "behavior": "allow",
+                "downloadPath": os.path.abspath(staging_dir)
+            })
+        except Exception:
+            pass
+
+        before_snapshot = set(glob.glob(os.path.join(staging_dir, "*.csv")))
+        dl_buttons = driver.find_elements(
+            By.CSS_SELECTOR,
+            "a.toolbar-button.download, [data-bc-download-button], button.download, a.download"
+        )
+        if not dl_buttons:
+            all_links = driver.find_elements(By.CSS_SELECTOR, "a.toolbar-button, button, a")
+            for el in all_links:
+                txt = (el.text or "").strip().lower()
+                if "download" in txt and el.is_displayed():
+                    dl_buttons.append(el)
+                    break
+
+        downloaded_file = None
+        if dl_buttons:
+            btn = dl_buttons[0]
+            btn_text = btn.text.strip() if btn.text else "Download"
+            print(f"[INFO] [DownloadSkill] 找到下載按鈕 (text='{btn_text}'), 點擊下載 {sym_clean} Options Prices CSV ...")
+            driver.execute_script("arguments[0].click();", btn)
+            downloaded_file = wait_for_file_download(staging_dir, before_snapshot, timeout=25)
+        else:
+            print(f"[WARN] [DownloadSkill] {sym_clean} Options Prices 頁面未找到官方下載按鈕。")
+
+        # 若 staging_dir 未抓到，檢查 target_dir 或 Barchart 根目錄
+        if not downloaded_file or not os.path.exists(downloaded_file):
+            for check_dir in [target_dir, TARGET_DIR]:
+                cands = glob.glob(os.path.join(check_dir, f"*{sym_filename.lower()}*options*.csv"))
+                recent = [f for f in cands if os.path.gettime(f) > (time.time() - 30) and os.path.getsize(f) > 350] if hasattr(os.path, 'gettime') else [f for f in cands if os.path.getmtime(f) > (time.time() - 30) and os.path.getsize(f) > 350]
+                if recent:
+                    recent.sort(key=os.path.getmtime, reverse=True)
+                    downloaded_file = recent[0]
+                    break
+
+        # 若原生下載仍無有效檔案，啟用 DOM 表格抓取備援
+        if not downloaded_file or not os.path.exists(downloaded_file) or os.path.getsize(downloaded_file) < 350:
+            print("[INFO] [DownloadSkill] 原生下載未產出檔案，嘗試透過 DOM 備援抓取頁面表格...")
+            tables = driver.find_elements(By.CSS_SELECTOR, "div.bc-table-scrollable table, table.bc-data-grid, table")
+            if tables:
+                table = tables[0]
+                rows = table.find_elements(By.TAG_NAME, "tr")
+                if rows:
+                    dom_path = os.path.join(staging_dir, f"{sym_filename.lower()}-options-dom-{today_str}.csv")
+                    with open(dom_path, "w", newline="", encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        for row in rows:
+                            cols = row.find_elements(By.CSS_SELECTOR, "th, td")
+                            if cols:
+                                writer.writerow([c.text.strip().replace("\n", " ") for c in cols])
+                    if os.path.exists(dom_path) and os.path.getsize(dom_path) > 350:
+                        downloaded_file = dom_path
+                        print(f"[SUCCESS] [DownloadSkill] DOM 備援成功提取 {len(rows)} 列數據。")
+
+        if downloaded_file and os.path.exists(downloaded_file) and os.path.getsize(downloaded_file) > 100:
+            import shutil
+            shutil.copy2(downloaded_file, target_csv_path)
+            size_bytes = os.path.getsize(target_csv_path)
+            print(f"[SUCCESS] [DownloadSkill] ✅ {sym_clean} Options Prices CSV 準備就緒: {target_csv_path} ({size_bytes:,} 位元組)")
+            return target_csv_path
+
+    except Exception as e:
+        print(f"[ERROR] [DownloadSkill] 下載 {url} 異常: {e}")
+
+    # 本地備援：檢查現存檔案
+    if os.path.exists(target_csv_path) and os.path.getsize(target_csv_path) > 350:
+        print(f"[INFO] [DownloadSkill] 沿用現存檔案: {target_csv_path}")
+        return target_csv_path
+
+    print(f"[WARN] [DownloadSkill] 標的 {sym_clean} 查無有效之 Options Prices 數據。")
+    return None
+
 

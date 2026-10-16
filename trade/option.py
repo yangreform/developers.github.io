@@ -1007,10 +1007,10 @@ def execute_butterfly(legs):
                 contract=combo_contract,
                 order=order,
                 current_mid=limit_price,
-                max_slippage=0.15,
+                max_slippage=0.25,
                 step=0.05,
-                step_time=3.0,
-                max_steps=3,
+                step_time=4.0,
+                max_steps=5,
                 symbol=f"{symbol}-{strategy_name}",
                 trade=trade
             )

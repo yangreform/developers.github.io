@@ -13,16 +13,20 @@ Barchart UOA Options Pipeline with Skills Architecture (trade/uoa.py)
       - 調用 Gemini AI 量化分析，各挑選出 BUY CALL 與 BUY PUT，產出共 4 檔預選期權標的
       - 儲存 latest_ai_analysis.txt 供即時看板展示，並推播 LINE 速覽
   (3) Download Skill:
-      - 導航至 https://www.barchart.com/stocks/quotes/{symbol}/vertical-spreads/bull-put-spread
-      - 下載這 4 檔預選標的之官方 Bull Put 垂直價差篩選數據，若查無數據則依風控規則放棄該標的
+      - 若 UOA 為 多頭主動掃盤（Bullish Sweep） -> 啟動 Bull Put Spread:
+        導航至 https://www.barchart.com/stocks/quotes/{symbol}/vertical-spreads/bull-put-spread，
+        下載預選標的之官方 Bull Put 垂直價差篩選數據，若查無數據則依風控規則放棄該標的。
+      - 若 UOA 為 空頭大單（Bearish Put Flow） -> 切換為 Bear Call Spread:
+        導航至 https://www.barchart.com/stocks/quotes/{symbol}/vertical-spreads/bear-call-spread，
+        下載預選標的之官方 Bear Call 垂直價差篩選數據，若查無數據則依風控規則放棄該標的。
         • Target Folder: trade/Barchart/
   (4) Gemini Helper (trade/skills/gemini_helper.py):
-      - 針對每檔預選標的重複執行 Bull Put 垂直價差自動化分析流程：
-      - 清洗各標的價差數據、過濾已到期合約、按跌破機率與報酬率排序
-      - 調用 Gemini AI 深度量化分析，精選各預選標的之最佳 Bull Put Spread 組合
+      - 針對每檔預選標的重複執行垂直價差 (Bull Put / Bear Call) 自動化分析流程：
+      - 清洗各標的價差數據、過濾已到期合約、按風險緩衝與虧損機率排序
+      - 調用 Gemini AI 深度量化分析，精選各預選標的之最佳垂直價差組合
       - 儲存詳細分析報告並推播至手機 LINE
   (5) Scale In Order Skill (trade/skills/scale_in_order_skill/):
-      - 依序為每檔精選標的連線 IBKR 建立下翼賣權 (Short Put) 與保護賣權 (Long Put) 之 BAG 組合單
+      - 依序為每檔精選標的連線 IBKR 建立 Short Leg 與 Long Leg 之 BAG 組合單
       - 當執行加碼委託 (SELL) 時若遭遇 IBKR Error 201:
         "Cannot have open orders on both sides of the same US Option contract."
         自動依序執行 4 大重組步驟：撤銷衝突舊單 -> 送出加碼母單 -> 合併新舊口數 -> 重掛總口數 OCA 括號單
@@ -142,12 +146,17 @@ def format_exp_date_display(exp_date_yyyymmdd):
     return s
 
 
-def clean_and_prepare_bull_put_data(csv_path_input, top_count=35, target_symbols=None):
+def clean_and_prepare_vertical_spread_data(csv_path_input, spread_type="bull-put-spread", top_count=35, target_symbols=None):
     """
-    清洗 Bull Put 價差數據，過濾已過期合約。
-    若指定 target_symbols (UOA 預選標的)，僅鎖定並保留該等標的之專屬 Bull Put 價差；
+    清洗垂直價差 (Bull Put 或 Bear Call) 數據，過濾已過期合約。
+    若指定 target_symbols (UOA 預選標的)，僅鎖定並保留該等標的之專屬價差；
     若無任何預選標的之價差數據，回傳空 DataFrame (依風控規則放棄，不跨標的備援)。
     """
+    is_bear_call = "bear" in spread_type.lower() and "call" in spread_type.lower()
+    spread_slug = "bear-call-spread" if is_bear_call else "bull-put-spread"
+    spread_name = "Bear Call" if is_bear_call else "Bull Put"
+    exclude_keyword = "bear-put" if is_bear_call else "bull-call"
+
     candidate_files = []
     if csv_path_input:
         if isinstance(csv_path_input, list):
@@ -157,27 +166,27 @@ def clean_and_prepare_bull_put_data(csv_path_input, top_count=35, target_symbols
         elif isinstance(csv_path_input, str) and os.path.exists(csv_path_input):
             candidate_files.append(csv_path_input)
 
-    # 若無指定輸入檔案，則自目錄中搜尋 (若有 target_symbols 優先搜尋對應標的，否則搜尋全域)
+    # 若無指定輸入檔案，則自目錄中搜尋
     if not candidate_files:
         if target_symbols:
             for s in target_symbols:
                 cands = (
-                    glob.glob(os.path.join(BARCHART_DIR, f"{str(s).lower()}-*bull-put*.csv"))
-                    + glob.glob(os.path.join(BARCHART_DIR, f"*{str(s).lower()}_*bull-put*.csv"))
-                    + glob.glob(os.path.join(OLD_DIR, f"{str(s).lower()}-*bull-put*.csv"))
-                    + glob.glob(os.path.join(OLD_DIR, f"*{str(s).lower()}_*bull-put*.csv"))
+                    glob.glob(os.path.join(BARCHART_DIR, f"{str(s).lower()}-*{spread_slug}*.csv"))
+                    + glob.glob(os.path.join(BARCHART_DIR, f"*{str(s).lower()}_*{spread_slug}*.csv"))
+                    + glob.glob(os.path.join(OLD_DIR, f"{str(s).lower()}-*{spread_slug}*.csv"))
+                    + glob.glob(os.path.join(OLD_DIR, f"*{str(s).lower()}_*{spread_slug}*.csv"))
                 )
                 cands.sort(key=os.path.getmtime, reverse=True)
                 for f in cands:
                     if f not in candidate_files:
                         candidate_files.append(f)
         else:
-            all_bp = (
-                glob.glob(os.path.join(BARCHART_DIR, "*bull-put*.csv"))
-                + glob.glob(os.path.join(OLD_DIR, "*bull-put*.csv"))
+            all_sp = (
+                glob.glob(os.path.join(BARCHART_DIR, f"*{spread_slug}*.csv"))
+                + glob.glob(os.path.join(OLD_DIR, f"*{spread_slug}*.csv"))
             )
-            all_bp.sort(key=os.path.getmtime, reverse=True)
-            for f in all_bp:
+            all_sp.sort(key=os.path.getmtime, reverse=True)
+            for f in all_sp:
                 if f not in candidate_files:
                     candidate_files.append(f)
 
@@ -187,8 +196,8 @@ def clean_and_prepare_bull_put_data(csv_path_input, top_count=35, target_symbols
     for f in candidate_files:
         if not os.path.exists(f) or os.path.getsize(f) < 350:
             continue
-        # 嚴格排除包含 bull-call 的檔案
-        if "bull-call" in os.path.basename(f).lower():
+        # 排除相反方向的價差檔案
+        if exclude_keyword in os.path.basename(f).lower():
             continue
         try:
             df = pd.read_csv(f)
@@ -211,44 +220,58 @@ def clean_and_prepare_bull_put_data(csv_path_input, top_count=35, target_symbols
             continue
 
     if not all_dfs:
-        print("[WARN] [BullPutSkill] 未找到任何含有未過期合約之 Bull Put Spread 數據檔案。")
+        print(f"[WARN] [{spread_name}Skill] 未找到任何含有未過期合約之 {spread_name} Spread 數據檔案。")
         return pd.DataFrame()
 
-    combined_bp = pd.concat(all_dfs, ignore_index=True)
-    dedup_cols = [c for c in ["Symbol", "Exp Date", "Leg1 Strike", "Leg2 Strike"] if c in combined_bp.columns]
+    combined_sp = pd.concat(all_dfs, ignore_index=True)
+    dedup_cols = [c for c in ["Symbol", "Exp Date", "Leg1 Strike", "Leg2 Strike"] if c in combined_sp.columns]
     if dedup_cols:
-        combined_bp = combined_bp.drop_duplicates(subset=dedup_cols)
+        combined_sp = combined_sp.drop_duplicates(subset=dedup_cols)
 
     # 確保 Net Credit 欄位存在 (Barchart 個股垂直價差常以 Max Profit 代表每口最大淨權利金收入)
-    if "Net Credit" not in combined_bp.columns and "Max Profit" in combined_bp.columns:
-        combined_bp["Net Credit"] = combined_bp["Max Profit"]
+    if "Net Credit" not in combined_sp.columns and "Max Profit" in combined_sp.columns:
+        combined_sp["Net Credit"] = combined_sp["Max Profit"]
 
     # 排序：以 Loss Prob 昇序為主
-    if "Loss Prob" in combined_bp.columns:
-        loss_clean = combined_bp["Loss Prob"].astype(str).str.replace("%", "").str.strip()
-        combined_bp["_loss_sort"] = pd.to_numeric(loss_clean, errors="coerce")
-        combined_bp = combined_bp.sort_values(by="_loss_sort", ascending=True)
-        combined_bp = combined_bp.drop(columns=["_loss_sort"])
+    if "Loss Prob" in combined_sp.columns:
+        loss_clean = combined_sp["Loss Prob"].astype(str).str.replace("%", "").str.strip()
+        combined_sp["_loss_sort"] = pd.to_numeric(loss_clean, errors="coerce")
+        combined_sp = combined_sp.sort_values(by="_loss_sort", ascending=True)
+        combined_sp = combined_sp.drop(columns=["_loss_sort"])
 
     # 若指定 target_symbols (如 UOA 預選標的)，嚴格只保留該等標的之價差數據
     if target_symbols:
         target_set = {str(s).strip().upper() for s in target_symbols if s}
-        sym_match = combined_bp[combined_bp["Symbol"].astype(str).str.upper().isin(target_set)]
+        sym_match = combined_sp[combined_sp["Symbol"].astype(str).str.upper().isin(target_set)]
         if not sym_match.empty:
             matched_syms = list(sym_match["Symbol"].unique())
-            print(f"[INFO] [BullPutSkill] 成功鎖定預選標的 {matched_syms} 之 Bull Put 垂直價差數據 (共 {len(sym_match)} 筆)！")
+            print(f"[INFO] [{spread_name}Skill] 成功鎖定預選標的 {matched_syms} 之 {spread_name} 垂直價差數據 (共 {len(sym_match)} 筆)！")
             return sym_match.head(top_count).copy()
         else:
-            print(f"[WARN] [BullPutSkill] 數據中無任何符合預選標的 {list(target_set)} 之 Bull Put 價差記錄。")
+            print(f"[WARN] [{spread_name}Skill] 數據中無任何符合預選標的 {list(target_set)} 之 {spread_name} 價差記錄。")
             return pd.DataFrame()
 
-    top_df = combined_bp.head(top_count).copy()
-    print(f"[INFO] [BullPutSkill] 數據清洗完成：篩選出 {len(top_df)} 筆未過期候選價差組合 (涵蓋標的: {list(top_df['Symbol'].unique())[:6]})")
+    top_df = combined_sp.head(top_count).copy()
+    print(f"[INFO] [{spread_name}Skill] 數據清洗完成：篩選出 {len(top_df)} 筆未過期候選價差組合 (涵蓋標的: {list(top_df['Symbol'].unique())[:6]})")
     return top_df
 
 
-def build_bull_put_prompt(top_df, target_symbols=None):
-    """組裝專屬之 Bull Put Spread 提示詞"""
+def clean_and_prepare_bull_put_data(csv_path_input, top_count=35, target_symbols=None):
+    """向下相容 clean_and_prepare_vertical_spread_data"""
+    return clean_and_prepare_vertical_spread_data(
+        csv_path_input, spread_type="bull-put-spread", top_count=top_count, target_symbols=target_symbols
+    )
+
+
+def build_vertical_spread_prompt(top_df, target_symbols=None, spread_type="bull-put-spread"):
+    """組裝專屬之 Bull Put 或 Bear Call Spread 提示詞"""
+    is_bear_call = "bear" in spread_type.lower() and "call" in spread_type.lower()
+    spread_name = "Bear Call Spread" if is_bear_call else "Bull Put Spread"
+    spread_title_zh = "垂直買權信用價差 (Bear Call)" if is_bear_call else "垂直賣權信用價差 (Bull Put)"
+    leg1_label = "賣出上翼 (Short Call Leg 1)" if is_bear_call else "賣出下翼 (Short Put Leg 1)"
+    leg2_label = "買入保護 (Long Call Leg 2)" if is_bear_call else "買入保護 (Long Put Leg 2)"
+    uoa_context = "空頭大單（Bearish Put Flow）避險/收租佈局" if is_bear_call else "多頭主動掃盤（Bullish Sweep）強勢收租佈局"
+
     display_cols = [
         c for c in [
             "Symbol", "Price~", "Exp Date", "DTE", "Leg1 Strike", "Leg1 Bid", "Bid1",
@@ -259,24 +282,32 @@ def build_bull_put_prompt(top_df, target_symbols=None):
     table_str = top_df[display_cols].to_string(index=False)
     target_str = ", ".join(target_symbols) if target_symbols else "指定標的"
     target_note = (
-        f"\n請注意：本輪分析專屬聚焦於標的【{target_str}】，請務必從清單中挑選出該標的最優質價差組合。"
+        f"\n請注意：本輪分析專屬聚焦於標的【{target_str}】，對應 UOA 之 {uoa_context}，請務必從清單中挑選出該標的最優質價差組合。"
         if target_symbols else ""
     )
 
+    if is_bear_call:
+        buffer_criteria = """1. **上方安全防禦空間 (Break-Even Buffer %)**：
+   優先挑選上方緩衝空間充足（BE Buffer 較大），現貨價格遠低於賣出上翼 Call 履約價，上方具備堅實均線或密集壓力區防護的標的。
+2. **極高勝率與低向上突破機率 (Low Loss Probability)**：
+   向上突破虧損機率 (Loss Prob) 越低越優（建議小於 20%~25%），享有 75% 以上的高概率收租勝率。"""
+    else:
+        buffer_criteria = """1. **安全防禦空間 (Break-Even Buffer %)**：
+   優先挑選下檔緩衝空間充足（BE Buffer 較大），現貨價格遠高於賣出下翼 Put 履約價，具備堅實技術支撐的標的。
+2. **極高勝率與低跌破機率 (Low Loss Probability)**：
+   跌破虧損機率 (Loss Prob) 越低越優（建議小於 20%~25%），享有 75% 以上的高概率收租勝率。"""
+
     return f"""你是一名華爾街頂級期權量化經理人與波動率價差收租專家。
-請根據以下來自 Barchart Bull Put Spread 官方篩選器針對【{target_str}】的未過期候選價差組合清單，進行深度的多因子量化評選，挑選出該標的「唯一最佳、勝率極高、安全緩衝極充足、性價比最高」的 1 組 Bull Put 垂直價差組合：{target_note}
+請根據以下來自 Barchart {spread_name} 官方篩選器針對【{target_str}】的未過期候選價差組合清單，進行深度的多因子量化評選，挑選出該標的「唯一最佳、勝率極高、安全緩衝極充足、性價比最高」的 1 組 {spread_name} 垂直價差組合：{target_note}
 
 ======================================================================
-【待評選之 {target_str} Bull Put 垂直價差候選清單】
+【待評選之 {target_str} {spread_name} 垂直價差候選清單】
 ======================================================================
 {table_str}
 
 ======================================================================
 【量化評比標準】
-1. **安全防禦空間 (Break-Even Buffer %)**：
-   優先挑選下檔緩衝空間充足（BE Buffer 較大），現貨價格遠高於賣出下翼 Put 履約價，具備堅實技術支撐的標的。
-2. **極高勝率與低跌破機率 (Low Loss Probability)**：
-   跌破虧損機率 (Loss Prob) 越低越優（通常建議小於 20%~25%），享有 75% 以上的高概率收租勝率。
+{buffer_criteria}
 3. **合理的淨權利金收入 (Net Credit & Return %)**：
    在確保極高安全邊際的前提下，提供健康的年化報酬率與每口淨權利金收入（Net Credit 建議至少 $0.30~$1.50 以上）。
 4. **期限窗口最適性 (DTE Horizon)**：
@@ -286,30 +317,39 @@ def build_bull_put_prompt(top_df, target_symbols=None):
 【輸出格式規範】
 請嚴格依據下列 Markdown 結構輸出，不得更動欄位名稱：
 
-#### 📌 【最佳 Bull Put 垂直價差推薦】
+#### 📌 【最佳 {spread_name} 垂直價差推薦】
 - **推薦標的代號 (Symbol)**: [標的代號，如 {target_str}]
 - **標的現價 (Price)**: $[現價]
-- **建議策略**: Bull Put Spread (垂直賣權信用價差)
+- **建議策略**: {spread_name} ({spread_title_zh})
 - **到期日 (Exp Date)**: [YYYY-MM-DD]
 - **到期天數 (DTE)**: [數字] 天
-- **賣出下翼 (Short Put Leg 1)**: 履約價 $[數字] @ Bid $[數字]
-- **買入保護 (Long Put Leg 2)**: 履約價 $[數字] @ Ask $[數字]
+- **{leg1_label}**: 履約價 $[數字] @ Bid $[數字]
+- **{leg2_label}**: 履約價 $[數字] @ Ask $[數字]
 - **淨權利金收入 (Net Credit)**: $[數字] (每口最大獲利)
 - **最大虧損風險 (Max Loss)**: $[數字]
 - **損益兩平點與安全空間 (Break-Even Buffer)**: $[數字] (緩衝約 [百分比]%)
 - **最大報酬率 (Max Return %)**: [數字]%
-- **跌破虧損機率 (Loss Prob %)**: [數字]%
+- **虧損機率 (Loss Prob %)**: [數字]%
 - **進場推薦理由與深度量化分析**:
-  1. [安全邊際與下檔支撐評估]
-  2. [跌破機率與勝率優勢]
+  1. [安全邊際與支撐/壓力防守評估]
+  2. [勝率與 Loss Prob 優勢]
   3. [權利金收斂與 Theta 衰退性價比]
 """
 
 
-def parse_best_bull_put(report_text, top_df, default_symbol=None):
-    """自報告中解析獲勝之 Bull Put 價差合約參數"""
+def build_bull_put_prompt(top_df, target_symbols=None):
+    """向下相容 build_vertical_spread_prompt"""
+    return build_vertical_spread_prompt(top_df, target_symbols=target_symbols, spread_type="bull-put-spread")
+
+
+def parse_best_vertical_spread(report_text, top_df, default_symbol=None, spread_type="bull-put-spread"):
+    """自報告中解析獲勝之 Bull Put 或 Bear Call 價差合約參數"""
     if not report_text:
         return None
+
+    is_bear_call = ("bear" in spread_type.lower() and "call" in spread_type.lower()) or ("bear call" in (report_text or "").lower())
+    strategy_name = "Bear Call Spread" if is_bear_call else "Bull Put Spread"
+    right = "C" if is_bear_call else "P"
 
     sym_m = re.search(r"(?:推薦標的代號|標的代號|Symbol).*?[:：]\s*[*_`]*([A-Za-z0-9\.\-]+)", report_text, re.IGNORECASE)
     symbol = sym_m.group(1).strip().upper().replace("*", "") if sym_m else default_symbol
@@ -317,14 +357,14 @@ def parse_best_bull_put(report_text, top_df, default_symbol=None):
     exp_m = re.search(r"(?:到期日|Exp(?:iration)?\s*(?:Date)?).*?[:：]\s*[*_`]*([0-9\-\/]{8,10})", report_text, re.IGNORECASE)
     exp_date_norm = normalize_exp_date(exp_m.group(1)) if exp_m else None
 
-    # Leg 1 Short Put
-    leg1_m = re.search(r"(?:賣出下翼|Short Put|Leg 1).*?履約價.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
+    # Leg 1 Short Leg (Short Put or Short Call)
+    leg1_m = re.search(r"(?:賣出下翼|賣出上翼|Short Put|Short Call|Leg 1).*?履約價.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
     if not leg1_m:
         leg1_m = re.search(r"Leg 1 Strike.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
     leg1_strike = float(leg1_m.group(1)) if leg1_m else None
 
-    # Leg 2 Long Put
-    leg2_m = re.search(r"(?:買入保護|Long Put|Leg 2).*?履約價.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
+    # Leg 2 Long Leg (Long Put or Long Call)
+    leg2_m = re.search(r"(?:買入保護|Long Put|Long Call|Leg 2).*?履約價.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
     if not leg2_m:
         leg2_m = re.search(r"Leg 2 Strike.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
     leg2_strike = float(leg2_m.group(1)) if leg2_m else None
@@ -350,13 +390,21 @@ def parse_best_bull_put(report_text, top_df, default_symbol=None):
     if not symbol or not exp_date_norm or leg1_strike is None or leg2_strike is None:
         return None
 
-    # 確保 Short Strike > Long Strike (Bull Put Spread 特性)
-    if leg1_strike < leg2_strike:
-        leg1_strike, leg2_strike = leg2_strike, leg1_strike
+    # 確保 Short Leg 與 Long Leg 履約價順序符合策略定義：
+    # Bull Put: 賣出 Put 履約價 (leg1) > 買入 Put 履約價 (leg2)
+    # Bear Call: 賣出 Call 履約價 (leg1) < 買入 Call 履約價 (leg2)
+    if is_bear_call:
+        if leg1_strike > leg2_strike:
+            leg1_strike, leg2_strike = leg2_strike, leg1_strike
+    else:
+        if leg1_strike < leg2_strike:
+            leg1_strike, leg2_strike = leg2_strike, leg1_strike
 
     spread_info = {
         "symbol": symbol,
-        "strategy": "Bull Put Spread",
+        "strategy": strategy_name,
+        "spread_type": "bear-call-spread" if is_bear_call else "bull-put-spread",
+        "right": right,
         "action": "SELL",
         "exp_date": exp_date_norm,
         "exp_date_disp": format_exp_date_display(exp_date_norm),
@@ -368,28 +416,49 @@ def parse_best_bull_put(report_text, top_df, default_symbol=None):
     return spread_info
 
 
-def save_bull_put_report_and_notify(report_text, spread_info, idx=None, total=None):
-    """儲存 Bull Put 報告並推播至 LINE"""
+def parse_best_bull_put(report_text, top_df, default_symbol=None):
+    """向下相容 parse_best_vertical_spread"""
+    return parse_best_vertical_spread(report_text, top_df, default_symbol=default_symbol, spread_type="bull-put-spread")
+
+
+def save_vertical_spread_report_and_notify(report_text, spread_info, idx=None, total=None):
+    """儲存垂直價差報告並推播至 LINE"""
     now = datetime.datetime.now()
     ts_str = now.strftime("%Y-%m-%d_%H%M%S")
     now_str = now.strftime("%Y-%m-%d %H:%M:%S")
     sym = spread_info["symbol"]
+    strat = spread_info.get("strategy", "Bull Put Spread")
+    is_bear_call = "bear" in strat.lower() and "call" in strat.lower()
+    prefix_slug = "bear_call" if is_bear_call else "bull_put"
 
-    archive_fname = f"latest_bull_put_{sym}_{ts_str}.txt"
+    archive_fname = f"latest_{prefix_slug}_{sym}_{ts_str}.txt"
     archive_path = os.path.join(REPORTS_DIR, archive_fname)
-    latest_sym_path = os.path.join(BARCHART_DIR, f"latest_bull_put_{sym}.txt")
-    latest_path = os.path.join(BARCHART_DIR, "latest_bull_put.txt")
+    latest_sym_path = os.path.join(BARCHART_DIR, f"latest_{prefix_slug}_{sym}.txt")
+    latest_path = os.path.join(BARCHART_DIR, f"latest_{prefix_slug}.txt")
+    latest_general_path = os.path.join(BARCHART_DIR, "latest_vertical_spread.txt")
 
-    content = f"==標的：{sym} 分析時間：{now_str}==\n{report_text}\n"
+    content = f"==標的：{sym} ({strat}) 分析時間：{now_str}==\n{report_text}\n"
 
-    for p in [archive_path, latest_sym_path, latest_path]:
+    # 個別標的專屬檔案與歷史歸檔
+    for p in [archive_path, latest_sym_path]:
         try:
             with open(p, "w", encoding="utf-8") as f:
                 f.write(content)
         except Exception:
             pass
 
-    print(f"[INFO] [BullPutSkill] {sym} 完整報告已存檔至：{archive_path}")
+    # 若是 Bull Put，亦同步保持 latest_bull_put.txt；若為 Bear Call 則保持 latest_bear_call.txt；同時累積至 latest_vertical_spread.txt
+    try:
+        mode = "w" if (idx is None or idx == 1) else "a"
+        prefix = "" if (idx is None or idx == 1) else "\n" + "=" * 60 + "\n\n"
+        with open(latest_path, mode, encoding="utf-8") as f:
+            f.write(prefix + content)
+        with open(latest_general_path, mode, encoding="utf-8") as f:
+            f.write(prefix + content)
+    except Exception:
+        pass
+
+    print(f"[INFO] [SpreadSkill] {sym} ({strat}) 完整報告已存檔至：{archive_path}")
 
     # 發送 LINE 推播
     if send_push_message:
@@ -398,36 +467,48 @@ def save_bull_put_report_and_notify(report_text, spread_info, idx=None, total=No
         s2 = spread_info["leg2_strike"]
         nc = spread_info["net_credit"]
         idx_str = f" [{idx}/{total}]" if (idx and total) else ""
+        leg_str = f"賣出 Short Call ${s1} / 買入 Long Call ${s2}" if is_bear_call else f"賣出 Short Put ${s1} / 買入 Long Put ${s2}"
 
-        line_msg = f"""🛡️【Barchart UOA -> {sym} Bull Put 垂直價差推薦{idx_str}】
+        line_msg = f"""🛡️【Barchart UOA -> {sym} {strat} 推薦{idx_str}】
 🕒 時間：{now_str}
-📋 標的：{sym} Bull Put Spread
+📋 標的：{sym} {strat}
 📅 到期日：{exp}
-📉 組合：賣出 Short Put ${s1} / 買入 Long Put ${s2}
+📉 組合：{leg_str}
 💵 預估權利金收入：${nc:.2f}
 
 📁 完整報告：{archive_fname}"""
-        print(f"[INFO] [BullPutSkill] 正在發送 {sym} LINE 推播通知...")
+        print(f"[INFO] [SpreadSkill] 正在發送 {sym} LINE 推播通知...")
         ok = send_push_message(line_msg.strip())
         if ok:
-            print(f"[SUCCESS] [BullPutSkill] ✅ {sym} LINE 推播成功！")
+            print(f"[SUCCESS] [SpreadSkill] ✅ {sym} LINE 推播成功！")
 
     return archive_path
 
 
-def execute_bull_put_scale_in_order(spread_info, dry_run=False):
+def save_bull_put_report_and_notify(report_text, spread_info, idx=None, total=None):
+    """向下相容 save_vertical_spread_report_and_notify"""
+    return save_vertical_spread_report_and_notify(report_text, spread_info, idx=idx, total=total)
+
+
+def execute_vertical_spread_scale_in_order(spread_info, dry_run=False):
     """
-    連線 IBKR 建立下翼賣權 (Short Put) 與保護賣權 (Long Put) 之 BAG 組合單，
+    連線 IBKR 建立 Short Leg (賣出) 與 Long Leg (買入保護) 之 BAG 組合單，
+    支援 Bull Put Spread (Short Put / Long Put) 與 Bear Call Spread (Short Call / Long Call)，
     並調用 ScaleInOrderSkill 執行下單與處理 Error 201 兩側衝突防禦。
     """
     symbol = spread_info["symbol"]
+    strat = spread_info.get("strategy", "Bull Put Spread")
+    right = spread_info.get("right", "P")
+    is_bear_call = (right == "C") or ("bear" in strat.lower() and "call" in strat.lower())
+    leg_type_str = "Call" if is_bear_call else "Put"
+
     exp_date = spread_info["exp_date"]
     s1 = spread_info["leg1_strike"]
     s2 = spread_info["leg2_strike"]
     credit = float(spread_info.get("net_credit", 0.5) or 0.5)
 
     print("\n" + "=" * 65)
-    print(f"🚀 【IBKR 智能下單模組】執行 {symbol} Bull Put Spread 組合單 (ScaleInOrderSkill)")
+    print(f"🚀 【IBKR 智能下單模組】執行 {symbol} {strat} 組合單 (ScaleInOrderSkill)")
     print("=" * 65)
 
     cfg = load_env_settings(ENV_FILE)
@@ -440,20 +521,20 @@ def execute_bull_put_scale_in_order(spread_info, dry_run=False):
         import random
         ib = create_fast_ib_connection(host=host, port=port, client_id=random.randint(9700, 9799))
 
-        short_put = Option(symbol, exp_date, s1, "P", "SMART")
-        long_put = Option(symbol, exp_date, s2, "P", "SMART")
+        short_contract = Option(symbol, exp_date, s1, right, "SMART")
+        long_contract = Option(symbol, exp_date, s2, right, "SMART")
 
-        qualified = ib.qualifyContracts(short_put, long_put)
-        if not short_put.conId or not long_put.conId:
-            err = f"❌ [合約無效] 期權腿合約在 IBKR 查無定義 (short: {short_put.conId}, long: {long_put.conId})"
+        qualified = ib.qualifyContracts(short_contract, long_contract)
+        if not short_contract.conId or not long_contract.conId:
+            err = f"❌ [合約無效] 期權腿合約在 IBKR 查無定義 (short: {short_contract.conId}, long: {long_contract.conId})"
             print(f"[WARN] {err}，略過下單。")
             return {"status": "error", "message": err}
 
-        print(f"[SUCCESS] ✅ 雙腿合約通過 IBKR 驗證: Short Put conId={short_put.conId}, Long Put conId={long_put.conId}")
+        print(f"[SUCCESS] ✅ 雙腿合約通過 IBKR 驗證: Short {leg_type_str} conId={short_contract.conId}, Long {leg_type_str} conId={long_contract.conId}")
 
         # 建立 BAG 垂直價差組合單
-        c1 = ComboLeg(conId=short_put.conId, ratio=1, action="SELL", exchange="SMART")
-        c2 = ComboLeg(conId=long_put.conId, ratio=1, action="BUY", exchange="SMART")
+        c1 = ComboLeg(conId=short_contract.conId, ratio=1, action="SELL", exchange="SMART")
+        c2 = ComboLeg(conId=long_contract.conId, ratio=1, action="BUY", exchange="SMART")
         bag_contract = Contract(
             symbol=symbol,
             secType="BAG",
@@ -487,12 +568,17 @@ def execute_bull_put_scale_in_order(spread_info, dry_run=False):
         return order_res
 
     except Exception as e:
-        print(f"[ERROR] 執行 Bull Put 下單異常: {e}")
+        print(f"[ERROR] 執行 {symbol} {strat} 下單異常: {e}")
         return {"status": "error", "message": str(e)}
     finally:
         if ib and ib.isConnected():
             ib.disconnect()
             print("[INFO] 已安全斷開 IBKR 連線。")
+
+
+def execute_bull_put_scale_in_order(spread_info, dry_run=False):
+    """向下相容 execute_vertical_spread_scale_in_order"""
+    return execute_vertical_spread_scale_in_order(spread_info, dry_run=dry_run)
 
 
 def run_uoa_pipeline(
@@ -584,22 +670,60 @@ def run_uoa_pipeline(
             df_etf=df_etf_f,
         )
 
-        unique_symbols = list(dict.fromkeys([t["symbol"] for t in preselected_targets]))
-        print(f"[INFO] 預選涵蓋標的代號: {unique_symbols}")
+        target_tasks = []
+        seen_targets = set()
+        for t in preselected_targets:
+            sym = t["symbol"].strip().upper()
+            uoa_type = t.get("type", "CALL").strip().upper()
+            is_call = (uoa_type == "CALL") or ("CALL" in t.get("strategy", "").upper())
+            spread_type = "bull-put-spread" if is_call else "bear-call-spread"
+            spread_strategy = "Bull Put Spread" if is_call else "Bear Call Spread"
+            uoa_direction = "多頭主動掃盤 (Bullish Sweep)" if is_call else "空頭大單 (Bearish Put Flow)"
+            key = (sym, spread_type)
+            if key not in seen_targets:
+                seen_targets.add(key)
+                target_tasks.append({
+                    "symbol": sym,
+                    "uoa_type": "CALL" if is_call else "PUT",
+                    "uoa_strategy": t.get("strategy", "BUY CALL" if is_call else "BUY PUT"),
+                    "uoa_direction": uoa_direction,
+                    "spread_type": spread_type,
+                    "spread_strategy": spread_strategy,
+                    "label": t.get("label", ""),
+                    "source": t.get("source", "Stock"),
+                })
+
+        print(f"[INFO] 預選標的與垂直價差規劃 (共 {len(target_tasks)} 檔):")
+        for item in target_tasks:
+            print(f"  • [{item['label']}] {item['source']} {item['symbol']} -> {item['uoa_direction']} ({item['uoa_strategy']}) => 啟動 {item['spread_strategy']} ({item['spread_type']})")
 
         # ======================================================================
-        # (3) 步驟 3: Download Skill 下載這 4 檔預選標的之官方 Bull Put 垂直價差篩選數據
+        # (3) 步驟 3: Download Skill 下載這 4 檔預選標的之官方垂直價差篩選數據
+        #     - 若 UOA 為 多頭主動掃盤（Bullish Sweep） -> 啟動 Bull Put Spread:
+        #       導航至 https://www.barchart.com/stocks/quotes/{symbol}/vertical-spreads/bull-put-spread
+        #     - 若 UOA 為 空頭大單（Bearish Put Flow）  -> 切換為 Bear Call Spread:
+        #       導航至 https://www.barchart.com/stocks/quotes/{symbol}/vertical-spreads/bear-call-spread
+        #     - 若查無數據則依風控規則放棄該標的
+        #     • Target Folder: trade/Barchart/
         # ======================================================================
-        print("\n📥 【步驟 3】取得這 4 檔預選標的之官方 Bull Put 垂直價差篩選數據 (Download Skill)")
-        print(f"    • 目標 URL: https://www.barchart.com/stocks/quotes/{{symbol}}/vertical-spreads/bull-put-spread")
+        print("\n📥 【步驟 3】取得預選標的之官方垂直價差篩選數據 (Download Skill)")
         print(f"    • 儲存目錄: {BARCHART_DIR}")
         print("-" * 70)
 
         spread_csv_list = []
-        valid_retained_symbols = []
-        symbol_csv_map = {}
+        valid_retained_targets = []
 
-        for sym in unique_symbols:
+        for item in target_tasks:
+            sym = item["symbol"]
+            spread_type = item["spread_type"]
+            strat_name = item["spread_strategy"]
+            uoa_dir = item["uoa_direction"]
+            uoa_strat = item["uoa_strategy"]
+            url_target = f"https://www.barchart.com/stocks/quotes/{sym}/vertical-spreads/{spread_type}"
+
+            print(f"\n[INFO] [DownloadSkill] 處理標的: {sym} | UOA: {uoa_dir} ({uoa_strat}) -> 目標策略: {strat_name}")
+            print(f"    • 導航 URL: {url_target}")
+
             cur_csv = None
             if not skip_download:
                 if not driver:
@@ -607,35 +731,33 @@ def run_uoa_pipeline(
                     driver = init_driver(download_dir=BARCHART_DIR, profile_dir=PROFILE_DIR, headless=headless)
                     login_if_needed(driver, account, password)
                 try:
-                    cur_csv = download_stock_vertical_spread_csv(driver, sym, target_dir=BARCHART_DIR)
+                    cur_csv = download_stock_vertical_spread_csv(driver, sym, spread_type=spread_type, target_dir=BARCHART_DIR)
                 except Exception as dl_err:
-                    print(f"[WARN] 下載 {sym} 垂直價差異常: {dl_err}")
+                    print(f"[WARN] 下載 {sym} {strat_name} 垂直價差異常: {dl_err}")
             else:
+                exclude_kw = "bear-put" if "bear" in spread_type else "bull-call"
                 candidates = (
-                    glob.glob(os.path.join(BARCHART_DIR, f"{sym.lower()}-*bull-put*.csv"))
-                    + glob.glob(os.path.join(BARCHART_DIR, f"*{sym.lower()}_*bull-put*.csv"))
+                    glob.glob(os.path.join(BARCHART_DIR, f"{sym.lower()}-*{spread_type}*.csv"))
+                    + glob.glob(os.path.join(BARCHART_DIR, f"*{sym.lower()}_*{spread_type}*.csv"))
+                    + glob.glob(os.path.join(OLD_DIR, f"{sym.lower()}-*{spread_type}*.csv"))
+                    + glob.glob(os.path.join(OLD_DIR, f"*{sym.lower()}_*{spread_type}*.csv"))
                 )
-                if not candidates:
-                    candidates = (
-                        glob.glob(os.path.join(OLD_DIR, f"{sym.lower()}-*bull-put*.csv"))
-                        + glob.glob(os.path.join(OLD_DIR, f"*{sym.lower()}_*bull-put*.csv"))
-                    )
                 if candidates:
                     candidates.sort(key=os.path.getmtime, reverse=True)
-                    valid_cands = [c for c in candidates if os.path.getsize(c) > 350 and "bull-call" not in os.path.basename(c).lower()]
+                    valid_cands = [c for c in candidates if os.path.getsize(c) > 350 and exclude_kw not in os.path.basename(c).lower()]
                     if valid_cands:
                         monthly_cands = [c for c in valid_cands if "monthly" in os.path.basename(c).lower()]
                         cur_csv = monthly_cands[0] if monthly_cands else valid_cands[0]
-                        print(f"[INFO] (跳過下載) 使用現存 {sym} Bull Put 價差 CSV: {cur_csv}")
+                        print(f"[INFO] (跳過下載) 使用現存 {sym} {strat_name} 價差 CSV: {cur_csv}")
 
-            if cur_csv and os.path.exists(cur_csv) and os.path.getsize(cur_csv) > 350 and "bull-call" not in os.path.basename(cur_csv).lower():
+            if cur_csv and os.path.exists(cur_csv) and os.path.getsize(cur_csv) > 350:
+                item["csv_path"] = cur_csv
                 if cur_csv not in spread_csv_list:
                     spread_csv_list.append(cur_csv)
-                symbol_csv_map[sym] = cur_csv
-                valid_retained_symbols.append(sym)
-                print(f"[SUCCESS] ✅ 標的 {sym} 成功取得專屬 Bull Put 垂直價差數據！")
+                valid_retained_targets.append(item)
+                print(f"[SUCCESS] ✅ 標的 {sym} 成功取得專屬 {strat_name} 垂直價差數據！")
             else:
-                print(f"[WARN] ⚠️ 標的 {sym} 查無專屬 Bull Put 垂直價差 CSV，依風控規則放棄此預選標的。")
+                print(f"[WARN] ⚠️ 標的 {sym} ({strat_name}) 查無專屬垂直價差 CSV，依風控規則放棄此預選標的。")
 
         # 關閉瀏覽器釋放資源
         if driver:
@@ -646,10 +768,10 @@ def run_uoa_pipeline(
                 pass
 
         # 檢查是否有任何保留的預選標的
-        if not spread_csv_list or not valid_retained_symbols:
+        if not valid_retained_targets:
             msg = (
                 f"📊【UOA 垂直價差無數據提醒】\n"
-                f"⚠️ 預選標的 ({', '.join(unique_symbols)}) 均無專屬之 Bull Put 垂直價差數據，已依風控規則放棄並略過期權價差下單程序。"
+                f"⚠️ 預選標的 ({', '.join([it['symbol'] for it in target_tasks])}) 均無專屬垂直價差數據，已依風控規則放棄並略過期權價差下單程序。"
             )
             print(f"\n{msg}")
             if not no_line:
@@ -658,113 +780,133 @@ def run_uoa_pipeline(
                 except Exception:
                     pass
             print("\n######################################################################")
-            print("# 🏁 Barchart UOA 流程結束 (無符合 Bull Put 垂直價差之標的)")
+            print("# 🏁 Barchart UOA 流程結束 (無符合垂直價差之標的)")
             print("######################################################################")
             return True
 
         # ======================================================================
-        # (4) 步驟 4 & 5: 針對每檔預選標的，重複執行 Bull Put 垂直價差自動化選股與下單流程
+        # (4) 步驟 4 & 5: 針對每檔預選標的，重複執行垂直價差自動化選股與下單流程
         # ======================================================================
-        total_targets = len(valid_retained_symbols)
+        total_targets = len(valid_retained_targets)
         print("\n" + "=" * 70)
-        print(f"🚀 啟動預選標的 Bull Put 垂直價差自動化分析與下單流程 (共 {total_targets} 檔標的: {', '.join(valid_retained_symbols)})")
+        target_desc_list = [f"{t['symbol']}({t['spread_strategy']})" for t in valid_retained_targets]
+        print(f"🚀 啟動預選標的垂直價差自動化分析與下單流程 (共 {total_targets} 檔標的: {', '.join(target_desc_list)})")
         print("=" * 70)
 
         pipeline_results = []
 
-        for idx, sym in enumerate(valid_retained_symbols, 1):
+        for idx, item in enumerate(valid_retained_targets, 1):
+            sym = item["symbol"]
+            spread_type = item["spread_type"]
+            strat_name = item["spread_strategy"]
+            uoa_strat = item["uoa_strategy"]
+            uoa_dir = item["uoa_direction"]
+            sym_csv = item.get("csv_path")
+
             print("\n" + "#" * 70)
-            print(f"🎯 【標的 {idx}/{total_targets}】開始執行 {sym} 之 Bull Put 垂直價差自動化流程")
+            print(f"🎯 【標的 {idx}/{total_targets}】開始執行 {sym} 之 {strat_name} 自動化流程 (UOA: {uoa_dir})")
             print("#" * 70)
 
-            # (4) 步驟 4: Gemini Helper 清洗價差數據、過濾已到期合約、量化評選最佳 Bull Put
-            print(f"\n🎯 【步驟 4.{idx}】清洗 {sym} 價差數據並由 Gemini AI 精選最佳 Bull Put Spread (Gemini Helper)")
-            print(f"[INFO] 正在處理標的: {sym}")
+            # (4) 步驟 4: Gemini Helper 清洗價差數據、過濾已到期合約、量化評選最佳垂直價差
+            print(f"\n🎯 【步驟 4.{idx}】清洗 {sym} 價差數據並由 Gemini AI 精選最佳 {strat_name} (Gemini Helper)")
+            print(f"[INFO] 正在處理標的: {sym} ({strat_name})")
             print("-" * 70)
 
-            sym_csv = symbol_csv_map.get(sym)
             csv_input = [sym_csv] if sym_csv else spread_csv_list
             try:
-                top_bp_df = clean_and_prepare_bull_put_data(csv_input, target_symbols=[sym])
+                top_sp_df = clean_and_prepare_vertical_spread_data(csv_input, spread_type=spread_type, target_symbols=[sym])
             except Exception as clean_err:
-                print(f"[WARN] [BullPutSkill] 清洗 {sym} 價差數據異常: {clean_err}")
-                top_bp_df = pd.DataFrame()
+                print(f"[WARN] [SpreadSkill] 清洗 {sym} 價差數據異常: {clean_err}")
+                top_sp_df = pd.DataFrame()
 
-            if top_bp_df is None or top_bp_df.empty:
-                msg = f"⚠️ 標的 {sym} 經清洗後無未過期之有效 Bull Put Spread 候選合約，略過此標的下單程序。"
-                print(f"\n[WARN] [BullPutSkill] {msg}")
+            if top_sp_df is None or top_sp_df.empty:
+                msg = f"⚠️ 標的 {sym} 經清洗後無未過期之有效 {strat_name} 候選合約，略過此標的下單程序。"
+                print(f"\n[WARN] [SpreadSkill] {msg}")
                 pipeline_results.append({
                     "symbol": sym,
+                    "strategy": strat_name,
                     "status": "no_contracts",
                     "message": msg
                 })
                 continue
 
-            bp_prompt = build_bull_put_prompt(top_bp_df, target_symbols=[sym])
+            sp_prompt = build_vertical_spread_prompt(top_sp_df, target_symbols=[sym], spread_type=spread_type)
 
-            bp_report_text = None
+            sp_report_text = None
             for attempt in range(1, retries + 1):
-                print(f"[INFO] [BullPutSkill] 正在向 Gemini 請求 {sym} Bull Put 深度量化分析 (嘗試第 {attempt}/{retries} 次)...")
+                print(f"[INFO] [SpreadSkill] 正在向 Gemini 請求 {sym} {strat_name} 深度量化分析 (嘗試第 {attempt}/{retries} 次)...")
                 try:
                     if call_gemini_for_skill:
-                        res = call_gemini_for_skill(prompt=bp_prompt, api_key=api_key, min_chars=350, max_output_tokens=4096)
+                        res = call_gemini_for_skill(prompt=sp_prompt, api_key=api_key, min_chars=350, max_output_tokens=4096)
                         if res and len(res.strip()) > 250:
-                            bp_report_text = res
-                            print(f"[SUCCESS] [BullPutSkill] ✅ 第 {attempt} 次成功獲得 {sym} Bull Put 最佳量化評選報告！")
+                            sp_report_text = res
+                            print(f"[SUCCESS] [SpreadSkill] ✅ 第 {attempt} 次成功獲得 {sym} {strat_name} 最佳量化評選報告！")
                             break
                 except Exception as e:
-                    print(f"[WARN] [BullPutSkill] 第 {attempt} 次呼叫異常: {e}")
+                    print(f"[WARN] [SpreadSkill] 第 {attempt} 次呼叫異常: {e}")
                 time.sleep(2)
 
-            if not bp_report_text and top_bp_df is not None and not top_bp_df.empty:
-                print(f"[WARN] [BullPutSkill] AI 分析未果，啟動 {sym} 規則型首位備援機制...")
-                top_row = top_bp_df.iloc[0]
-                bp_report_text = f"""#### 📌 【最佳 Bull Put 垂直價差推薦 (規則型備援)】
+            if not sp_report_text and top_sp_df is not None and not top_sp_df.empty:
+                print(f"[WARN] [SpreadSkill] AI 分析未果，啟動 {sym} 規則型首位備援機制...")
+                top_row = top_sp_df.iloc[0]
+                is_bc = "bear" in spread_type
+                leg1_lbl = "賣出上翼 (Short Call Leg 1)" if is_bc else "賣出下翼 (Short Put Leg 1)"
+                leg2_lbl = "買入保護 (Long Call Leg 2)" if is_bc else "買入保護 (Long Put Leg 2)"
+                sp_report_text = f"""#### 📌 【最佳 {strat_name} 垂直價差推薦 (規則型備援)】
 - **推薦標的代號 (Symbol)**: {top_row.get('Symbol', sym)}
 - **標的現價 (Price)**: ${top_row.get('Price~', 0)}
-- **建議策略**: Bull Put Spread (垂直賣權信用價差)
+- **建議策略**: {strat_name}
 - **到期日 (Exp Date)**: {top_row.get('Exp Date', '')}
 - **到期天數 (DTE)**: {top_row.get('DTE', 30)} 天
-- **賣出下翼 (Short Put Leg 1)**: 履約價 ${top_row.get('Leg1 Strike', 0)} @ Bid ${top_row.get('Leg1 Bid', top_row.get('Bid1', 0))}
-- **買入保護 (Long Put Leg 2)**: 履約價 ${top_row.get('Leg2 Strike', 0)} @ Ask ${top_row.get('Leg2 Ask', top_row.get('Ask2', 0))}
+- **{leg1_lbl}**: 履約價 ${top_row.get('Leg1 Strike', 0)} @ Bid ${top_row.get('Leg1 Bid', top_row.get('Bid1', 0))}
+- **{leg2_lbl}**: 履約價 ${top_row.get('Leg2 Strike', 0)} @ Ask ${top_row.get('Leg2 Ask', top_row.get('Ask2', 0))}
 - **淨權利金收入 (Net Credit)**: ${top_row.get('Net Credit', top_row.get('Max Profit', 0.5))}
 - **進場推薦理由與深度量化分析**:
-  1. 依據 Barchart 官方篩選器，挑選 {sym} 安全緩衝最大與跌破虧損機率極低之最佳組合。
+  1. 依據 Barchart 官方篩選器，挑選 {sym} 安全緩衝最大與虧損機率極低之最佳組合。
 """
 
-            spread_info = parse_best_bull_put(bp_report_text, top_bp_df, default_symbol=sym)
+            spread_info = parse_best_vertical_spread(sp_report_text, top_sp_df, default_symbol=sym, spread_type=spread_type)
             if not spread_info:
-                print(f"[ERROR] 無法解析出 {sym} 有效之 Bull Put Spread 組合參數，略過此標的。")
+                print(f"[ERROR] 無法解析出 {sym} 有效之 {strat_name} 組合參數，略過此標的。")
                 pipeline_results.append({
                     "symbol": sym,
+                    "strategy": strat_name,
                     "status": "parse_error",
                     "message": "無法解析合約參數"
                 })
                 continue
 
-            save_bull_put_report_and_notify(bp_report_text, spread_info, idx=idx, total=total_targets)
-            print(f"\n✨ 【{sym} Bull Put 精選價差組合】: {spread_info['symbol']} Exp={spread_info['exp_date_disp']} 賣出 ${spread_info['leg1_strike']} Put / 買入 ${spread_info['leg2_strike']} Put (預期收入: ${spread_info['net_credit']:.2f})")
+            save_vertical_spread_report_and_notify(sp_report_text, spread_info, idx=idx, total=total_targets)
+            is_bc = spread_info.get("right") == "C"
+            leg_desc = (
+                f"賣出 ${spread_info['leg1_strike']} Call / 買入 ${spread_info['leg2_strike']} Call"
+                if is_bc else
+                f"賣出 ${spread_info['leg1_strike']} Put / 買入 ${spread_info['leg2_strike']} Put"
+            )
+            print(f"\n✨ 【{sym} {strat_name} 精選價差組合】: {spread_info['symbol']} Exp={spread_info['exp_date_disp']} {leg_desc} (預期收入: ${spread_info['net_credit']:.2f})")
 
             # (5) 步驟 5: Scale In Order Skill 連線 IBKR 執行下單與 Error 201 兩側衝突防禦
-            print(f"\n⚡ 【步驟 5.{idx}】連線 IBKR 執行 {sym} Bull Put Spread 組合單 (整合 Scale In Order Skill)")
+            print(f"\n⚡ 【步驟 5.{idx}】連線 IBKR 執行 {sym} {strat_name} 組合單 (整合 Scale In Order Skill)")
             print("-" * 70)
 
             if not skip_order:
-                bp_order_res = execute_bull_put_scale_in_order(spread_info, dry_run=dry_run)
-                order_status = bp_order_res.get('status', 'unknown')
-                total_qty = bp_order_res.get('total_qty', 1)
-                print(f"[INFO] {sym} Bull Put 下單處理結果: {order_status} - 總口數: {total_qty} 口")
+                sp_order_res = execute_vertical_spread_scale_in_order(spread_info, dry_run=dry_run)
+                order_status = sp_order_res.get('status', 'unknown')
+                total_qty = sp_order_res.get('total_qty', 1)
+                print(f"[INFO] {sym} {strat_name} 下單處理結果: {order_status} - 總口數: {total_qty} 口")
                 pipeline_results.append({
                     "symbol": sym,
+                    "strategy": strat_name,
                     "status": order_status,
                     "total_qty": total_qty,
                     "spread": spread_info,
-                    "order_res": bp_order_res
+                    "order_res": sp_order_res
                 })
             else:
                 print(f"[INFO] 已略過 {sym} 的 IBKR 下單步驟 (--skip-order)")
                 pipeline_results.append({
                     "symbol": sym,
+                    "strategy": strat_name,
                     "status": "skipped_order",
                     "spread": spread_info
                 })
@@ -773,22 +915,24 @@ def run_uoa_pipeline(
         # 彙總報告
         # ======================================================================
         print("\n" + "=" * 70)
-        print(f"📊 【全體預選標的 Bull Put 垂直價差執行總結】 (共 {total_targets} 檔標的)")
+        print(f"📊 【全體預選標的垂直價差執行總結】 (共 {total_targets} 檔標的)")
         print("=" * 70)
         summary_lines = []
         for r in pipeline_results:
             sym = r["symbol"]
             st = r["status"]
+            strat = r.get("strategy", "Vertical Spread")
             spread = r.get("spread")
             if spread:
-                summary_line = f"  • {sym}: 下單狀態={st} | 到期日={spread['exp_date_disp']} | 賣出 ${spread['leg1_strike']}P / 買入 ${spread['leg2_strike']}P (Credit: ${spread['net_credit']:.2f})"
+                right_lbl = spread.get("right", "P")
+                summary_line = f"  • {sym} ({strat}): 下單狀態={st} | 到期日={spread['exp_date_disp']} | 賣出 ${spread['leg1_strike']}{right_lbl} / 買入 ${spread['leg2_strike']}{right_lbl} (Credit: ${spread['net_credit']:.2f})"
             else:
-                summary_line = f"  • {sym}: 狀態={st} ({r.get('message', '')})"
+                summary_line = f"  • {sym} ({strat}): 狀態={st} ({r.get('message', '')})"
             print(summary_line)
             summary_lines.append(summary_line)
 
         if not no_line and send_push_message and len(pipeline_results) > 1:
-            final_push = f"🏁【Barchart UOA -> 全體 Bull Put 垂直價差執行彙總】\n" + "\n".join(summary_lines)
+            final_push = f"🏁【Barchart UOA -> 全體垂直價差執行彙總】\n" + "\n".join(summary_lines)
             try:
                 send_push_message(final_push.strip())
             except Exception:
@@ -803,7 +947,7 @@ def run_uoa_pipeline(
 
     elapsed = time.time() - start_time
     print("\n" + "#" * 70)
-    print(f"# ✅ Barchart UOA -> Bull Put 垂直價差自動化流程完成！(總耗時: {elapsed:.1f} 秒)")
+    print(f"# ✅ Barchart UOA -> 垂直價差 (Bull Put / Bear Call) 自動化流程完成！(總耗時: {elapsed:.1f} 秒)")
     print("#" * 70 + "\n")
     return True
 

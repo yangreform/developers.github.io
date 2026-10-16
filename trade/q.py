@@ -2551,6 +2551,31 @@ FUTURE_REJECTED_CONTRACTS = {}
 
 FUTURE_CONTRACT_CACHE = {}
 
+# CME / COMEX / NYMEX 標準期貨交割月份代號
+CME_MONTH_CODES = {
+    'F': 1, 'G': 2, 'H': 3, 'J': 4, 'K': 5, 'M': 6,
+    'N': 7, 'Q': 8, 'U': 9, 'V': 10, 'X': 11, 'Z': 12
+}
+
+
+def get_contract_delivery_month(contract) -> int | None:
+    """
+    從期貨合約代號 (如 MHGZ6 -> Z -> 12, MESZ6 -> 12, MHGF7 -> 1) 精準提取交割月份。
+    避免大宗商品 (如銅/天然氣/原油) 因到期日在交割前一個月而誤判月份。
+    """
+    local_sym = getattr(contract, 'localSymbol', '') or ''
+    if len(local_sym) >= 3 and local_sym[-1].isdigit():
+        month_char = local_sym[-2].upper()
+        if month_char in CME_MONTH_CODES:
+            return CME_MONTH_CODES[month_char]
+    exp = getattr(contract, 'lastTradeDateOrContractMonth', '') or ''
+    if len(exp) >= 6:
+        try:
+            return int(exp[4:6])
+        except Exception:
+            pass
+    return None
+
 
 def is_physical_delivery_safe(contract, today_date: datetime.date | None = None) -> bool:
     """
@@ -2563,8 +2588,9 @@ def is_physical_delivery_safe(contract, today_date: datetime.date | None = None)
     if not exp_str or len(exp_str) < 6:
         return True
     try:
+        deliv_m = get_contract_delivery_month(contract)
         c_year = int(exp_str[:4])
-        c_month = int(exp_str[4:6])
+        c_month = deliv_m if deliv_m else int(exp_str[4:6])
         if c_month == 1:
             safe_year = c_year - 1
             safe_month = 12
@@ -2663,8 +2689,8 @@ def get_target_future_contract(ib_instance: IB, symbol: str, min_days_to_expiry:
         if (now_ts - cached_time < 1800) and not is_contract_blacklisted(contract) and is_unexpired(contract.lastTradeDateOrContractMonth, today_str, min_days=min_days_to_expiry):
             if actual_symbol not in PHYSICAL_DELIVERY_SYMBOLS or is_physical_delivery_safe(contract, today_date):
                 allowed = FUTURE_ACTIVE_MONTHS.get(actual_symbol)
-                exp = getattr(contract, 'lastTradeDateOrContractMonth', '')
-                if not allowed or (len(exp) >= 6 and int(exp[4:6]) in allowed):
+                m_int = get_contract_delivery_month(contract)
+                if not allowed or (m_int and m_int in allowed):
                     return contract
 
     details = []
@@ -2702,11 +2728,11 @@ def get_target_future_contract(ib_instance: IB, symbol: str, min_days_to_expiry:
         exp = c.lastTradeDateOrContractMonth
         fallback_details.append(d)
 
-        # 1. 主力流動性月份過濾 (如 MGC 僅允許 2, 4, 6, 8, 12 月)
+        # 1. 主力流動性月份過濾 (如 MHG 僅允許 3, 5, 7, 9, 12 月，以交割月為準)
         if allowed_months:
             try:
-                m_int = int(exp[4:6])
-                if m_int not in allowed_months:
+                m_int = get_contract_delivery_month(c)
+                if m_int and m_int not in allowed_months:
                     continue
             except Exception:
                 pass
@@ -2923,10 +2949,10 @@ def evaluate_and_run_vxm(ib_instance, execute_order=True):
                         action=trade_action,
                         quantity=trade_qty,
                         current_mid=current_mid,
-                        max_slippage=0.15,
+                        max_slippage=0.25,
                         step=0.05,
-                        step_time=3.0,
-                        max_steps=3,
+                        step_time=4.0,
+                        max_steps=5,
                         symbol=f"VXM-{trade_contract.localSymbol}",
                         account=TARGET_ACCOUNT,
                         tif='DAY',
@@ -3461,8 +3487,8 @@ def close_dash_position():
                 current_mid=current_mid,
                 max_slippage=max_slip,
                 step=step_val,
-                step_time=3.0,
-                max_steps=3,
+                step_time=4.0,
+                max_steps=5,
                 symbol=contract.localSymbol or str(conId),
                 account=TARGET_ACCOUNT,
                 tif='GTC' if contract.secType in ('FOP', 'FUT') else 'DAY',
@@ -4767,8 +4793,8 @@ def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int
                 current_mid=current_price,
                 max_slippage=max_slip,
                 step=step_val,
-                step_time=3.0,
-                max_steps=3,
+                step_time=4.0,
+                max_steps=5,
                 symbol=f"{symbol}-Hedge",
                 account=TARGET_ACCOUNT,
                 tif='DAY',

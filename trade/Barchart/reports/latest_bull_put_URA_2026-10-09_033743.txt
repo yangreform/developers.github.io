@@ -1,0 +1,8 @@
+==標的：URA 分析時間：2026-10-09 03:37:43==
+1 (37.5/36.0)** and explicitly explain this ATM vs OTM dynamic in the rationale.
+    *   Wait, let me double check the math for Option 1:
+        *   Leg 1: Short 37.5 Put @ 0.50
+        *   Leg 2: Long 36.0 Put @ 0.25
+        *   Net Credit = 0.50 - 0.25 = 0.25. Correct.
+        *   Max Loss = (37.5 - 36.0) - 0.25 = 1.50 - 0.25 = 1.25. Correct.
+        *   Max Profit

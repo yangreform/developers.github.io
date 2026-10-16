@@ -4,23 +4,6 @@
   "blacklist": [],
   "history": [
     {
-      "symbol": "COO",
-      "recommended_at": "2026-09-17 01:35:57",
-      "company_name": "Cooper Companies",
-      "insider_net_buy": 1330789.0,
-      "selected_call": {
-        "symbol": "COO",
-        "strike": 55.0,
-        "exp_date": "20261016",
-        "ref_price": 1.8,
-        "strategy": "Buy Call",
-        "right": "C",
-        "action": "BUY"
-      },
-      "status": "recommended",
-      "notes": "Selected by Skills Pipeline on 2026-09-17 01:34:06"
-    },
-    {
       "symbol": "CELH",
       "recommended_at": "2026-09-18 01:35:58",
       "company_name": "Celsius Holdings Inc",
@@ -121,6 +104,40 @@
       },
       "status": "recommended",
       "notes": "Selected by Skills Pipeline on 2026-09-29 00:24:07"
+    },
+    {
+      "symbol": "GME",
+      "recommended_at": "2026-10-14 22:36:19",
+      "company_name": "Gamestop Corp",
+      "insider_net_buy": 22356751.0,
+      "selected_call": {
+        "symbol": "GME",
+        "strike": 30.0,
+        "exp_date": "20261218",
+        "ref_price": 2.35,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-10-14 22:33:07"
+    },
+    {
+      "symbol": "BORR",
+      "recommended_at": "2026-10-15 22:34:56",
+      "company_name": "Borr Drilling Ltd",
+      "insider_net_buy": 10944151.0,
+      "selected_call": {
+        "symbol": "BORR",
+        "strike": 2.5,
+        "exp_date": "20280121",
+        "ref_price": 2.6,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-10-15 22:33:12"
     }
   ]
 }

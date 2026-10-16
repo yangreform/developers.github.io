@@ -363,12 +363,12 @@ def get_mes_future_contract(hedge_sym: str = "MES", matched_positions: list = No
 # ==============================================================================
 # 4. 執行 DTE0 翼幅與即時庫存平衡檢查核心流程
 # ==============================================================================
-def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
+def check_and_hedge(dry_run=False, no_line=False, force_action=None, notify=False) -> dict:
     """
     即時查詢 SPX 現價、wing_call/wing_put，以及 DTE0_CONFIG_JSON 中 MES 的即時持倉：
       - hedge_step: 階梯級距 (例如 5 點)
       - buffer: 遲滯緩衝區 (例如 2.5 點)
-      - max_qty: 強制硬上限 (例如 2 口)
+      - max_qty: 強制硬上限 (例如 3 口)
       - 多階階梯遲滯判斷 target_qty
     計算庫存差異並透過 Custom Walk-Up 自動調倉至目標庫存。
     """
@@ -381,7 +381,7 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
         'hedge_sym': 'MES',
         'hedge_step': 5.0,
         'buffer': 2.5,
-        'max_qty': 2,
+        'max_qty': 3,
         'current_pos': 0.0,
         'target_pos': 0.0,
         'diff': 0.0,
@@ -411,9 +411,9 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
         buffer = 2.5
 
     try:
-        max_qty = int(spx_cfg.get("max_qty", 2))
+        max_qty = int(spx_cfg.get("max_qty", 3))
     except (ValueError, TypeError):
-        max_qty = 2
+        max_qty = 3
 
     w_call_raw = str(spx_cfg.get("wing_call", "NIL")).strip()
     w_put_raw = str(spx_cfg.get("wing_put", "NIL")).strip()
@@ -442,6 +442,45 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
         print(f"⚠️ [DTE0_HEDGE] {msg}")
         result['reason'] = msg
         return result
+
+    # 預先計算防線階梯點位 (上翼/下翼、第1階、第1階遲滯線、第2階、第2階遲滯線)
+    call_t1 = wing_call - hedge_step
+    call_t1_buf = wing_call - hedge_step - buffer
+    call_t2 = wing_call + hedge_step
+    call_t2_buf = wing_call + hedge_step - buffer
+
+    put_t1 = wing_put + hedge_step
+    put_t1_buf = wing_put + hedge_step + buffer
+    put_t2 = wing_put - hedge_step
+    put_t2_buf = wing_put - hedge_step + buffer
+
+    result['levels'] = {
+        'wing_call': wing_call,
+        'call_t1': call_t1,
+        'call_t1_buf': call_t1_buf,
+        'call_t2': call_t2,
+        'call_t2_buf': call_t2_buf,
+        'wing_put': wing_put,
+        'put_t1': put_t1,
+        'put_t1_buf': put_t1_buf,
+        'put_t2': put_t2,
+        'put_t2_buf': put_t2_buf,
+    }
+
+    levels_text = (
+        f"🛡️【上翼防線 (Call 側)】\n"
+        f"  • 上翼履約價：{wing_call:.2f}\n"
+        f"  • 第 1 階觸發：{call_t1:.2f} (+1口)\n"
+        f"  • 第 1 階遲滯線：{call_t1_buf:.2f} (多單清零)\n"
+        f"  • 第 2 階觸發：{call_t2:.2f} (+2口)\n"
+        f"  • 第 2 階遲滯線：{call_t2_buf:.2f} (降回+1口)\n"
+        f"🛡️【下翼防線 (Put 側)】\n"
+        f"  • 下翼履約價：{wing_put:.2f}\n"
+        f"  • 第 1 階觸發：{put_t1:.2f} (-1口)\n"
+        f"  • 第 1 階遲滯線：{put_t1_buf:.2f} (空單清零)\n"
+        f"  • 第 2 階觸發：{put_t2:.2f} (-2口)\n"
+        f"  • 第 2 階遲滯線：{put_t2_buf:.2f} (升回-1口)"
+    )
 
     # 3. 取得 SPX 即時現價
     spx_price = get_spx_live_price()
@@ -472,7 +511,7 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
     elif spx_price >= wing_call - hedge_step:
         # 判斷是否滿足第 2 階
         if spx_price >= wing_call + hedge_step:
-            target_qty = min(2, max_qty)
+            target_qty = min(3, max_qty)
             condition_desc = f"SPX ({spx_price:.2f}) >= 2階上翼 ({wing_call + hedge_step:.2f})，目標持倉: +{target_qty}口"
         else:
             # 在第 1 階與第 2 階之間
@@ -487,7 +526,7 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
     # ================= 向下跌破 (Put 側) =================
     elif spx_price <= wing_put + hedge_step:
         if spx_price <= wing_put - hedge_step:
-            target_qty = -min(2, max_qty)
+            target_qty = -min(3, max_qty)
             condition_desc = f"SPX ({spx_price:.2f}) <= 2階下翼 ({wing_put - hedge_step:.2f})，目標持倉: {target_qty}口"
         else:
             if current_mes_pos <= -2 and spx_price > (wing_put - hedge_step + buffer):
@@ -521,7 +560,9 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
     result['diff'] = diff
 
     print(f"📊 [DTE0_HEDGE 階梯遲滯庫存檢視]")
-    print(f"   • SPX 即時現價: {spx_price:.2f} (上翼: {wing_call:.2f}, 下翼: {wing_put:.2f}, 級距: {hedge_step}, 緩衝: {buffer})")
+    print(f"   • SPX 即時現價: {spx_price:.2f} (級距: {hedge_step}, 緩衝: {buffer})")
+    print(f"   • 🛡️ 上翼 (Call 側): 履約價={wing_call:.2f} | 1階={call_t1:.2f} | 1階遲滯(清零)={call_t1_buf:.2f} | 2階={call_t2:.2f} | 2階遲滯={call_t2_buf:.2f}")
+    print(f"   • 🛡️ 下翼 (Put 側): 履約價={wing_put:.2f} | 1階={put_t1:.2f} | 1階遲滯(清零)={put_t1_buf:.2f} | 2階={put_t2:.2f} | 2階遲滯={put_t2_buf:.2f}")
     print(f"   • {hedge_sym} 即時持倉: {current_mes_pos:g} 口")
     print(f"   • {hedge_sym} 目標持倉: {target_qty:g} 口")
     print(f"   • 持倉差異 (diff): {diff:+g} 口")
@@ -532,6 +573,38 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
         msg = f"目前 {hedge_sym} 即時持倉 ({current_mes_pos:g}口) 已完全符合目標持倉 ({target_qty:g}口)，無需下單。"
         print(f"✅ [DTE0_HEDGE] {msg}")
         result['reason'] = msg
+
+        # 若指定 --notify 或需要通知防線點位，發送 LINE 彙報
+        if notify and not no_line:
+            status_line_msg = (
+                f"📊【DTE0 SPX 翼幅防線點位彙報】\n"
+                f"🕒 時間：{now_str}\n"
+                f"📈 SPX 現價：{spx_price:.2f}\n"
+                f"----------------------------------------\n"
+                f"{levels_text}\n"
+                f"----------------------------------------\n"
+                f"📦 庫存狀態：{current_mes_pos:g}口 (目標 {target_qty:g}口)\n"
+                f"🎯 狀態說明：{condition_desc}\n"
+                f"✅ 判定結果：持倉符合目標，無須調倉"
+            )
+            payload = {
+                "strategy": "DTE0_WING_INVENTORY_HEDGE",
+                "spx_price": spx_price,
+                "levels": result['levels'],
+                "current_pos": current_mes_pos,
+                "target_pos": target_qty,
+                "diff": 0,
+                "action": "HOLD",
+                "status": "Balanced"
+            }
+            try:
+                ok = send_trade_notification('DTE0_HEDGE', status_line_msg, payload)
+                if not ok:
+                    send_push_message(status_line_msg)
+                print("📲 [LINE 推播] 翼幅防線點位彙報發送成功。")
+            except Exception as le:
+                print(f"⚠️ [LINE 推播失敗] {le}")
+
         return result
 
     # 7. 決定下單方向與數量
@@ -603,52 +676,54 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
         result['order_status'] = 'DryRun'
         result['fill_price'] = start_price
         result['success'] = True
-        return result
+    else:
+        # 11. 正式送單 (Custom Walk-Up)
+        try:
+            filled, trade, avg_price = execute_walk_up_order(
+                ib=ib,
+                contract=mes_contract,
+                action=action,
+                quantity=trade_qty,
+                current_mid=start_price,
+                max_slippage=max_slip,
+                step=step_val,
+                step_time=3.0,
+                max_steps=3,
+                symbol=f"DTE0-Hedge-{disp_sym}",
+                account=TARGET_ACCOUNT,
+                tif='DAY',
+                outside_rth=True,
+                min_tick=min_tick
+            )
 
-    # 11. 正式送單 (Custom Walk-Up)
-    try:
-        filled, trade, avg_price = execute_walk_up_order(
-            ib=ib,
-            contract=mes_contract,
-            action=action,
-            quantity=trade_qty,
-            current_mid=start_price,
-            max_slippage=max_slip,
-            step=step_val,
-            step_time=3.0,
-            max_steps=3,
-            symbol=f"DTE0-Hedge-{disp_sym}",
-            account=TARGET_ACCOUNT,
-            tif='DAY',
-            outside_rth=True,
-            min_tick=min_tick
-        )
+            result['fill_price'] = avg_price
+            if filled:
+                result['order_status'] = 'Filled'
+                result['success'] = True
+                print(f"✅ [DTE0_HEDGE 對沖完全成交] 均價: ${fmt_price(avg_price, min_tick)} | 新庫存應為: {target_pos:g}口")
+            else:
+                final_st = getattr(getattr(trade, 'orderStatus', None), 'status', 'Cancelled')
+                result['order_status'] = final_st
+                result['success'] = False
+                print(f"⚠️ [DTE0_HEDGE 對沖未成交] 狀態: {final_st} (步進逾時已徹底撤單)")
 
-        result['fill_price'] = avg_price
-        if filled:
-            result['order_status'] = 'Filled'
-            result['success'] = True
-            print(f"✅ [DTE0_HEDGE 對沖完全成交] 均價: ${fmt_price(avg_price, min_tick)} | 新庫存應為: {target_pos:g}口")
-        else:
-            final_st = getattr(getattr(trade, 'orderStatus', None), 'status', 'Cancelled')
-            result['order_status'] = final_st
-            result['success'] = False
-            print(f"⚠️ [DTE0_HEDGE 對沖未成交] 狀態: {final_st} (步進逾時已徹底撤單)")
-
-    except Exception as we:
-        print(f"❌ [DTE0_HEDGE 下單異常] {we}")
-        result['order_status'] = 'Error'
-        result['reason'] += f" | 錯誤: {we}"
+        except Exception as we:
+            print(f"❌ [DTE0_HEDGE 下單異常] {we}")
+            result['order_status'] = 'Error'
+            result['reason'] += f" | 錯誤: {we}"
 
     # 12. LINE 推播通知
     if not no_line:
         mode_str = "【模擬測試】" if dry_run else "【正式下單】"
-        status_disp = f"已成交 (${result['fill_price']:.2f})" if result['success'] else (result['order_status'] or "未成交")
+        status_disp = f"已成交 (${result['fill_price']:.2f})" if (result['success'] and not dry_run) else (
+            f"模擬試算 (${result['fill_price']:.2f})" if dry_run else (result['order_status'] or "未成交")
+        )
         line_msg = (
             f"🚨{mode_str} DTE0 翼幅庫存調倉通知\n"
             f"🕒 時間：{now_str}\n"
             f"📈 SPX 現價：{spx_price:.2f}\n"
-            f"🛡️ 翼幅界限：下翼 {wing_put:.2f} ~ 上翼 {wing_call:.2f}\n"
+            f"----------------------------------------\n"
+            f"{levels_text}\n"
             f"----------------------------------------\n"
             f"📦 庫存調整：{current_pos:g}口 -> 目標 {target_pos:g}口\n"
             f"⚡ 調倉指令：{action} {trade_qty}口 {disp_sym}\n"
@@ -658,8 +733,7 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
         payload = {
             "strategy": "DTE0_WING_INVENTORY_HEDGE",
             "spx_price": spx_price,
-            "wing_call": wing_call,
-            "wing_put": wing_put,
+            "levels": result['levels'],
             "current_pos": current_pos,
             "target_pos": target_pos,
             "diff": diff,
@@ -674,7 +748,7 @@ def check_and_hedge(dry_run=False, no_line=False, force_action=None) -> dict:
             ok = send_trade_notification('DTE0_HEDGE', line_msg, payload)
             if not ok:
                 send_push_message(line_msg)
-            print("📲 [LINE 推播] 對沖回報通知發送成功。")
+            print("📲 [LINE 推播] 對沖回報通知 (含所有上下翼防線點位) 發送成功。")
         except Exception as le:
             print(f"⚠️ [LINE 推播失敗] {le}")
 
@@ -694,6 +768,7 @@ def main():
     parser.add_argument("--loop", type=float, default=0.0, help="持續監控輪詢秒數 (例如 --loop 5 每 5 秒檢查一次，0 為單次執行)")
     parser.add_argument("--force-buy", action="store_true", help="測試用：強制設定目標庫存為 +qty")
     parser.add_argument("--force-sell", action="store_true", help="測試用：強制設定目標庫存為 -qty")
+    parser.add_argument("--notify", action="store_true", help="強制將目前上下翼、第1階、第1階遲滯線、第2階、第2階遲滯線點位推播至手機 LINE (即使持倉達標亦發送)")
 
     args = parser.parse_args()
 
@@ -716,7 +791,7 @@ def main():
             cooldown_seconds = 60.0
             while True:
                 try:
-                    res = check_and_hedge(dry_run=args.dry_run, no_line=args.no_line, force_action=force_act)
+                    res = check_and_hedge(dry_run=args.dry_run, no_line=args.no_line, force_action=force_act, notify=args.notify)
                     if res.get('triggered') and res.get('success'):
                         last_hedge_time = time.time()
                         print(f"⏳ [冷卻中] 調倉已觸發，進入 {cooldown_seconds} 秒保護冷卻以防高頻重複對沖...")
@@ -730,7 +805,7 @@ def main():
                     print(f"⚠️ 輪詢異常: {inner_e}")
                     time.sleep(args.loop)
         else:
-            check_and_hedge(dry_run=args.dry_run, no_line=args.no_line, force_action=force_act)
+            check_and_hedge(dry_run=args.dry_run, no_line=args.no_line, force_action=force_act, notify=args.notify)
 
         print("\n" + "=" * 70)
         print("🎉 【執行完畢】")

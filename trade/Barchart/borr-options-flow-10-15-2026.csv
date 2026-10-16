@@ -1,0 +1,3 @@
+Symbol,Price~,"Exp Date",Type,Strike,DTE,"Bid x Size","Ask x Size",Trade,Size,Side,Premium,Volume,"Open Int",IV,Delta,Code,*,Time
+BORR,4.625,2028-01-21,Call,2.5,463,"2.25 x 1","3.20 x 2817",2.6,50,mid,13000,50,2681,114.78%,0.82855285325985,AUTO,N/A,"09:30:59 ET"
+"Downloaded from Barchart.com as of 10-15-2026 09:34am CDT"

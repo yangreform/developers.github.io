@@ -15,7 +15,8 @@ Barchart Opinion Auto Hedge / Position Adjuster (trade/opinion.py)
      依序檢查即時該 symbol 在 IBKR 的未平倉庫存：
      - 若為 "BUY"：檢查未平倉淨部位是否為 +1。若不是，送出 Custom Walk-Up 步進限價調倉至 +1。
      - 若為 "SELL"：檢查未平倉淨部位是否為 -1。若不是，送出 Custom Walk-Up 步進限價調倉至 -1。
-     - 若為 "HOLD" / 其他：不執行調倉，維持現有持倉。
+     - 若為 "HOLD"：平倉該標的，目標部位為 0 口 (若目前持有部位則執行平倉，已為 0 則維持空手)。
+     - 若為其他未知訊號：不執行調倉，維持現有持倉。
      - 若已達標則維持持倉不重複下單。
   4. 自動推播調倉與執行明細至手機 LINE。
 
@@ -371,7 +372,10 @@ def run_opinion_strategy(
                 if placed:
                     desc = f"🚀 已送出委託: {ores.get('order_desc')}"
                 else:
-                    desc = f"✅ 持倉已達標 ({tpos:+g} 口)，無須重複送單"
+                    if sig == "HOLD":
+                        desc = f"✅ 部位已為 0 口 (已為空手，無須平倉)"
+                    else:
+                        desc = f"✅ 持倉已達標 ({tpos:+g} 口)，無須重複送單"
                 pos_str = f"部位: {cpos:+g} ➔ {tpos:+g} 口 | " if (cpos is not None and tpos is not None) else ""
                 print(f"  • {sym_desc:<18} ({c_name}) | 指標[{ind}]: 【{sig:<4}】 | {pos_str}{desc}")
         else:
@@ -398,9 +402,12 @@ def run_opinion_strategy(
                 tpos = ores.get("target_pos")
                 c_name = ores.get("contract", order_sym)
                 if ores.get("status") == "ignored":
-                    summary_lines.append(f"• {sym}➔{order_sym} ({c_name}): {ind} 【{sig}】 | 維持觀望 (不調倉)")
+                    summary_lines.append(f"• {sym}➔{order_sym} ({c_name}): {ind} 【{sig}】 | 維持觀望 (未知訊號不調倉)")
                 else:
-                    action_info = "已送單" if ores.get("order_placed") else "維持持倉"
+                    if ores.get("order_placed"):
+                        action_info = "HOLD 平倉送單" if sig == "HOLD" else "已送單"
+                    else:
+                        action_info = "部位已為0口 (空手)" if sig == "HOLD" else "維持持倉"
                     pos_info = f" | 部位 {cpos:+g} ➔ {tpos:+g}" if (cpos is not None and tpos is not None) else ""
                     summary_lines.append(f"• {sym}➔{order_sym} ({c_name}): {ind} 【{sig}】{pos_info} | {action_info}")
             else:

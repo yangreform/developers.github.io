@@ -1,0 +1,5 @@
+Symbol,Symbol,Price~,"Exp Date",DTE,Type,Strike,Type,Moneyness,Ask,"%TP Ask","BE (Ask)","%BE (Ask)",Volume,"Open Int","IV Rank",IV,Delta,"Profit Prob",Time,"Exp Type"
+MSFT|20261120|410.00C,MSFT,523.8,2026-11-20,43,Call,410.00,Call,+21.73%,114.3,0.10%,524.3,0.10%,233,953,42.48%,43.36%,0.954048,51.36%,"13:37 ET",monthly
+PLTR|20261120|140.00C,PLTR,196.13,2026-11-20,43,Call,140.00,Call,+28.62%,58.25,1.08%,198.25,1.08%,190,3215,39.30%,65.24%,0.949967,48.44%,"14:02 ET",monthly
+MSFT|20261120|465.00C,MSFT,523.8,2026-11-20,43,Call,465.00,Call,+11.23%,62.2,0.65%,527.2,0.65%,157,1586,42.48%,33.63%,0.853572,49.08%,"13:54 ET",monthly
+"Downloaded from Barchart.com as of 10-08-2026 01:33pm CDT"

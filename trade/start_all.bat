@@ -40,9 +40,6 @@ if "%MM%"=="33" (
         echo [!] Scheduled restart time %HH%:%MM% reached.
         wmic process where "name='python.exe' and commandline like '%%q.py%%'" call terminate >nul 2>&1
         wmic process where "name='py.exe' and commandline like '%%q.py%%'" call terminate >nul 2>&1
-
-        wmic process where "name='python.exe' and commandline like '%%DTE0_HEDGE.py%%'" call terminate >nul 2>&1
-        wmic process where "name='py.exe' and commandline like '%%DTE0_HEDGE.py%%'" call terminate >nul 2>&1
         echo [%time%] Processes terminated. Watchdog will restart them now...
         timeout /t 3 /nobreak >nul
     )
@@ -70,7 +67,17 @@ if "%MM%"=="33" (
             )
         )
 
-        if "%HH%"=="02" (
+	if "%HH%"=="22" (
+	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "insider.py" >nul
+	    if !errorlevel! equ 0 (
+	        echo [OK] insider.py is running.
+	    ) else (
+	        start "insider" /max py .\insider.py
+	    )
+	)
+
+
+        if "%HH%"=="23" (
             wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "long-call-options-screener.py" >nul
             if not errorlevel 1 (
                 echo [OK] long-call-options-screener.py is running.
@@ -78,16 +85,6 @@ if "%MM%"=="33" (
                 start "long-call-options-screener" /max py .\long-call-options-screener.py
             )
         )
-
-    :: [02:24 執行 uoa.py]
-    if "%HH%"=="03" (
-        wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "uoa.py" >nul
-        if !errorlevel! equ 0 (
-            echo [OK] uoa.py is running.
-        ) else (
-            start "uoa" /max py .\uoa.py
-        )
-    )
 
         echo =======================================================
         :: 清除變數以免影響其他天
@@ -99,17 +96,7 @@ if "%MM%"=="33" (
         if "!DOW!"=="5" set "RUN_SHIOAJI=1"
         
         if "!RUN_SHIOAJI!"=="1" (
-            if "%HH%"=="09" (
-                wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "close_Shioaji.py" >nul
-                if not errorlevel 1 (
-                    echo [OK] close_Shioaji.py is running.
-                ) else (
-                    echo [START] close_Shioaji.py is not running, launching now...
-                    start "close_Shioaji" /max py .\close_Shioaji.py
-                )
-            )
-            
-            if "%HH%"=="15" (
+            if "%HH%"=="16" (
                 wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "open_Shioaji.py" >nul
                 if not errorlevel 1 (
                     echo [OK] open_Shioaji.py is running.
@@ -124,22 +111,13 @@ if "%MM%"=="33" (
 
 :: [改用具體時間取代 timeout 600，避免腳本死鎖卡住]
 :: 01:24 執行完 long-call 後，10 分鐘後即 01:34 執行 bull-put.py
-if "%MM%"=="56" (
-    if "%HH%"=="02" (
+if "%MM%"=="58" (
+    if "%HH%"=="21" (
     	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "bull-put.py" >nul
     	if !errorlevel! equ 0 (
     	    echo [OK] bull-put.py is running.
     	) else (
     	    start "bull-put.py" /max py .\bull-put.py
-    	)
-    )
-
-    if "%HH%"=="03" (
-    	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "DTE0_cancel.py" >nul
-    	if !errorlevel! equ 0 (
-    	    echo [OK] DTE0_cancel.py is running.
-    	) else (
-    	    start "DTE0_cancel.py" /max py .\DTE0_cancel.py
     	)
     )
 )
@@ -164,14 +142,6 @@ if not errorlevel 1 (
 )
 
 echo.
-wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "DTE0_HEDGE.py" >nul
-if not errorlevel 1 (
-    echo  [OK] DTE0_HEDGE.py is running.
-) else (
-    start "DTE0_HEDGE.py" /min py .\DTE0_HEDGE.py
-)
-
-echo.
 wmic process where "name='ngrok.exe'" get commandline 2>nul | find "http 5000" >nul
 if not errorlevel 1 (
     echo  [OK] ngrok http 5000 is running.
@@ -184,3 +154,23 @@ echo Monitoring in background... (Next check in 10s)
 timeout /t 10 >nul
 
 goto loop
+
+
+
+::       if "%HH%"=="21" (
+::           wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "download_op_price.py" >nul
+::
+::           if not errorlevel 1 (
+::               echo [OK] download_op_price.py is running.
+::           ) else (
+::               start "download_op_price" /max py .\download_op_price.py --no-line
+::           )
+::       )
+::	if "%HH%"=="22" (
+::	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "uoa.py" >nul
+::	    if !errorlevel! equ 0 (
+::	        echo [OK] uoa.py is running.
+::	    ) else (
+::	        start "uoa" /max py .\uoa.py
+::	    )
+::	)

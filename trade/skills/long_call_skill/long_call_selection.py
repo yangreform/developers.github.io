@@ -165,9 +165,15 @@ class LongCallSelectionSkill:
         if non_opt_mask.any():
             filtered_non_opt = df[non_opt_mask]["Symbol"].unique().tolist()
             df = df[~non_opt_mask]
-            print(f"[INFO] [LongCallSkill] 已剔除非期權標的 (特別股/權證/非標準代碼共 {len(filtered_non_opt)} 檔): {filtered_non_opt[:6]}")
+        # 6. 【單口合約成本風控過濾】：剔除權利金過高 (Ask > 30.0，每口成本 > $3,000 USD) 或過低 (Ask < 0.20) 之極端合約
+        # 嚴格防範巨型合約導致帳戶保證金不足 (IBKR Error 201 拒單)
+        cost_mask = (df["Ask"] >= 0.20) & (df["Ask"] <= 30.0)
+        if not cost_mask.all():
+            filtered_cost_count = (~cost_mask).sum()
+            df = df[cost_mask]
+            print(f"[INFO] [LongCallSkill] 已依風控規則排除 {filtered_cost_count} 筆權利金過高(Ask>$30)或過低(Ask<$0.2)合約，防範保證金超載。")
 
-        # 6. 【資料層物理過濾】：嚴格排除冷卻中與黑名單標的
+        # 7. 【資料層物理過濾】：嚴格排除冷卻中與黑名單標的
         excluded_set = {s.upper() for s in (excluded_symbols or [])}
         if excluded_set:
             original_len = len(df)
@@ -250,6 +256,8 @@ class LongCallSelectionSkill:
      強烈傾向選擇 Delta 介於 0.70 至 0.95 之間的深度價內 (ITM) 或平價偏價內合約。高 Delta 具備高達 70%~95% 的現貨替代效應，且時間價值衰退 (Theta Decay) 相對較低，獲利機率 (Profit Prob) 明顯更高。
    - **到期時間窗口 (Expiration Horizon & DTE)**：
      優先挑選到期天數 DTE 介於 14 至 45 天（次月或季度波段合約），避免 0~7 DTE 即期合約的極端 Gamma 劇烈震盪與快速歸零風險。
+   - **單口合約成本風控 (Max Cost per Contract)**：
+     單口權利金 (Ask) 應在合理散戶承受範圍 ($1.0 ~ $30.0，即單口 $100 ~ $3,000 USD)，嚴禁挑選極端高價 (> $30.0) 的巨型合約，以防帳戶保證金超載或被 IBKR 拒單 (Error 201)。
    - **隱含波動率與盈虧比 (IV & Risk-Reward)**：
      IV Rank 處於合理偏低或適中區間，無過度溢價，提供非對稱獲利空間。
 

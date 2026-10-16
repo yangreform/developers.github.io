@@ -310,7 +310,22 @@ class ScaleInOrderSkill:
         print(f"  -> ✅ [步驟 1 完成] 已成功撤銷 {len(conflicting_items)} 筆衝突平倉單 (推斷原持倉: {inferred_prev_qty:g} 口)！")
         return conflicting_items, inferred_prev_qty
 
-    def step2_place_parent_order(self, contract, symbol, action="SELL", quantity=1.0, limit_price=0.0, target_account=None, dry_run=False, timeout_seconds=60):
+    def step2_place_parent_order(
+        self,
+        contract,
+        symbol,
+        action="SELL",
+        quantity=1.0,
+        limit_price=0.0,
+        target_account=None,
+        dry_run=False,
+        timeout_seconds=60,
+        max_slippage=0.25,
+        step=0.05,
+        step_time=40.0,
+        max_steps=10,
+        use_walk_up=True
+    ):
         """
         [步驟 2: 送出加碼母單 (SELL)]
         送出新的單純加碼母單 (SELL 自適應步進修單 Custom Walk-Up，不帶附屬單)，並步進撮合成交
@@ -323,30 +338,53 @@ class ScaleInOrderSkill:
             print(f"  -> 🔍 [模擬模式 (Dry-Run)] 模擬加碼母單成交: {action} {quantity:g}口")
             return True, None, (limit_price or 1.0)
 
-        current_mid = limit_price
-        if not current_mid or current_mid <= 0:
-            ticker = self.ib.reqMktData(contract, '', False, False)
-            self.ib.sleep(0.8)
-            mid = ticker.midpoint()
-            if not mid or math.isnan(mid) or mid <= 0:
-                mid = ticker.marketPrice() or ticker.last or ticker.close or 1.0
-            current_mid = float(mid)
+        # 優先向 IBKR 預查目標合約 (BAG 組合單或單腿) 之即時真實市場報價
+        # 避免因靜態/歷史 Barchart 表格數據 (如 50 分鐘前數據) 偏離最新盤面導致掛單無法成交
+        live_mid = None
+        if self.ib and self.ib.isConnected():
             try:
-                self.ib.cancelMktData(contract)
-            except Exception:
-                pass
+                self.ib.reqMarketDataType(3)
+                ticker = self.ib.reqMktData(contract, '', False, False)
+                self.ib.sleep(1.2)
+                mid = getattr(ticker, 'midpoint', lambda: None)()
+                mkt = getattr(ticker, 'marketPrice', lambda: None)()
 
-        if execute_walk_up_order:
+                # 若為 BAG 組合單，IBKR 回傳負數代表 Credit，取絕對值
+                if mid is not None and not math.isnan(mid) and abs(mid) > 0.01:
+                    live_mid = abs(float(mid))
+                elif mkt is not None and not math.isnan(mkt) and abs(mkt) > 0.01:
+                    live_mid = abs(float(mkt))
+                elif getattr(ticker, 'close', None) and not math.isnan(ticker.close) and abs(ticker.close) > 0.01:
+                    live_mid = abs(float(ticker.close))
+
+                try:
+                    self.ib.cancelMktData(contract)
+                except Exception:
+                    pass
+            except Exception as pe:
+                print(f"  -> [行情預查提示] 即時查詢合約市價失敗: {pe}")
+
+        if live_mid and live_mid > 0.01:
+            if limit_price and abs(live_mid - limit_price) > 0.02:
+                print(f"  -> ℹ️ 檢測到即時市場中間價 (${live_mid:.2f}) 與傳入參考價 (${limit_price:.2f}) 存在差異，校正為最新即時市價！")
+            current_mid = live_mid
+        elif limit_price and limit_price > 0:
+            current_mid = float(limit_price)
+            print(f"  -> ℹ️ 沿用傳入預期參考價: ${current_mid:.2f}")
+        else:
+            current_mid = 1.0
+
+        if use_walk_up and execute_walk_up_order:
             filled, trade, avg_price = execute_walk_up_order(
                 ib=self.ib,
                 contract=contract,
                 action=action,
                 quantity=quantity,
                 current_mid=current_mid,
-                max_slippage=0.15,
-                step=0.05,
-                step_time=3.0,
-                max_steps=3,
+                max_slippage=max_slippage,
+                step=step,
+                step_time=step_time,
+                max_steps=max_steps,
                 symbol=f"{symbol}-ScaleIn",
                 account=target_account,
                 tif="DAY",
@@ -670,7 +708,24 @@ class ScaleInOrderSkill:
             except Exception as e:
                 print(f"  -> ❌ [LINE 異常] {e}")
 
-    def execute(self, contract, symbol, action="SELL", quantity=1.0, credit=0.0, take_profit_price=None, stop_loss_price=None, target_account=None, dry_run=False, item=None):
+    def execute(
+        self,
+        contract,
+        symbol,
+        action="SELL",
+        quantity=1.0,
+        credit=0.0,
+        take_profit_price=None,
+        stop_loss_price=None,
+        target_account=None,
+        dry_run=False,
+        item=None,
+        max_slippage=0.25,
+        step=0.10,
+        step_time=10.0,
+        max_steps=20,
+        use_walk_up=True
+    ):
         """
         完整執行 Error 201 處理技能 4 大流程
         """
@@ -697,7 +752,12 @@ class ScaleInOrderSkill:
             quantity=quantity,
             limit_price=credit,
             target_account=target_account,
-            dry_run=dry_run
+            dry_run=dry_run,
+            max_slippage=max_slippage,
+            step=step,
+            step_time=step_time,
+            max_steps=max_steps,
+            use_walk_up=use_walk_up
         )
 
         if not step2_ok and not dry_run:
@@ -717,7 +777,11 @@ class ScaleInOrderSkill:
             added_qty=quantity
         )
 
-        # 步驟 4: 重掛總口數的 OCA 停利停損單
+        # 步驟 4: 重掛總口數的 OCA 停利停損單 (依實際成交價動態校準 0.5倍停利 / 2倍停損)
+        actual_credit = fill_price if (fill_price and fill_price > 0) else credit
+        actual_tp = round(actual_credit * 0.5, 2) if actual_credit > 0 else take_profit_price
+        actual_sl = round(actual_credit * 2.0, 2) if actual_credit > 0 else stop_loss_price
+
         oca_res = self.step4_place_combined_oca_orders(
             contract=contract,
             symbol=symbol,
@@ -725,8 +789,8 @@ class ScaleInOrderSkill:
             opposite_action=opposite_action,
             added_qty=quantity,
             total_qty=total_qty,
-            take_profit_price=take_profit_price,
-            stop_loss_price=stop_loss_price,
+            take_profit_price=actual_tp,
+            stop_loss_price=actual_sl,
             target_account=target_account,
             dry_run=dry_run
         )
@@ -737,9 +801,9 @@ class ScaleInOrderSkill:
             action=action,
             quantity=quantity,
             total_qty=total_qty,
-            fill_price=fill_price or credit,
-            take_profit_price=take_profit_price,
-            stop_loss_price=stop_loss_price,
+            fill_price=actual_credit,
+            take_profit_price=actual_tp,
+            stop_loss_price=actual_sl,
             cancelled_count=len(cancelled_items),
             oca_res=oca_res,
             dry_run=dry_run

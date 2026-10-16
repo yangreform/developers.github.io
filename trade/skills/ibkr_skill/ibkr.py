@@ -258,10 +258,10 @@ def execute_adaptive_option_bracket(contract_info, dry_run=False, env_path=ENV_F
                     contract=contract,
                     order=bracket.parent,
                     current_mid=current_price,
-                    max_slippage=0.15,
+                    max_slippage=0.25,
                     step=0.05,
-                    step_time=3.0,
-                    max_steps=3,
+                    step_time=4.0,
+                    max_steps=5,
                     symbol=f"{contract.localSymbol}-Bracket",
                     trade=parent_trade
                 )
@@ -269,12 +269,41 @@ def execute_adaptive_option_bracket(contract_info, dry_run=False, env_path=ENV_F
             else:
                 ib.sleep(1)
                 status = parent_trade.orderStatus.status if (parent_trade and hasattr(parent_trade, "orderStatus")) else "Submitted"
-            print(f"  -> ✅ [已送出自適應步進委託至 IBKR] 母單狀態: {status}")
+                is_filled = (status == "Filled")
+
+            rejection_reason = ""
+            if parent_trade and hasattr(parent_trade, "log"):
+                for entry in parent_trade.log:
+                    msg = str(getattr(entry, "message", "") or "")
+                    if msg:
+                        rejection_reason = msg
+                        break
+
+            if status in ("Inactive", "Cancelled", "ApiCancelled") and not is_filled:
+                if status == "Inactive":
+                    reason_desc = rejection_reason or "委託被拒絕，可用資金或保證金不足 (IBKR Error 201)"
+                    print(f"  -> ❌ [IBKR 委託被拒] 母單狀態: {status} (原因: {reason_desc})")
+                else:
+                    reason_desc = "逾時未成交，已徹底撤單以防追價風險"
+                    print(f"  -> ⚠️ [IBKR 委託未成交] 母單狀態: {status} ({reason_desc})")
+            else:
+                reason_desc = ""
+                print(f"  -> ✅ [已送出自適應步進委託至 IBKR] 母單狀態: {status}")
         else:
             print(f"  -> 🔍 [模擬模式 (Dry-Run)] 不實際送單至交易所")
             status = "DryRun"
+            is_filled = True
+            reason_desc = ""
 
         # 推播下單詳情報告至 LINE
+        status_display = status
+        if status == "Filled":
+            status_display = "✅ 撮合成交 (Filled)"
+        elif status == "Inactive":
+            status_display = f"❌ 委託被拒 (Inactive - {rejection_reason or '保證金不足'})"
+        elif status in ("Cancelled", "ApiCancelled"):
+            status_display = f"⚠️ 逾時未成交撤單 ({status})"
+
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         line_msg = f"""🚀【IBKR 期權自動下單回報】
 🕒 時間：{now_str}
@@ -284,7 +313,7 @@ def execute_adaptive_option_bracket(contract_info, dry_run=False, env_path=ENV_F
 🎯 停利單 (2倍)：${take_profit_price:.2f}
 🛑 停損單 (一半)：${stop_loss_price:.2f}
 ⚡ 委託方式：自適應步進修單 Custom Walk-Up
-📊 委託狀態：{status}"""
+📊 委託狀態：{status_display}"""
 
         if send_push_message:
             print(f"[INFO] [IBKRSkill] 正在推播下單詳情至手機 LINE...")
@@ -293,6 +322,18 @@ def execute_adaptive_option_bracket(contract_info, dry_run=False, env_path=ENV_F
                 print(f"[SUCCESS] [IBKRSkill] ✅ 下單回報 LINE 推播成功！")
             else:
                 print(f"[WARN] [IBKRSkill] ⚠️ LINE 推播異常。")
+
+        if status in ("Inactive", "Cancelled", "ApiCancelled") and not is_filled:
+            return {
+                "status": "error" if status == "Inactive" else "cancelled",
+                "symbol": symbol,
+                "desc": desc,
+                "limit_price": current_price,
+                "take_profit": take_profit_price,
+                "stop_loss": stop_loss_price,
+                "order_status": status,
+                "message": f"訂單狀態為 {status}: {reason_desc}",
+            }
 
         return {
             "status": "ok",

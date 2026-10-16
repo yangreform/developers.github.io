@@ -66,7 +66,7 @@ def fmt_price(price: Any, min_tick: Optional[float] = None) -> str:
     if min_tick and min_tick > 0:
         if min_tick < 0.00005:
             return f"{p:.6f}"
-        elif min_tick < 0.0005:
+        elif min_tick <= 0.0005:
             return f"{p:.4f}"
         elif min_tick < 0.005:
             return f"{p:.3f}"
@@ -172,10 +172,10 @@ def walk_up_limit_price(
     contract: Any,
     order: Any,
     current_mid: float,
-    max_slippage: float = 0.15,
+    max_slippage: float = 0.25,
     step: float = 0.05,
-    step_time: float = 3.0,
-    max_steps: int = 3,
+    step_time: float = 4.0,
+    max_steps: int = 5,
     symbol: Optional[str] = None,
     trade: Optional[Any] = None,
     min_tick: Optional[float] = None
@@ -323,10 +323,10 @@ def execute_walk_up_order(
     action: str,
     quantity: float,
     current_mid: float,
-    max_slippage: float = 0.15,
+    max_slippage: float = 0.25,
     step: float = 0.05,
-    step_time: float = 3.0,
-    max_steps: int = 3,
+    step_time: float = 4.0,
+    max_steps: int = 5,
     symbol: Optional[str] = None,
     account: Optional[str] = None,
     tif: str = 'DAY',
@@ -400,7 +400,7 @@ class WalkUpOrderSkill:
     def __init__(self, ib_instance=None):
         self.ib = ib_instance
 
-    def walk_up(self, contract, order, current_mid, max_slippage=0.15, step=0.05, step_time=3.0, max_steps=3, symbol=None, trade=None, min_tick=None):
+    def walk_up(self, contract, order, current_mid, max_slippage=0.25, step=0.05, step_time=4.0, max_steps=5, symbol=None, trade=None, min_tick=None):
         return walk_up_limit_price(
             ib=self.ib,
             contract=contract,
@@ -415,7 +415,7 @@ class WalkUpOrderSkill:
             min_tick=min_tick
         )
 
-    def execute(self, contract, action, quantity, current_mid, max_slippage=0.15, step=0.05, step_time=3.0, max_steps=3, symbol=None, account=None, tif='DAY', outside_rth=False, min_tick=None):
+    def execute(self, contract, action, quantity, current_mid, max_slippage=0.25, step=0.05, step_time=4.0, max_steps=5, symbol=None, account=None, tif='DAY', outside_rth=False, min_tick=None):
         return execute_walk_up_order(
             ib=self.ib,
             contract=contract,

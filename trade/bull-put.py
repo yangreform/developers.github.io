@@ -335,6 +335,10 @@ def run_bull_put_pipeline(
     retries=3,
     #no_line=False,
     no_line=True,
+    max_slippage=0.5,
+    step=0.05,
+    step_time=10.0,
+    max_steps=10,
 ):
     """
     執行 Bull Put 完整模組化技能流程：
@@ -495,6 +499,10 @@ def run_bull_put_pipeline(
                 stop_loss_price=stop_loss_price,
                 target_account=target_account,
                 dry_run=dry_run,
+                max_slippage=max_slippage,
+                step=step,
+                step_time=step_time,
+                max_steps=max_steps,
             )
 
             print(f"[INFO] ScaleInOrderSkill 處理結果: {order_res.get('status')} (總口數: {order_res.get('total_qty', 1)} 口)")
@@ -527,6 +535,10 @@ if __name__ == "__main__":
     parser.add_argument("--retries", type=int, default=3, help="Gemini 請求最大重試次數")
     parser.add_argument("--no-line", action="store_true", help="不發送 LINE 通知")
     parser.add_argument("--no-sleep", action="store_true", help="執行完畢後直接退出，不常駐 sleep")
+    parser.add_argument("--step-time", type=float, default=40.0, help="自適應步進修單每階等待秒數 (預設: 40.0 秒)")
+    parser.add_argument("--max-steps", type=int, default=10, help="自適應步進修單最大讓步次數 (預設: 10 次)")
+    parser.add_argument("--max-slippage", type=float, default=0.5, help="自適應步進修單最大累計讓步金額 (預設: 0.25)")
+    parser.add_argument("--step", type=float, default=0.05, help="自適應步進修單每次讓步金額 (預設: 0.05)")
     args = parser.parse_args()
 
     run_bull_put_pipeline(
@@ -536,6 +548,10 @@ if __name__ == "__main__":
         skip_order=args.skip_order,
         retries=args.retries,
         no_line=args.no_line,
+        max_slippage=args.max_slippage,
+        step=args.step,
+        step_time=args.step_time,
+        max_steps=args.max_steps,
     )
 
     if not args.no_sleep and not args.dry_run and sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():

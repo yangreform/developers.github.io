@@ -4,30 +4,6 @@
   "blacklist": [],
   "history": [
     {
-      "symbol": "INTC",
-      "recommended_at": "2026-09-29 03:15:20",
-      "company_name": "",
-      "insider_net_buy": 0.0,
-      "selected_call": {
-        "symbol": "INTC",
-        "strike": 90.0,
-        "exp_date": "20261023",
-        "exp_date_disp": "2026-10-23",
-        "ref_price": 26.25,
-        "ask": 26.25,
-        "delta": 0.918358,
-        "dte": 25,
-        "underlying_price": 115.13,
-        "volume": 1004,
-        "open_int": 1374,
-        "right": "C",
-        "action": "BUY",
-        "strategy": "Long Call"
-      },
-      "status": "recommended",
-      "notes": "Selected by Long Call Pipeline on 2026-09-29 03:14:35"
-    },
-    {
       "symbol": "NVDA",
       "recommended_at": "2026-09-30 01:32:58",
       "company_name": "",
@@ -98,6 +74,30 @@
       },
       "status": "recommended",
       "notes": "Selected by Long Call Pipeline on 2026-10-03 02:32:10"
+    },
+    {
+      "symbol": "CLOV",
+      "recommended_at": "2026-10-15 23:34:11",
+      "company_name": "",
+      "insider_net_buy": 0.0,
+      "selected_call": {
+        "symbol": "CLOV",
+        "strike": 2.5,
+        "exp_date": "20261120",
+        "exp_date_disp": "2026-11-20",
+        "ref_price": 2.31,
+        "ask": 2.31,
+        "delta": 0.9388,
+        "dte": 36,
+        "underlying_price": 4.68,
+        "volume": 154,
+        "open_int": 750,
+        "right": "C",
+        "action": "BUY",
+        "strategy": "Long Call"
+      },
+      "status": "recommended",
+      "notes": "Selected by Long Call Pipeline on 2026-10-15 23:33:11"
     }
   ]
 }

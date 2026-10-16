@@ -1,0 +1,3 @@
+Symbol,Price~,"Exp Date",DTE,Strike,Type,Moneyness,Ask,"%TP Ask","BE (Ask)","%BE (Ask)",Volume,"Open Int","IV Rank",IV,Delta,"Profit Prob"
+AAPL,345.9,2026-11-20,38,305.00,Call,+11.82%,43.7,0.81%,348.7,0.81%,166,3543,55.43%,31.28%,0.907992,47.44%
+"Downloaded from Barchart.com as of 10-13-2026 10:34am CDT"

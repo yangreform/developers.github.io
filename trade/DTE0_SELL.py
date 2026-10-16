@@ -44,6 +44,14 @@ from ib_insync import (
     LimitOrder,
 )
 
+try:
+    from dte0_config import load_dte0_config
+except ImportError:
+    try:
+        from trade.dte0_config import load_dte0_config
+    except ImportError:
+        load_dte0_config = None
+
 # 確保 Windows 主控台與子行程正確輸出 UTF-8 字符，避免 UnicodeEncodeError
 if sys.platform == 'win32':
     try:
@@ -72,15 +80,6 @@ except ImportError:
         from trade.skills.walk_up_skill import walk_up_limit_price
     except ImportError:
         walk_up_limit_price = None
-
-try:
-    from dte0_config import update_dte0_wings, load_dte0_config
-except ImportError:
-    try:
-        from trade.dte0_config import update_dte0_wings, load_dte0_config
-    except ImportError:
-        update_dte0_wings = None
-        load_dte0_config = None
 
 # ==============================================================================
 # 0. 讀取 .env 設定
@@ -944,10 +943,10 @@ def execute_dte0_butterfly_with_tp(legs):
                 contract=combo_contract,
                 order=parent_order,
                 current_mid=limit_price,
-                max_slippage=0.15,
+                max_slippage=0.5,
                 step=0.05,
-                step_time=3.0,
-                max_steps=3,
+                step_time=10.0,
+                max_steps=10,
                 symbol=f"{symbol} 0DTE [{set_label}]",
                 trade=parent_trade
             )
@@ -1060,6 +1059,28 @@ def send_symbol_dte0_summary(symbol, legs_sets, results):
         f"  • 總組數: {len(results)} 組 (共 {len(results)*leg_count} 腿)",
         f"  • 停利保護機制: 每組均已附帶 Attached Bracket 停利買回單"
     ])
+
+    atm_res = next((r for r in results if r.get('short_tag') == 'ATM'), results[0] if results else None)
+    if atm_res and atm_res.get('call_wing_strike') and atm_res.get('put_wing_strike'):
+        try:
+            c_w = float(atm_res['call_wing_strike'])
+            p_w = float(atm_res['put_wing_strike'])
+            dte0_cfg = load_dte0_config() if load_dte0_config else {}
+            spx_info = dte0_cfg.get(symbol, {}) or dte0_cfg.get("SPX", {})
+            h_step = float(spx_info.get('hedge_step', 5.0))
+            h_buf = float(spx_info.get('buffer', 2.0))
+            lines.extend([
+                "",
+                "🛡️ 0DTE MES 對沖防線點位 (DTE0_CONFIG_JSON)：",
+                f"  • 上翼 (Call 側)：{c_w:.2f}",
+                f"    - 1階 (+1口)：{c_w - h_step:.2f} | 1階遲滯(清零)：{c_w - h_step - h_buf:.2f}",
+                f"    - 2階 (+2口)：{c_w + h_step:.2f} | 2階遲滯(降回1口)：{c_w + h_step - h_buf:.2f}",
+                f"  • 下翼 (Put 側)：{p_w:.2f}",
+                f"    - 1階 (-1口)：{p_w + h_step:.2f} | 1階遲滯(清零)：{p_w + h_step + h_buf:.2f}",
+                f"    - 2階 (-2口)：{p_w - h_step:.2f} | 2階遲滯(升回-1口)：{p_w - h_step + h_buf:.2f}"
+            ])
+        except Exception:
+            pass
 
     error_items = [r for r in results if r.get('error_msg')]
     if error_items:
@@ -1189,20 +1210,6 @@ def run_dte0_cycle():
                     r = execute_dte0_butterfly_with_tp(s)
                     results.append(r)
 
-                # 同步將 [ATM] 組之上下翼點位寫入 trade/.env 之 DTE0_CONFIG_JSON
-                if update_dte0_wings:
-                    atm_set = next((s for s in sets if s.get('short_tag') == 'ATM'), sets[0] if sets else None)
-                    if atm_set and atm_set.get('call_wing_strike') and atm_set.get('put_wing_strike'):
-                        c_w = atm_set['call_wing_strike']
-                        p_w = atm_set['put_wing_strike']
-                        update_dte0_wings(
-                            symbol=underlying.symbol,
-                            wing_call=f"{c_w:g}",
-                            wing_put=f"{p_w:g}",
-                            hedge_sym="MES",
-                            hedge_qty=1
-                        )
-
                 # 每個 symbol 統一傳一次手機 LINE 彙總
                 send_symbol_dte0_summary(underlying.symbol, sets, results)
             else:
@@ -1237,7 +1244,7 @@ if __name__ == '__main__':
 
     if not args.dry_run and sys.stdin and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
         try:
-            time.sleep(60 * 60 * 20)
+    	    time.sleep(60 * 60 * 20)
         except KeyboardInterrupt:
             pass
 

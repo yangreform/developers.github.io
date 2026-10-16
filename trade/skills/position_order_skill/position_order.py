@@ -287,9 +287,10 @@ class PositionOrderSkill:
 
     def adjust_position(self, symbol: str, signal: str, dry_run: bool = False, send_line: bool = True) -> dict:
         """
-        依據方向訊號 (BUY / SELL) 檢查與調倉至目標部位：
+        依據方向訊號 (BUY / SELL / HOLD) 檢查與調倉至目標部位：
           • signal == "BUY"  ➔ 目標淨部位: +1
           • signal == "SELL" ➔ 目標淨部位: -1
+          • signal == "HOLD" ➔ 目標淨部位: 0 (平倉清空部位)
         """
         sig_upper = signal.strip().upper()
         if "BUY" in sig_upper:
@@ -298,19 +299,22 @@ class PositionOrderSkill:
         elif "SELL" in sig_upper:
             target_pos = -1.0
             sig_name = "SELL"
+        elif "HOLD" in sig_upper or "FLAT" in sig_upper or "CLOSE" in sig_upper:
+            target_pos = 0.0
+            sig_name = "HOLD"
         else:
             return {
                 "status": "ignored",
                 "symbol": symbol,
                 "signal": signal,
-                "message": f"訊號為 {signal}，非 BUY/SELL，不執行調倉。"
+                "message": f"訊號為 {signal}，非 BUY/SELL/HOLD，不執行調倉。"
             }
 
         print(f"\n" + "=" * 60)
         print(f"📊 [PositionSkill] 開始持倉檢查與 Adaptive Patient 委託調度")
         print(f"   • 目標標的: {symbol}")
         print(f"   • 方向訊號: 【{sig_name}】")
-        print(f"   • 目標淨部位: {target_pos:+g} 口")
+        print(f"   • 目標淨部位: {target_pos:+g} 口{' (平倉清空部位至0口)' if sig_name == 'HOLD' else ''}")
         print(f"   • 運行模式: {'模擬測試 (Dry-Run)' if dry_run else '正式送單 (Live)'}")
         print("=" * 60)
 
@@ -326,7 +330,10 @@ class PositionOrderSkill:
 
         # 3. 判斷是否已達標
         if current_pos == target_pos:
-            msg = f"🎉 標的 {contract.localSymbol} 當前部位已為 {current_pos:+g} 口，完全符合 {sig_name} 目標 ({target_pos:+g})，無須重複下單！"
+            if sig_name == "HOLD":
+                msg = f"🎉 標的 {contract.localSymbol} 當前部位已為 0 口 (空手)，完全符合 HOLD 平倉目標 (0口)，無須重複下單！"
+            else:
+                msg = f"🎉 標的 {contract.localSymbol} 當前部位已為 {current_pos:+g} 口，完全符合 {sig_name} 目標 ({target_pos:+g})，無須重複下單！"
             print(f"[SUCCESS] ✅ {msg}")
             return {
                 "status": "already_target",
@@ -381,9 +388,10 @@ class PositionOrderSkill:
 
         # 6. 自適應步進修單 (Custom Walk-Up)
         step_val = max(0.05, min_tick) if min_tick else 0.05
-        max_slip = max(0.15, step_val * 3)
+        max_slip = max(0.25, step_val * 5)
         price_desc = f"Custom Walk-Up (起始限價: ${market_price:.2f})"
-        order_desc = f"{order_action} {order_qty} 口 {contract.localSymbol} @ {price_desc}"
+        action_prefix = "【HOLD平倉】" if sig_name == "HOLD" else ""
+        order_desc = f"{action_prefix}{order_action} {order_qty} 口 {contract.localSymbol} @ {price_desc}"
 
         # 7. 執行下單
         order_status = "DryRun"
@@ -397,8 +405,8 @@ class PositionOrderSkill:
                     current_mid=market_price or 0.05,
                     max_slippage=max_slip,
                     step=step_val,
-                    step_time=3.0,
-                    max_steps=3,
+                    step_time=4.0,
+                    max_steps=5,
                     symbol=f"{symbol}-Opinion",
                     account=target_account,
                     tif="DAY",
@@ -407,7 +415,7 @@ class PositionOrderSkill:
                 )
                 order_status = "Filled" if filled else (trade.orderStatus.status if trade else "Cancelled")
                 if filled:
-                    order_desc = f"{order_action} {order_qty} 口 {contract.localSymbol} @ Walk-Up 成交均價 ${avg_price:.2f}"
+                    order_desc = f"{action_prefix}{order_action} {order_qty} 口 {contract.localSymbol} @ Walk-Up 成交均價 ${avg_price:.2f}"
             else:
                 order = LimitOrder(order_action, order_qty, market_price or 0.05)
                 order.tif = "DAY"
@@ -422,12 +430,13 @@ class PositionOrderSkill:
 
         # 8. 組裝推播通知
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        action_title = "平倉清空部位" if sig_name == "HOLD" else "部位校正"
         line_msg = (
             f"🎯【Barchart Opinion 自動調倉回報】\n"
             f"🕒 時間：{now_str}\n"
             f"📌 標的：{symbol} ({contract.localSymbol})\n"
             f"🧭 方向訊號：{sig_name}\n"
-            f"📊 部位校正：{current_pos:+g} 口 ➔ 目標 {target_pos:+g} 口\n"
+            f"📊 {action_title}：{current_pos:+g} 口 ➔ 目標 {target_pos:+g} 口\n"
             f"🚀 執行委託：{order_desc}\n"
             f"⚙️ 模式：{'模擬測試 (Dry-Run)' if dry_run else '正式送單 (Live)'}\n"
             f"📋 狀態：{order_status}"
