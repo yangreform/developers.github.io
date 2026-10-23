@@ -8,9 +8,9 @@ Barchart Bull Put Spread Pipeline with Skills Architecture (trade/bull-put.py)
       - 自動連線 Barchart 下載官方 Bull Put 垂直價差篩選數據：
         • URL: https://www.barchart.com/options/vertical-spreads/bull-put-spread?popularScreener=221982&setPopularScreener=true&orderBy=lossProbability&orderDir=asc
         • Target Folder: trade/Barchart/
-  (2) Gemini Helper (trade/skills/gemini_helper.py):
+  (2) NVIDIA Helper (trade/skills/nv_helper.py):
       - 清洗價差數據、過濾已到期合約、按跌破機率與報酬率排序
-      - 調用 Gemini AI 深度量化分析，精選唯一最佳 Bull Put Spread 組合
+      - 調用 NVIDIA DeepSeek AI 深度量化分析，精選唯一最佳 Bull Put Spread 組合
       - 儲存詳細分析報告並推播至手機 LINE
   (3) Scale In Order Skill (trade/skills/scale_in_order_skill/):
       - 連線 IBKR 建立下翼賣權 (Short Put) 與保護賣權 (Long Put) 之 BAG 組合單
@@ -65,8 +65,8 @@ try:
         ScaleInOrderSkill,
         load_env_settings,
         create_fast_ib_connection,
-        load_gemini_api_key,
-        call_gemini_for_skill,
+        load_nv_api_key,
+        call_nv_for_skill,
     )
 except ImportError:
     from skills.download_skill import (
@@ -79,7 +79,7 @@ except ImportError:
     )
     from skills.scale_in_order_skill import ScaleInOrderSkill
     from skills.ibkr_skill import load_env_settings, create_fast_ib_connection
-    from skills.gemini_helper import load_gemini_api_key, call_gemini_for_skill
+    from skills.nv_helper import load_nv_api_key, call_nv_for_skill
 
 try:
     from ib_insync import IB, Option, Contract, ComboLeg
@@ -390,20 +390,20 @@ def run_bull_put_pipeline(
                 pass
 
         # ======================================================================
-        # (2) 步驟 2: 清洗數據並調用 Gemini AI 深度量化分析
+        # (2) 步驟 2: 清洗數據並調用 NVIDIA DeepSeek AI 深度量化分析
         # ======================================================================
-        print("\n🎯 【步驟 2】清洗數據並呼叫 Gemini AI 精選唯一最佳 Bull Put Spread")
+        print("\n🎯 【步驟 2】清洗數據並呼叫 NVIDIA DeepSeek AI 精選唯一最佳 Bull Put Spread")
         print("-" * 70)
-        api_key = load_gemini_api_key(ENV_FILE) if load_gemini_api_key else None
+        api_key = load_nv_api_key(ENV_FILE) if load_nv_api_key else None
         top_df = clean_and_prepare_bull_put_data(bp_csv)
         prompt = build_bull_put_prompt(top_df)
 
         report_text = None
         for attempt in range(1, retries + 1):
-            print(f"[INFO] [BullPutSkill] 正在向 Gemini 請求 Bull Put 深度量化分析 (嘗試第 {attempt}/{retries} 次)...")
+            print(f"[INFO] [BullPutSkill] 正在向 NVIDIA DeepSeek 請求 Bull Put 深度量化分析 (嘗試第 {attempt}/{retries} 次)...")
             try:
-                if call_gemini_for_skill:
-                    res = call_gemini_for_skill(prompt=prompt, api_key=api_key, min_chars=500, max_output_tokens=40096)
+                if call_nv_for_skill:
+                    res = call_nv_for_skill(prompt=prompt, api_key=api_key, min_chars=500, max_output_tokens=262144)
                     if res and len(res.strip()) > 300:
                         report_text = res
                         print(f"[SUCCESS] [BullPutSkill] ✅ 第 {attempt} 次成功獲得 Bull Put 最佳量化評選報告！")

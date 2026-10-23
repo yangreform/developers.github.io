@@ -42,7 +42,7 @@ from .ibkr_skill import (
     check_ibkr_contract_validity,
     execute_adaptive_option_bracket,
 )
-from .gemini_helper import call_gemini_for_skill, load_gemini_api_key
+from .nv_helper import call_nv_for_skill, load_nv_api_key, call_gemini_for_skill, load_gemini_api_key
 from .walk_up_skill import WalkUpOrderSkill, walk_up_limit_price, execute_walk_up_order, round_to_tick, is_valid_price, extract_valid_price, determine_min_tick_and_step, fmt_price
 
 __all__ = [
@@ -81,6 +81,8 @@ __all__ = [
     "on_ib_error",
     "check_ibkr_contract_validity",
     "execute_adaptive_option_bracket",
+    "call_nv_for_skill",
+    "load_nv_api_key",
     "call_gemini_for_skill",
     "load_gemini_api_key",
 ]

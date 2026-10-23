@@ -36,14 +36,22 @@ for p in [BASE_DIR, PROJECT_ROOT]:
         sys.path.insert(0, p)
 
 try:
-    from ..gemini_helper import call_gemini_for_skill, load_gemini_api_key
+    from ..nv_helper import call_nv_for_skill, load_nv_api_key
+    call_gemini_for_skill = call_nv_for_skill
+    load_gemini_api_key = load_nv_api_key
 except Exception:
     try:
-        from trade.skills.gemini_helper import call_gemini_for_skill, load_gemini_api_key
+        from trade.skills.nv_helper import call_nv_for_skill, load_nv_api_key
+        call_gemini_for_skill = call_nv_for_skill
+        load_gemini_api_key = load_nv_api_key
     except Exception:
         try:
-            from skills.gemini_helper import call_gemini_for_skill, load_gemini_api_key
+            from skills.nv_helper import call_nv_for_skill, load_nv_api_key
+            call_gemini_for_skill = call_nv_for_skill
+            load_gemini_api_key = load_nv_api_key
         except Exception:
+            call_nv_for_skill = None
+            load_nv_api_key = None
             call_gemini_for_skill = None
             load_gemini_api_key = None
 
@@ -88,7 +96,14 @@ class LongCallSelectionSkill:
 
     def __init__(self, api_key=None, env_path=None):
         self.env_path = env_path or os.path.join(BASE_DIR, ".env")
-        self.api_key = api_key or (load_gemini_api_key(self.env_path) if load_gemini_api_key else None)
+        if api_key:
+            self.api_key = api_key
+        elif load_nv_api_key:
+            self.api_key = load_nv_api_key(self.env_path)
+        elif load_gemini_api_key:
+            self.api_key = load_gemini_api_key(self.env_path)
+        else:
+            self.api_key = None
 
     def clean_and_aggregate(self, csv_path, excluded_symbols=None, top_count=30):
         """
@@ -432,11 +447,12 @@ class LongCallSelectionSkill:
         contract_info = None
         report_text = ""
 
-        # 嘗試呼叫 Gemini
+        # 嘗試呼叫 NVIDIA AI (deepseek-v4.1-flash)
+        ai_caller = call_nv_for_skill or call_gemini_for_skill
         for attempt in range(1, max_retries + 1):
-            print(f"[INFO] [LongCallSkill] 正在向 Gemini 請求 Long Call 深度量化分析 (嘗試第 {attempt}/{max_retries} 次)...")
+            print(f"[INFO] [LongCallSkill] 正在向 NVIDIA AI 請求 Long Call 深度量化分析 (嘗試第 {attempt}/{max_retries} 次)...")
             try:
-                report = call_gemini_for_skill(prompt=prompt, api_key=self.api_key)
+                report = ai_caller(prompt=prompt, api_key=self.api_key) if ai_caller else None
                 if report:
                     parsed = self.parse_contract_from_report(
                         report_text=report, candidates_df=top_df, excluded_symbols=excluded_symbols

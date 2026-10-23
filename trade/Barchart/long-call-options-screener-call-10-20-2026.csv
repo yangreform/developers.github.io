@@ -1,0 +1,4 @@
+Symbol,Price~,"Exp Date",DTE,Strike,Type,Moneyness,Ask,"%TP Ask","BE (Ask)","%BE (Ask)",Volume,"Open Int","IV Rank",IV,Delta,"Profit Prob"
+AMZN,263.69,2026-11-20,31,210.00,Call,+20.36%,56.2,0.95%,266.2,0.95%,198,806,64.08%,48.53%,0.95712,48.60%
+PAA,25.29,2026-11-20,31,24.00,Call,+5.10%,1.5,0.83%,25.5,0.83%,100,10394,39.48%,18.04%,0.852139,51.20%
+"Downloaded from Barchart.com as of 10-20-2026 10:34am CDT"

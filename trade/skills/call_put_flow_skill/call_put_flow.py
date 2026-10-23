@@ -34,14 +34,22 @@ for p in [BASE_DIR, PROJECT_ROOT]:
         sys.path.insert(0, p)
 
 try:
-    from ..gemini_helper import call_gemini_for_skill, load_gemini_api_key
+    from ..nv_helper import call_nv_for_skill, load_nv_api_key
+    call_gemini_for_skill = call_nv_for_skill
+    load_gemini_api_key = load_nv_api_key
 except Exception:
     try:
-        from trade.skills.gemini_helper import call_gemini_for_skill, load_gemini_api_key
+        from trade.skills.nv_helper import call_nv_for_skill, load_nv_api_key
+        call_gemini_for_skill = call_nv_for_skill
+        load_gemini_api_key = load_nv_api_key
     except Exception:
         try:
-            from skills.gemini_helper import call_gemini_for_skill, load_gemini_api_key
+            from skills.nv_helper import call_nv_for_skill, load_nv_api_key
+            call_gemini_for_skill = call_nv_for_skill
+            load_gemini_api_key = load_nv_api_key
         except Exception:
+            call_nv_for_skill = None
+            load_nv_api_key = None
             call_gemini_for_skill = None
             load_gemini_api_key = None
 
@@ -81,7 +89,14 @@ class CallPutFlowSkill:
 
     def __init__(self, api_key=None, env_path=None):
         self.env_path = env_path or os.path.join(BASE_DIR, ".env")
-        self.api_key = api_key or (load_gemini_api_key(self.env_path) if load_gemini_api_key else None)
+        if api_key:
+            self.api_key = api_key
+        elif load_nv_api_key:
+            self.api_key = load_nv_api_key(self.env_path)
+        elif load_gemini_api_key:
+            self.api_key = load_gemini_api_key(self.env_path)
+        else:
+            self.api_key = None
 
     def clean_and_prepare_flow(self, csv_path, symbol, target_type=None, min_dte=7, top_count=35):
         """
@@ -398,15 +413,16 @@ class CallPutFlowSkill:
                 "stats2": stats2,
             }
 
-        # 情況 C: 雙方皆具備大單，調用 Gemini 橫向深度量化對比
+        # 情況 C: 雙方皆具備大單，調用 NVIDIA AI (deepseek-v4.1-flash) 橫向深度量化對比
         prompt = self.build_comparison_prompt(candidate1, candidate2, flow_str1, stats1, flow_str2, stats2)
         decision_report = None
 
-        if self.api_key and call_gemini_for_skill:
+        ai_caller = call_nv_for_skill or call_gemini_for_skill
+        if self.api_key and ai_caller:
             for attempt in range(1, max_retries + 1):
-                print(f"[INFO] [CallPutFlowSkill] 正在向 Gemini 請求多空大單橫向評決 (嘗試第 {attempt}/{max_retries} 次)...")
+                print(f"[INFO] [CallPutFlowSkill] 正在向 NVIDIA AI 請求多空大單橫向評決 (嘗試第 {attempt}/{max_retries} 次)...")
                 try:
-                    res = call_gemini_for_skill(prompt, self.api_key)
+                    res = ai_caller(prompt, self.api_key)
                     if res and len(res.strip()) > 150:
                         parsed = self.parse_decision(res, candidate1, candidate2)
                         if parsed.get("strike") and parsed.get("exp_date"):
@@ -528,11 +544,12 @@ class CallPutFlowSkill:
   3. [履約價行使空間與波段獲利潛力評估]
 """
         report_text = None
+        ai_caller = call_nv_for_skill or call_gemini_for_skill
         for attempt in range(1, max_retries + 1):
-            print(f"[INFO] [CallPutFlowSkill] 正在向 Gemini 請求 {sym} 最佳期權分析 (嘗試第 {attempt}/{max_retries} 次)...")
+            print(f"[INFO] [CallPutFlowSkill] 正在向 NVIDIA AI 請求 {sym} 最佳期權分析 (嘗試第 {attempt}/{max_retries} 次)...")
             try:
-                if call_gemini_for_skill:
-                    res = call_gemini_for_skill(prompt, self.api_key, min_chars=300, max_output_tokens=40906)
+                if ai_caller:
+                    res = ai_caller(prompt, self.api_key, min_chars=300, max_output_tokens=40906)
                     if res and len(res.strip()) > 100:
                         report_text = res
                         print(f"[SUCCESS] [CallPutFlowSkill] ✅ 第 {attempt} 次成功獲得 {sym} 期權大單精選報告！")

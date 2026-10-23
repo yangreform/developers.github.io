@@ -18,23 +18,27 @@ import requests
 
 # 預設候選模型順序：以回應最為迅速 (~1s) 且具高可用性的 flash-lite 模型優先，依序降級
 CANDIDATE_MODELS = [
-    "gemini-3.1-pro-preview",
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
+    "deepseek-ai/deepseek-v4.1-flash",
+    "deepseek-ai/deepseek-r1",
+    "meta/llama-3.3-70b-instruct",
 ]
+
+try:
+    from .nv_helper import load_nv_api_key, call_nv_for_skill
+except Exception:
+    load_nv_api_key = None
+    call_nv_for_skill = None
 
 
 def load_gemini_api_key(env_path=None):
     """
-    從環境檔 (.env) 解析 Gemini API Key。支援以下格式：
-      gemini_api:AIzaSy...
-      gemini_api=AIzaSy...
-      GEMINI_API_KEY=AIzaSy...
+    從環境檔 (.env) 解析 API Key，優先回傳 nv_api (NVIDIA NIM)，其次回傳 gemini_api。
     """
+    if load_nv_api_key:
+        nv_key = load_nv_api_key(env_path)
+        if nv_key:
+            return nv_key
+
     if env_path is None:
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         env_path = os.path.join(base_dir, ".env")
@@ -52,7 +56,7 @@ def load_gemini_api_key(env_path=None):
                 if delim in line:
                     k, v = line.split(delim, 1)
                     k = k.strip().lower()
-                    if k in ["gemini_api", "gemini_api_key", "gemini_key", "gemini"]:
+                    if k in ["nv_api", "nv_api_key", "gemini_api", "gemini_api_key", "gemini_key", "gemini"]:
                         v_str = v.strip()
                         # 若值以引號包覆，優先擷取成對引號內的字串 (排除行尾註解如 #...)
                         if v_str.startswith(('"', "'")):
@@ -79,14 +83,25 @@ def call_gemini_for_skill(
     retry_on_busy=True,
 ):
     """
-    通用 Gemini REST API 呼叫器：
-      - 依序嘗試候選模型
-      - 支援內容完整性檢驗 (validate_func)
-      - 支援 503 高負載與 429 速率限制重試
-      - 回傳完整文字報告
+    通用 AI 呼叫器：
+      - 優先自動路由至 NVIDIA NIM / nv_helper (OpenAI 相容 API)
+      - 若無 nv_helper 則退回使用 Gemini REST API
     """
+    if call_nv_for_skill:
+        return call_nv_for_skill(
+            prompt=prompt,
+            api_key=api_key,
+            candidate_models=candidate_models,
+            timeout=timeout,
+            min_chars=min_chars,
+            validate_func=validate_func,
+            max_output_tokens=max_output_tokens if max_output_tokens > 8000 else 262144,
+            temperature=temperature if temperature >= 0.5 else 1.0,
+            retry_on_busy=retry_on_busy,
+        )
+
     if not api_key:
-        raise ValueError("Gemini API Key 未提供！")
+        raise ValueError("AI API Key 未提供！")
 
     models = candidate_models or CANDIDATE_MODELS
 

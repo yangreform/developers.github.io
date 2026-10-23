@@ -138,6 +138,102 @@
       },
       "status": "recommended",
       "notes": "Selected by Skills Pipeline on 2026-10-15 22:33:12"
+    },
+    {
+      "symbol": "CRBG",
+      "recommended_at": "2026-10-16 22:34:56",
+      "company_name": "Corebridge Financial Inc",
+      "insider_net_buy": 25214258.0,
+      "selected_call": {},
+      "status": "no_options_flow",
+      "notes": "Selected by Skills Pipeline on 2026-10-16 22:33:12 (no options flow)"
+    },
+    {
+      "symbol": "PLTR",
+      "recommended_at": "2026-10-16 22:36:09",
+      "company_name": "Corebridge Financial Inc",
+      "insider_net_buy": 25214258.0,
+      "selected_call": {
+        "symbol": "PLTR",
+        "strategy": "Bull Put Spread",
+        "action": "SELL",
+        "exp_date": "20261113",
+        "exp_date_disp": "2026-11-13",
+        "leg1_strike": 170.0,
+        "leg2_strike": 160.0,
+        "net_credit": 1.31,
+        "report_text": "身為華爾街期權量化經理人，我已對您提供的 Barchart 候選清單進行了深度的多因子回測與篩選。\n\n首先，關於您的特別指示：**經掃描全表，本次清單中並未包含內部人推薦標的 CRBG**。因此，我將純粹依據量化模型（安全緩衝、勝率、Theta 衰退期、資本報酬率）在現有清單中為您挑選出數據最完美、性價比最高的唯一最佳組合。\n\n在剔除 DTE 超過 50 天（時間價值衰退過慢）以及跌破機率較高的標的後，**PLTR (Palantir)** 的 29 天期價差組合展現了全場最低的虧損機率與極佳的風險報酬比，是本次收租策略的首選。\n\n以下為嚴格依據您要求格式輸出的評選結果：\n\n#### 📌 【最佳 Bull Put 垂直價差推薦】\n- **推薦標的代號 (Symbol)**: PLTR\n- **標的現價 (Price)**: $200.5\n- **建議策略**: Bull Put Spread (垂直賣權信用價差)\n- **到期日 (Exp Date)**: 2026-11-13\n- **到期天數 (DTE)**: 29 天\n- **賣出下翼 (Short Put Leg 1)**: 履約價 $170.0 @ Bid $3.25\n- **買入保護 (Long Put Leg 2)**: 履約價 $160.0 @ Ask $1.94\n- **淨權利金收入 (Net Credit)**: $1.31 (每口最大獲利)\n- **最大虧損風險 (Max Loss)**: $8.69\n- **損益兩平點與安全空間 (Break-Even Buffer)**: $168.69 (緩衝約 -15.87%)\n- **最大報酬率 (Max Return %)**: 15.07%\n- **跌破虧損機率 (Loss Prob %)**: 16.0%\n- **進場推薦理由與深度量化分析**:\n  1. **安全邊際與下檔支撐評估**：\n     PLTR 現價高達 $200.5，而我們賣出的下翼履約價設定在極深價外的 $170.0。這意味著在短短 29 天內，標的必須經歷超過 -15.87% 的劇烈崩跌才會觸及損益兩平點 ($168.69)。此寬廣的護城河為策略提供了極為堅實的安全緩衝，足以抵禦大盤短期的非理性波動。\n  2. **跌破機率與勝率優勢**：\n     經量化模型計算，此組合的跌破虧損機率 (Loss Prob) 僅為 **16.0%**，是**整份清單中風險最低、勝率最高**的候選者。這代表我們擁有高達 84% 的統計勝率能將權利金全額或部分收進口袋，完全符合華爾街機構對於「高勝率收租」的嚴格標準。\n  3. **權利金收斂與 Theta 衰退性價比**：\n     到期天數 (DTE) 29 天正處於期權時間價值 (Theta) 加速崩塌的「黃金甜蜜期」（14~50天內）。在僅需承擔 $8.69 最大風險的前提下，能收取 $1.31 的淨權利金，創造出 15.07% 的優異資本報酬率 (ROC)。相較於清單中其他 DTE 高達 60 天的 META 組合，PLTR 能在更短的時間內實現資金的高效周轉與獲利收斂，性價比無可挑剔。"
+      },
+      "status": "bull_put_spread",
+      "notes": "Selected by Bull Put Fallback Pipeline on 2026-10-16 22:33:12"
+    },
+    {
+      "symbol": "PEP",
+      "recommended_at": "2026-10-19 22:34:40",
+      "company_name": "Pepsico Inc",
+      "insider_net_buy": 23686389.0,
+      "selected_call": {
+        "symbol": "PEP",
+        "strike": 136.0,
+        "exp_date": "20261120",
+        "ref_price": 1.67,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-10-19 22:33:07"
+    },
+    {
+      "symbol": "APLD",
+      "recommended_at": "2026-10-20 22:36:31",
+      "company_name": "Applied Digital Corp",
+      "insider_net_buy": 6664686.0,
+      "selected_call": {
+        "symbol": "APLD",
+        "strike": 25.0,
+        "exp_date": "20290119",
+        "ref_price": 8.8,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-10-20 22:33:07"
+    },
+    {
+      "symbol": "LLY",
+      "recommended_at": "2026-10-21 22:38:28",
+      "company_name": "Eli Lilly and Company",
+      "insider_net_buy": 43208.0,
+      "selected_call": {
+        "symbol": "LLY",
+        "strike": 1300.0,
+        "exp_date": "20261023",
+        "ref_price": 6.75,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-10-21 22:33:08"
+    },
+    {
+      "symbol": "DX",
+      "recommended_at": "2026-10-22 21:36:08",
+      "company_name": "Dynex Capital",
+      "insider_net_buy": 216870.0,
+      "selected_call": {
+        "symbol": "DX",
+        "strike": 10.0,
+        "exp_date": "20261120",
+        "ref_price": 1.0,
+        "strategy": "Buy Call",
+        "right": "C",
+        "action": "BUY"
+      },
+      "status": "recommended",
+      "notes": "Selected by Skills Pipeline on 2026-10-22 21:33:10"
     }
   ]
 }

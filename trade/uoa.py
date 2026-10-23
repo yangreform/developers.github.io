@@ -20,10 +20,10 @@ Barchart UOA Options Pipeline with Skills Architecture (trade/uoa.py)
         導航至 https://www.barchart.com/stocks/quotes/{symbol}/vertical-spreads/bear-call-spread，
         下載預選標的之官方 Bear Call 垂直價差篩選數據，若查無數據則依風控規則放棄該標的。
         • Target Folder: trade/Barchart/
-  (4) Gemini Helper (trade/skills/gemini_helper.py):
+  (4) NVIDIA Helper (trade/skills/nv_helper.py):
       - 針對每檔預選標的重複執行垂直價差 (Bull Put / Bear Call) 自動化分析流程：
       - 清洗各標的價差數據、過濾已到期合約、按風險緩衝與虧損機率排序
-      - 調用 Gemini AI 深度量化分析，精選各預選標的之最佳垂直價差組合
+      - 調用 NVIDIA DeepSeek AI 深度量化分析，精選各預選標的之最佳垂直價差組合
       - 儲存詳細分析報告並推播至手機 LINE
   (5) Scale In Order Skill (trade/skills/scale_in_order_skill/):
       - 依序為每檔精選標的連線 IBKR 建立 Short Leg 與 Long Leg 之 BAG 組合單
@@ -81,8 +81,8 @@ try:
         ScaleInOrderSkill,
         load_env_settings,
         create_fast_ib_connection,
-        load_gemini_api_key,
-        call_gemini_for_skill,
+        load_nv_api_key,
+        call_nv_for_skill,
     )
 except ImportError:
     from skills.download_skill import (
@@ -102,7 +102,7 @@ except ImportError:
         load_env_settings,
         create_fast_ib_connection,
     )
-    from skills.gemini_helper import load_gemini_api_key, call_gemini_for_skill
+    from skills.nv_helper import load_nv_api_key, call_nv_for_skill
 
 try:
     from notifier import send_push_message
@@ -652,7 +652,7 @@ def run_uoa_pipeline(
         # ======================================================================
         print("\n🎯 【步驟 2】呼叫 UOA Analysis Skill 篩選 0DTE 並精選 4 檔預選標的")
         print("-" * 70)
-        api_key = load_gemini_api_key(ENV_FILE) if load_gemini_api_key else None
+        api_key = load_nv_api_key(ENV_FILE) if load_nv_api_key else None
         uoa_skill = UoaAnalysisSkill(api_key=api_key, env_path=ENV_FILE)
 
         data_str, df_stock_f, df_etf_f = uoa_skill.clean_and_prepare_data(
@@ -834,10 +834,10 @@ def run_uoa_pipeline(
 
             sp_report_text = None
             for attempt in range(1, retries + 1):
-                print(f"[INFO] [SpreadSkill] 正在向 Gemini 請求 {sym} {strat_name} 深度量化分析 (嘗試第 {attempt}/{retries} 次)...")
+                print(f"[INFO] [SpreadSkill] 正在向 NVIDIA DeepSeek 請求 {sym} {strat_name} 深度量化分析 (嘗試第 {attempt}/{retries} 次)...")
                 try:
-                    if call_gemini_for_skill:
-                        res = call_gemini_for_skill(prompt=sp_prompt, api_key=api_key, min_chars=350, max_output_tokens=4096)
+                    if call_nv_for_skill:
+                        res = call_nv_for_skill(prompt=sp_prompt, api_key=api_key, min_chars=350, max_output_tokens=262144)
                         if res and len(res.strip()) > 250:
                             sp_report_text = res
                             print(f"[SUCCESS] [SpreadSkill] ✅ 第 {attempt} 次成功獲得 {sym} {strat_name} 最佳量化評選報告！")

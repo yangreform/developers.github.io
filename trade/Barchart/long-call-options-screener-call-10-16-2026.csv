@@ -1,0 +1,3 @@
+Symbol,Price~,"Exp Date",DTE,Strike,Type,Moneyness,Ask,"%TP Ask","BE (Ask)","%BE (Ask)",Volume,"Open Int","IV Rank",IV,Delta,"Profit Prob"
+MET,101.85,2026-11-20,35,95.00,Call,+6.73%,8.1,1.23%,103.1,1.23%,267,691,42.74%,26.48%,0.815111,46.91%
+"Downloaded from Barchart.com as of 10-16-2026 10:33am CDT"

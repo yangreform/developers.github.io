@@ -82,12 +82,12 @@ except ImportError:
         create_fast_ib_connection = None
 
 try:
-    from trade.skills.gemini_helper import load_gemini_api_key
+    from trade.skills.nv_helper import load_nv_api_key
 except Exception:
     try:
-        from skills.gemini_helper import load_gemini_api_key
+        from skills.nv_helper import load_nv_api_key
     except Exception:
-        load_gemini_api_key = None
+        load_nv_api_key = None
 
 try:
     from notifier import send_push_message
@@ -518,7 +518,7 @@ def run_long_call_pipeline(
         # 3. 步驟 2: Selection Skill 籌碼清洗、雙重防重複過濾與 Gemini AI 量化分析
         print("\n🎯 【步驟 2】呼叫 Selection Skill 進行數據清洗、防重過濾與 AI 選約")
         print("-" * 70)
-        api_key = load_gemini_api_key(ENV_FILE) if load_gemini_api_key else None
+        api_key = load_nv_api_key(ENV_FILE) if load_nv_api_key else None
         selection_skill = LongCallSelectionSkill(api_key=api_key, env_path=ENV_FILE)
 
         selection_result = selection_skill.select_best_contract(

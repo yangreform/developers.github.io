@@ -49,24 +49,32 @@ except ImportError:
     send_push_message = None
 
 try:
-    from trade.skills import UoaAnalysisSkill, call_gemini_for_skill
+    from trade.skills.nv_helper import call_nv_for_skill, load_nv_api_key
+    from trade.skills import UoaAnalysisSkill
+    call_gemini_for_skill = call_nv_for_skill
 except ImportError:
     try:
-        from skills import UoaAnalysisSkill, call_gemini_for_skill
+        from skills.nv_helper import call_nv_for_skill, load_nv_api_key
+        from skills import UoaAnalysisSkill
+        call_gemini_for_skill = call_nv_for_skill
     except ImportError:
+        call_nv_for_skill = None
+        load_nv_api_key = None
         UoaAnalysisSkill = None
         call_gemini_for_skill = None
 
 
-def load_gemini_api_key(env_path=ENV_FILE):
+def load_ai_api_key(env_path=ENV_FILE):
     """
-    Parse Gemini API key from trade/.env supporting:
-      gemini_api:AIzaSy...
-      gemini_api=AIzaSy...
-      GEMINI_API_KEY=AIzaSy...
+    從 trade/.env 讀取 API Key，優先讀取 nv_api (NVIDIA NIM)，其次讀取 gemini_api。
     """
+    if load_nv_api_key:
+        k = load_nv_api_key(env_path)
+        if k:
+            return k
+
     if not os.path.exists(env_path):
-        raise FileNotFoundError(f".env file not found at: {env_path}")
+        return None
 
     with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -78,19 +86,19 @@ def load_gemini_api_key(env_path=ENV_FILE):
                 if delim in line:
                     k, v = line.split(delim, 1)
                     k = k.strip().lower()
-                    if k in ["gemini_api", "gemini_api_key", "gemini_key", "gemini"]:
+                    if k in ["nv_api", "nv_api_key", "gemini_api", "gemini_api_key", "gemini_key", "gemini"]:
                         v_str = v.strip()
-                        # 若值以引號包覆，優先擷取成對引號內的字串 (排除行尾註解如 #...)
                         if v_str.startswith(('"', "'")):
                             q = v_str[0]
                             end_idx = v_str.find(q, 1)
                             if end_idx != -1:
                                 return v_str[1:end_idx].strip()
-                        # 若無引號或引號未閉合，去除行尾 # 註解後清除兩端引號與空白
                         if "#" in v_str:
                             v_str = v_str.split("#", 1)[0].strip()
                         return v_str.strip().strip('"').strip("'")
     return None
+
+load_gemini_api_key = load_ai_api_key
 
 
 def is_valid_csv_file(file_path, min_rows=1):
@@ -503,12 +511,12 @@ def run_analysis(stock_file=None, etf_file=None, bull_put_file=None):
     print(" Barchart 選擇權異動與價差 AI 分析模組啟動")
     print("=" * 60)
 
-    # 1. 讀取 API Key
-    api_key = load_gemini_api_key(ENV_FILE)
+    # 1. 讀取 API Key (優先 nv_api，其次 gemini_api)
+    api_key = load_ai_api_key(ENV_FILE)
     if not api_key:
-        print("[ERROR] 無法在 trade/.env 找到 gemini_api 設定")
+        print("[ERROR] 無法在 trade/.env 找到 nv_api (或 gemini_api) 設定")
         sys.exit(1)
-    print(f"[INFO] 成功自 trade/.env 載入 gemini_api (長度: {len(api_key)})")
+    print(f"[INFO] 成功自 trade/.env 載入 AI API Key (長度: {len(api_key)})")
 
     # 2. 獲取最新 CSV 檔案
     if not stock_file:

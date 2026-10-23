@@ -74,8 +74,8 @@ try:
         PROFILE_DIR,
         create_fast_ib_connection,
         load_env_settings,
-        call_gemini_for_skill,
-        load_gemini_api_key,
+        call_nv_for_skill,
+        load_nv_api_key,
         SelectionMemory,
         InsiderSelectionSkill,
         OptionsFlowSkill,
@@ -94,7 +94,7 @@ except ImportError:
             PROFILE_DIR,
         )
         from skills.ibkr_skill import create_fast_ib_connection, load_env_settings
-        from skills.gemini_helper import call_gemini_for_skill, load_gemini_api_key
+        from skills.nv_helper import call_nv_for_skill, load_nv_api_key
         from skills.memory_skill import SelectionMemory
         from skills.insider_skill import InsiderSelectionSkill
         from skills.flow_skill import OptionsFlowSkill
@@ -103,8 +103,8 @@ except ImportError:
         print(f"[WARN] 無法自 skills 載入下載或下單輔助模組: {e}")
         init_driver = None
         create_fast_ib_connection = None
-        call_gemini_for_skill = None
-        load_gemini_api_key = None
+        call_nv_for_skill = None
+        load_nv_api_key = None
         SelectionMemory = None
         InsiderSelectionSkill = None
         OptionsFlowSkill = None
@@ -921,7 +921,7 @@ def run_insider_pipeline(
         # 3. 步驟 2: Selection Skill 內部人籌碼分析與 AI 選股
         print("\n🎯 【步驟 2】呼叫 Selection Skill 進行數據清洗、防重過濾與 AI 選股")
         print("-" * 70)
-        api_key = load_gemini_api_key(ENV_FILE) if load_gemini_api_key else None
+        api_key = load_nv_api_key(ENV_FILE) if load_nv_api_key else None
         selection_skill = InsiderSelectionSkill(api_key=api_key, env_path=ENV_FILE)
 
         if not selected_symbol:
@@ -1123,10 +1123,10 @@ def run_insider_pipeline(
 
             bp_report_text = None
             for attempt in range(1, retries + 1):
-                print(f"[INFO] [BullPutSkill] 正在向 Gemini 請求 Bull Put 深度量化分析 (嘗試第 {attempt}/{retries} 次)...")
+                print(f"[INFO] [BullPutSkill] 正在向 NVIDIA DeepSeek 請求 Bull Put 深度量化分析 (嘗試第 {attempt}/{retries} 次)...")
                 try:
-                    if call_gemini_for_skill:
-                        res = call_gemini_for_skill(prompt=bp_prompt, api_key=api_key, min_chars=500, max_output_tokens=80096)
+                    if call_nv_for_skill:
+                        res = call_nv_for_skill(prompt=bp_prompt, api_key=api_key, min_chars=500, max_output_tokens=262144)
                         if res and len(res.strip()) > 300:
                             bp_report_text = res
                             print(f"[SUCCESS] [BullPutSkill] ✅ 第 {attempt} 次成功獲得 Bull Put 最佳量化評選報告！")

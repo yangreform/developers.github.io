@@ -98,6 +98,78 @@
       },
       "status": "recommended",
       "notes": "Selected by Long Call Pipeline on 2026-10-15 23:33:11"
+    },
+    {
+      "symbol": "MET",
+      "recommended_at": "2026-10-16 23:34:09",
+      "company_name": "",
+      "insider_net_buy": 0.0,
+      "selected_call": {
+        "symbol": "MET",
+        "strike": 95.0,
+        "exp_date": "20261120",
+        "exp_date_disp": "2026-11-20",
+        "ref_price": 8.1,
+        "ask": 8.1,
+        "delta": 0.815,
+        "dte": 35,
+        "underlying_price": 101.85,
+        "volume": 267,
+        "open_int": 691,
+        "right": "C",
+        "action": "BUY",
+        "strategy": "Long Call"
+      },
+      "status": "recommended",
+      "notes": "Selected by Long Call Pipeline on 2026-10-16 23:33:08"
+    },
+    {
+      "symbol": "AAPL",
+      "recommended_at": "2026-10-19 23:35:14",
+      "company_name": "",
+      "insider_net_buy": 0.0,
+      "selected_call": {
+        "symbol": "AAPL",
+        "strike": 320.0,
+        "exp_date": "20261120",
+        "exp_date_disp": "2026-11-20",
+        "ref_price": 28.3,
+        "ask": 28.3,
+        "delta": 0.81,
+        "dte": 32,
+        "underlying_price": 345.12,
+        "volume": 200,
+        "open_int": 6902,
+        "right": "C",
+        "action": "BUY",
+        "strategy": "Long Call"
+      },
+      "status": "recommended",
+      "notes": "Selected by Long Call Pipeline on 2026-10-19 23:33:06"
+    },
+    {
+      "symbol": "PAA",
+      "recommended_at": "2026-10-20 23:38:40",
+      "company_name": "",
+      "insider_net_buy": 0.0,
+      "selected_call": {
+        "symbol": "PAA",
+        "strike": 24.0,
+        "exp_date": "20261120",
+        "exp_date_disp": "2026-11-20",
+        "ref_price": 1.5,
+        "ask": 1.5,
+        "delta": 0.852139,
+        "dte": 31,
+        "underlying_price": 25.29,
+        "volume": 100,
+        "open_int": 10394,
+        "right": "C",
+        "action": "BUY",
+        "strategy": "Long Call"
+      },
+      "status": "recommended",
+      "notes": "Selected by Long Call Pipeline on 2026-10-20 23:33:08"
     }
   ]
 }

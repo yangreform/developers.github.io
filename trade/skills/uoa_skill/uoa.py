@@ -45,11 +45,17 @@ os.makedirs(OLD_DIR, exist_ok=True)
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
 try:
-    from trade.skills.gemini_helper import call_gemini_for_skill, load_gemini_api_key
+    from trade.skills.nv_helper import call_nv_for_skill, load_nv_api_key
+    call_gemini_for_skill = call_nv_for_skill
+    load_gemini_api_key = load_nv_api_key
 except ImportError:
     try:
-        from skills.gemini_helper import call_gemini_for_skill, load_gemini_api_key
+        from skills.nv_helper import call_nv_for_skill, load_nv_api_key
+        call_gemini_for_skill = call_nv_for_skill
+        load_gemini_api_key = load_nv_api_key
     except ImportError:
+        call_nv_for_skill = None
+        load_nv_api_key = None
         call_gemini_for_skill = None
         load_gemini_api_key = None
 
@@ -94,7 +100,14 @@ class UoaAnalysisSkill:
 
     def __init__(self, api_key=None, env_path=None):
         self.env_path = env_path or os.path.join(BASE_DIR, ".env")
-        self.api_key = api_key or (load_gemini_api_key(self.env_path) if load_gemini_api_key else None)
+        if api_key:
+            self.api_key = api_key
+        elif load_nv_api_key:
+            self.api_key = load_nv_api_key(self.env_path)
+        elif load_gemini_api_key:
+            self.api_key = load_gemini_api_key(self.env_path)
+        else:
+            self.api_key = None
         self.barchart_dir = BARCHART_DIR
         self.old_dir = OLD_DIR
         self.reports_dir = REPORTS_DIR
@@ -269,32 +282,33 @@ class UoaAnalysisSkill:
         return has_s1 and has_s2 and has_s3 and has_s4
 
     def generate_analysis_report(self, data_str, max_retries=3):
-        """調用共享之 Gemini Helper 生成量化深度報告"""
+        """調用共享之 NV Helper (NVIDIA DeepSeek Flash) 生成量化深度報告"""
         if not self.api_key:
-            raise ValueError("[UoaSkill] Gemini API Key 未配置，請檢查 trade/.env")
+            raise ValueError("[UoaSkill] AI API Key (nv_api) 未配置，請檢查 trade/.env")
 
         prompt = self.build_analysis_prompt(data_str)
         analysis_text = None
         last_error = None
+        ai_caller = call_nv_for_skill or call_gemini_for_skill
 
         for attempt in range(1, max_retries + 1):
-            print(f"\n[INFO] [UoaSkill] 正在向 Gemini 請求 UOA 深度量化分析報告 (嘗試第 {attempt}/{max_retries} 次)...")
+            print(f"\n[INFO] [UoaSkill] 正在向 NVIDIA AI 請求 UOA 深度量化分析報告 (嘗試第 {attempt}/{max_retries} 次)...")
             try:
-                res = call_gemini_for_skill(
+                res = ai_caller(
                     prompt=prompt,
                     api_key=self.api_key,
-                    timeout=50,
+                    timeout=60,
                     min_chars=800,
                     validate_func=self.is_report_complete,
-                    max_output_tokens=80096,
-                    temperature=0.3,
-                )
+                    max_output_tokens=262144,
+                    temperature=1.0,
+                ) if ai_caller else None
                 if res and self.is_report_complete(res):
                     analysis_text = res
-                    print(f"[SUCCESS] [UoaSkill] ✅ 成功取得 Gemini 4 檔預選量化分析報告 (第 {attempt} 次嘗試成功，長度: {len(analysis_text)} 字)！")
+                    print(f"[SUCCESS] [UoaSkill] ✅ 成功取得 NVIDIA AI 4 檔預選量化分析報告 (第 {attempt} 次嘗試成功，長度: {len(analysis_text)} 字)！")
                     break
                 else:
-                    raise ValueError("Gemini 回傳內容長度不足或未包含完整的 4 檔預選建議")
+                    raise ValueError("AI 回傳內容長度不足或未包含完整的 4 檔預選建議")
             except Exception as e:
                 last_error = e
                 print(f"[WARN] [UoaSkill] ⚠️ 第 {attempt}/{max_retries} 次取得報告失敗: {e}")

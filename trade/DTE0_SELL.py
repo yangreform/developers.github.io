@@ -1069,16 +1069,6 @@ def send_symbol_dte0_summary(symbol, legs_sets, results):
             spx_info = dte0_cfg.get(symbol, {}) or dte0_cfg.get("SPX", {})
             h_step = float(spx_info.get('hedge_step', 5.0))
             h_buf = float(spx_info.get('buffer', 2.0))
-            lines.extend([
-                "",
-                "🛡️ 0DTE MES 對沖防線點位 (DTE0_CONFIG_JSON)：",
-                f"  • 上翼 (Call 側)：{c_w:.2f}",
-                f"    - 1階 (+1口)：{c_w - h_step:.2f} | 1階遲滯(清零)：{c_w - h_step - h_buf:.2f}",
-                f"    - 2階 (+2口)：{c_w + h_step:.2f} | 2階遲滯(降回1口)：{c_w + h_step - h_buf:.2f}",
-                f"  • 下翼 (Put 側)：{p_w:.2f}",
-                f"    - 1階 (-1口)：{p_w + h_step:.2f} | 1階遲滯(清零)：{p_w + h_step + h_buf:.2f}",
-                f"    - 2階 (-2口)：{p_w - h_step:.2f} | 2階遲滯(升回-1口)：{p_w - h_step + h_buf:.2f}"
-            ])
         except Exception:
             pass
 
@@ -1145,10 +1135,12 @@ def run_dte0_cycle():
 
     if not target_groups:
         print("[資訊] DTE0_CONFIG_JSON (與 OP_HEDGE_CONFIG_JSON) 中未找到 SPX, NDX, RUT 或 DJX 指數群組。")
-        return
+        return False
 
     market_date = get_market_today()
     print(f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動 0DTE 指數期權賣方策略掃描 (含括號停利單 TP，基準日: {market_date}，共 {len(target_groups)} 個指數群組)...")
+
+    any_filled = False
 
     for g_name, g_info in target_groups.items():
         print(f"\n================ 開始處理指數群組: {g_name} ================")
@@ -1212,10 +1204,20 @@ def run_dte0_cycle():
 
                 # 每個 symbol 統一傳一次手機 LINE 彙總
                 send_symbol_dte0_summary(underlying.symbol, sets, results)
+
+                if is_dry_run:
+                    print(f"-> 💡 [模擬模式] 執行完畢，視同完成。")
+                    any_filled = True
+                elif any(r.get('status') == 'Filled' for r in results):
+                    any_filled = True
+                    print(f"-> 🎉 偵測到 {underlying.symbol} 0DTE 組合已有委託成功成交 (Filled)！")
             else:
                 print(f"-> ⚠️ 未能成功建構 {underlying.symbol} 0DTE 組合。")
         else:
             print(f"-> {underlying.symbol} 已有指數期權部位 ({len(current_pos)} 筆)，跳過重複建倉。")
+            any_filled = True
+
+    return any_filled
 
 
 if __name__ == '__main__':
@@ -1232,7 +1234,32 @@ if __name__ == '__main__':
 
     try:
         connect_ib()
-        run_dte0_cycle()
+        for i in range(11):
+            print(f"\n" + "=" * 70)
+            print(f"🚀 [0DTE 執行循環] 第 {i}/10 次 (共最多 11 次) - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print("=" * 70)
+
+            is_filled = run_dte0_cycle()
+            if is_filled:
+                print(f"\n🎉 [成交確認] 0DTE 已成交（或已持有部位），結束嘗試迴圈 (break)！")
+                break
+
+            if i < 10:
+                print(f"\n⏳ 0DTE 委託未成交，等待 5 分鐘 (300 秒) 後進行下一次嘗試 (第 {i+1}/10 次)...")
+                try:
+                    for _ in range(60 * 5):
+                        if ib.isConnected():
+                            ib.sleep(1)
+                        else:
+                            time.sleep(1)
+                except KeyboardInterrupt:
+                    print("\n[使用者中斷] 停止等待。")
+                    break
+            else:
+                print(f"\n⚠️ 已完成 10 次重試 (共 11 次嘗試)，0DTE 仍未成交，結束執行。")
+
+    except KeyboardInterrupt:
+        print("\n[使用者中斷] 程式已手動終止。")
     except Exception as e:
         print(f"\n[錯誤] 執行異常: {e}")
     finally:
@@ -1244,7 +1271,7 @@ if __name__ == '__main__':
 
     if not args.dry_run and sys.stdin and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
         try:
-    	    time.sleep(60 * 60 * 20)
+            time.sleep(60 * 60 * 20)
         except KeyboardInterrupt:
             pass
 

@@ -48,7 +48,7 @@ if "%MM%"=="33" (
         set "last_trigger_32_hour=%HH%"
         set "MATCH=0"
         if "%HH%"=="11" set "MATCH=1"
-        if "%HH%"=="23" set "MATCH=1"
+        if "%HH%"=="01" set "MATCH=1"
         if "!MATCH!"=="1" (
             wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "opinion.py" >nul
             if not errorlevel 1 (
@@ -58,7 +58,7 @@ if "%MM%"=="33" (
             )
         )
 
-        if "%HH%"=="21" (
+        if "%HH%"=="22" (
             wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "DTE0_SELL.py" >nul
             if not errorlevel 1 (
                 echo [OK] DTE0_SELL.py is running.
@@ -67,7 +67,7 @@ if "%MM%"=="33" (
             )
         )
 
-	if "%HH%"=="22" (
+        if "%HH%"=="23" (
 	    wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "insider.py" >nul
 	    if !errorlevel! equ 0 (
 	        echo [OK] insider.py is running.
@@ -76,8 +76,7 @@ if "%MM%"=="33" (
 	    )
 	)
 
-
-        if "%HH%"=="23" (
+	if "%HH%"=="00" (
             wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "long-call-options-screener.py" >nul
             if not errorlevel 1 (
                 echo [OK] long-call-options-screener.py is running.
@@ -85,6 +84,15 @@ if "%MM%"=="33" (
                 start "long-call-options-screener" /max py .\long-call-options-screener.py
             )
         )
+
+	if "%HH%"=="01" (
+		wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "bull-put.py" >nul
+		if !errorlevel! equ 0 (
+		    echo [OK] bull-put.py is running.
+		) else (
+		    start "bull-put.py" /max py .\bull-put.py
+		)
+	)
 
         echo =======================================================
         :: 清除變數以免影響其他天
@@ -109,18 +117,6 @@ if "%MM%"=="33" (
     )
 )
 
-:: [改用具體時間取代 timeout 600，避免腳本死鎖卡住]
-:: 01:24 執行完 long-call 後，10 分鐘後即 01:34 執行 bull-put.py
-if "%MM%"=="58" (
-    if "%HH%"=="21" (
-    	wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "bull-put.py" >nul
-    	if !errorlevel! equ 0 (
-    	    echo [OK] bull-put.py is running.
-    	) else (
-    	    start "bull-put.py" /max py .\bull-put.py
-    	)
-    )
-)
 
 :: ---------------------------------------------------------
 :: 2. 常駐進程守門員區塊 (Process Watchdog & Auto-Restart)
