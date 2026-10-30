@@ -41,6 +41,9 @@ from ib_insync import (
     Option,
     Contract,
     ComboLeg,
+    Order,
+    OrderComboLeg,
+    TagValue,
     LimitOrder,
 )
 
@@ -442,7 +445,7 @@ def resolve_index_symbols(group_name, symbols):
 # ==============================================================================
 # 4. 獲取 0DTE 組合合約 (SPX - 4 腿鐵蝶式 Iron Butterfly 或 2 腿 Straddle)
 # ==============================================================================
-def get_dte0_butterfly_sets(underlying, opt_class, chains, wing_width=None, wing_width_call=None, wing_width_put=None, bid_up=None, tp=None, iron='short', price_jump=20.0):
+def get_dte0_butterfly_sets(underlying, opt_class, chains, wing_width=None, wing_width_call=None, wing_width_put=None, bid_up=None, tp=None, iron='short', price_jump=20.0, max_center_bid_diff=None):
     iron = str(iron).strip().lower() if iron else 'short'
     is_long = (iron != 'short')
 
@@ -652,7 +655,7 @@ def get_dte0_butterfly_sets(underlying, opt_class, chains, wing_width=None, wing
 
         def fmt_q(t, label_text, strike, right, action_text):
             if not t:
-                return f"    • {label_text} {strike}{right} [{action_text}]: 無即時報價"
+                return f"    • {label_text} {strike:g}{right} [{action_text}]: 無即時報價"
             bid = f"{t.bid:.2f}" if is_valid_price(t.bid) else "-"
             ask = f"{t.ask:.2f}" if is_valid_price(t.ask) else "-"
             last = f"{t.last:.2f}" if is_valid_price(t.last) else "-"
@@ -660,19 +663,19 @@ def get_dte0_butterfly_sets(underlying, opt_class, chains, wing_width=None, wing
             d = f"{mg.delta:+.3f}" if (mg and mg.delta is not None) else "-"
             th = f"{mg.theta:.2f}" if (mg and mg.theta is not None) else "-"
             iv = f"{mg.impliedVol*100:.1f}%" if (mg and mg.impliedVol is not None) else "-"
-            return f"    • {label_text} {strike}{right} [{action_text}]: Bid={bid} | Ask={ask} | Last={last} | Delta={d} | Theta={th} | IV={iv}"
+            return f"    • {label_text} {strike:g}{right} [{action_text}]: Bid={bid} | Ask={ask} | Last={last} | Delta={d} | Theta={th} | IV={iv}"
 
         if is_atm_only:
             legs_quote_str = "\n".join([
-                fmt_q(tc_center, f"Call ({center_action_desc})", center_strike, "C", center_action_desc),
-                fmt_q(tp_center, f"Put  ({center_action_desc})", center_strike, "P", center_action_desc),
+                fmt_q(tc_center, "Call", center_strike, "C", center_action_desc),
+                fmt_q(tp_center, "Put", center_strike, "P", center_action_desc),
             ])
         else:
             legs_quote_str = "\n".join([
-                fmt_q(tc_center, f"中心 Call ({center_action_desc})", center_strike, "C", center_action_desc),
-                fmt_q(tp_center, f"中心 Put  ({center_action_desc})", center_strike, "P", center_action_desc),
-                fmt_q(tc_wing, f"上翼 Call ({wing_action_desc})", call_wing_strike, "C", wing_action_desc),
-                fmt_q(tp_wing, f"下翼 Put  ({wing_action_desc})", put_wing_strike, "P", wing_action_desc),
+                fmt_q(tc_center, "中心 Call", center_strike, "C", center_action_desc),
+                fmt_q(tp_center, "中心 Put", center_strike, "P", center_action_desc),
+                fmt_q(tc_wing, "上翼 Call", call_wing_strike, "C", wing_action_desc),
+                fmt_q(tp_wing, "下翼 Put", put_wing_strike, "P", wing_action_desc),
             ])
 
         butterfly_sets.append({
@@ -695,6 +698,7 @@ def get_dte0_butterfly_sets(underlying, opt_class, chains, wing_width=None, wing
             'bid_up': bid_up,
             'tp': tp,
             'iron': iron,
+            'max_center_bid_diff': max_center_bid_diff,
             'is_long': is_long,
             'strategy_name': strategy_name,
             'center_action_desc': center_action_desc,
@@ -753,8 +757,59 @@ def execute_dte0_butterfly_with_tp(legs):
 
     combo_bid = ticker.bid if (ticker and ticker.bid is not None and ticker.bid > 0) else 0.0
 
-    c_center_bid = (legs['tc_center'].bid or 0.0) if legs.get('tc_center') else 0.0
-    p_center_bid = (legs['tp_center'].bid or 0.0) if legs.get('tp_center') else 0.0
+    tc_c = legs.get('tc_center')
+    tp_c = legs.get('tp_center')
+    # 若即時 Bid 尚未齊備，嘗試更新一次 Ticker
+    if not (tc_c and is_valid_price(tc_c.bid) and tp_c and is_valid_price(tp_c.bid)):
+        try:
+            refresh_tickers = ib.reqTickers(legs['c_center'], legs['p_center'])
+            ib.sleep(1.0)
+            for t in refresh_tickers:
+                if t.contract.conId == legs['c_center'].conId:
+                    tc_c = t
+                    legs['tc_center'] = t
+                elif t.contract.conId == legs['p_center'].conId:
+                    tp_c = t
+                    legs['tp_center'] = t
+        except Exception:
+            pass
+
+    c_center_bid = float(tc_c.bid) if (tc_c and is_valid_price(tc_c.bid)) else 0.0
+    p_center_bid = float(tp_c.bid) if (tp_c and is_valid_price(tp_c.bid)) else 0.0
+
+    env_cfg = load_env_config()
+    dte0_cfg = load_dte0_config() if load_dte0_config else {}
+    sym_cfg = dte0_cfg.get(symbol, {}) or dte0_cfg.get("SPX", {})
+    raw_max_diff = (
+        legs.get('max_center_bid_diff')
+        or sym_cfg.get('max_center_bid_diff')
+        or env_cfg.get('DTE0_CENTER_BID_DIFF_MAX')
+        or env_cfg.get('max_center_bid_diff')
+        or 0.20
+    )
+    try:
+        max_center_bid_diff = float(raw_max_diff)
+    except (ValueError, TypeError):
+        max_center_bid_diff = 0.20
+
+    has_valid_center_bids = (c_center_bid > 0 and p_center_bid > 0)
+    if has_valid_center_bids:
+        center_bid_diff = round(abs(c_center_bid - p_center_bid), 4)
+        center_bid_condition_met = (center_bid_diff <= max_center_bid_diff + 1e-6)
+    else:
+        center_bid_diff = None
+        center_bid_condition_met = False
+
+    if center_bid_condition_met:
+        cond_check_str = f"✅ 符合 (差距 ${center_bid_diff:.2f} <= ${max_center_bid_diff:.2f})"
+        print(f"-> ⚖️ [中心腿價差檢核] 中心 Call Bid: ${c_center_bid:.2f} | 中心 Put Bid: ${p_center_bid:.2f} | 差距: ${center_bid_diff:.2f} (門檻 <= ${max_center_bid_diff:.2f}) -> ✅ 符合下單條件！")
+    else:
+        if center_bid_diff is not None:
+            cond_check_str = f"⏸️ 不符 (差距 ${center_bid_diff:.2f} > ${max_center_bid_diff:.2f})"
+            print(f"-> ⏸️ [中心腿價差檢核] 中心 Call Bid: ${c_center_bid:.2f} | 中心 Put Bid: ${p_center_bid:.2f} | 差距: ${center_bid_diff:.2f} > 門檻 ${max_center_bid_diff:.2f} -> ⏸️ 差距過大，暫緩下單。")
+        else:
+            cond_check_str = f"⚠️ 不符 (中心 Call/Put 報價無效或未取得)"
+            print(f"-> ⏸️ [中心腿價差檢核] 中心 Call Bid: ${c_center_bid:.2f} | 中心 Put Bid: ${p_center_bid:.2f} -> ⚠️ 報價無效或未取得，暫緩下單。")
 
     synthetic_bid = 0.0
     if is_atm_only:
@@ -798,12 +853,24 @@ def execute_dte0_butterfly_with_tp(legs):
     print(f"-> 🎯 [{set_label}] 母單委託限價: ${limit_price} (bid_up: ${bid_up_val:.2f}) | 括號停利限價: ${tp_limit_price} (TP: ${tp_val:.2f}) | 即時市場買盤參考: ${raw_bid:.2f}")
 
     # 建立母單 (Parent Limit Order)
-    parent_order = LimitOrder(order_action, TRADE_QTY, limit_price)
-    parent_order.tif = 'DAY'
+    parent_order = Order(
+        action=order_action,
+        totalQuantity=TRADE_QTY,
+        orderType='LMT',
+        lmtPrice=limit_price,
+        tif='DAY',
+        smartComboRoutingParams=[TagValue('NonGuaranteed', '1')]  # 關鍵：允許跨交易所撮合
+    )
 
     # 建立括號停利子單 (Child Limit Order)
-    tp_order = LimitOrder(tp_action, TRADE_QTY, tp_limit_price)
-    tp_order.tif = 'DAY'
+    tp_order = Order(
+        action=tp_action,
+        totalQuantity=TRADE_QTY,
+        orderType='LMT',
+        lmtPrice=tp_limit_price,
+        tif='DAY',
+        smartComboRoutingParams=[TagValue('NonGuaranteed', '1')]  # 關鍵：允許跨交易所撮合
+    )
 
     # 綁定 Parent-Child 關聯 (Bracket 結構)
     try:
@@ -839,6 +906,7 @@ def execute_dte0_butterfly_with_tp(legs):
         f"  策略方向 (iron): {iron.upper()} (中心: {center_desc}" + (f" / 外翼: {wing_desc})" if not is_atm_only else ")") + "\n"
         f"  {structure_desc}\n"
         f"  到期日: {legs['expiry']} (DTE: {legs['dte']} 天)\n"
+        f"  中心 Call/Put 即時 Bid 檢核: Call Bid=${c_center_bid:.2f} | Put Bid=${p_center_bid:.2f} -> {cond_check_str}\n"
         f"  組合即時報價與 Greeks:\n"
         f"{legs_quote_str}\n"
         f"  下單方式: BID_UP LIMIT + 括號停利單 (Bracket Take-Profit)\n"
@@ -866,8 +934,16 @@ def execute_dte0_butterfly_with_tp(legs):
         'tp_limit_price': tp_limit_price,
         'tp_val': tp_val,
         'raw_bid': raw_bid,
+        'synthetic_bid': synthetic_bid,
+        'combo_bid': combo_bid,
+        'legs_quote_str': legs_quote_str,
         'total_delta': legs['total_delta'],
         'total_theta': legs['total_theta'],
+        'c_center_bid': c_center_bid,
+        'p_center_bid': p_center_bid,
+        'center_bid_diff': center_bid_diff,
+        'max_center_bid_diff': max_center_bid_diff,
+        'center_bid_condition_met': center_bid_condition_met,
         'status': 'DryRun',
         'tp_status': 'DryRun',
         'order_id': None,
@@ -879,6 +955,14 @@ def execute_dte0_butterfly_with_tp(legs):
     }
 
     if send_live:
+        if not center_bid_condition_met:
+            diff_text = f"${center_bid_diff:.2f}" if center_bid_diff is not None else "無效/未取得"
+            print(f"⏸️ [未達下單條件 - 暫緩送單] {symbol} 0DTE [{set_label}]: 中心 Call/Put 即時 Bid 價差 ({diff_text}) 未符合門檻 (<= ${max_center_bid_diff:.2f})，取消本次下單。")
+            res['status'] = 'ConditionNotMet'
+            res['error_msg'] = f"中心 Call/Put Bid 價差 ({diff_text}) 未達門檻 (<= ${max_center_bid_diff:.2f})"
+            ib.sleep(1.5)
+            return res
+
         RECENT_IB_ERRORS.clear()
         parent_trade = ib.placeOrder(combo_contract, parent_order)
         # 確保 tp_order 之 parentId 確實對齊母單
@@ -980,7 +1064,12 @@ def execute_dte0_butterfly_with_tp(legs):
         else:
             res['status'] = parent_trade.orderStatus.status
     else:
-        print(f"=== [測試模式 - 僅列印不送單] (OP_SEND_WEBHOOK=false 或 --dry-run) ===\n{summary_str}")
+        if not center_bid_condition_met:
+            res['status'] = 'DryRun-ConditionNotMet'
+            diff_text = f"${center_bid_diff:.2f}" if center_bid_diff is not None else "無效/未取得"
+            print(f"=== [測試模式 - 價差條件不符] (中心 Call/Put Bid 差距 {diff_text} 未符合 <= ${max_center_bid_diff:.2f}，實盤將暫緩下單) ===\n{summary_str}")
+        else:
+            print(f"=== [測試模式 - 僅列印不送單] (OP_SEND_WEBHOOK=false 或 --dry-run) ===\n{summary_str}")
 
     ib.sleep(1.5)
     return res
@@ -1021,12 +1110,7 @@ def send_symbol_dte0_summary(symbol, legs_sets, results):
     leg_count = 2 if is_atm_all else 4
 
     lines = [
-        f"🎯【0DTE 指數組合建倉總結 (含括號停利) - {symbol}】",
-        f"🕒 時間：{now_str}",
-        f"⚙️ 模式：{mode_text}",
-        f"📈 現價：{underlying_price:.2f} | 到期：{expiry} (DTE: {dte}天)",
-        f"🧭 策略：{strategy_name} ({center_action_desc})",
-        f"📋 五組部位委託明細 (母單限價 / 括號停利 TP)：",
+        f"📈 現價：{underlying_price:.2f}",
     ]
 
     for idx, r in enumerate(results, 1):
@@ -1037,7 +1121,9 @@ def send_symbol_dte0_summary(symbol, legs_sets, results):
             'Filled': f"已成交 (${r.get('avg_fill_price', 0):.2f})",
             'Rejected': f"❌ 拒絕 (Err {r.get('error_code')})",
             'Cancelled': '已取消',
-            'DryRun': '模擬 (Dry-Run)'
+            'DryRun': '模擬 (Dry-Run)',
+            'DryRun-ConditionNotMet': '⏸️ 模擬-未達標 (價差>0.2)',
+            'ConditionNotMet': '⏸️ 未達標未下單 (價差>0.2)',
         }
         status_desc = status_map.get(status, status)
         if r.get('is_atm_only'):
@@ -1051,6 +1137,34 @@ def send_symbol_dte0_summary(symbol, legs_sets, results):
             f"(Δ:{r.get('total_delta', 0):+.3f}, θ:{r.get('total_theta', 0):.2f})"
         )
 
+        # 四支腳即時查價 (準備下單時取得之最新行情與 Greeks)
+        legs_info = legs_sets[idx - 1] if (legs_sets and idx - 1 < len(legs_sets)) else {}
+        l_quote = r.get('legs_quote_str') or legs_info.get('legs_quote_str', '')
+        if l_quote:
+            '''
+            lines.append("     🔍 四支腳即時查價：")
+            for ql in l_quote.strip().split('\n'):
+                ql_clean = ql.strip()
+                if ql_clean:
+                    lines.append(f"     {ql_clean}")
+            '''
+            raw_bid = r.get('raw_bid') or 0.0
+            if raw_bid > 0:
+                lines.append(f"\n • 組合買盤參考(Bid): ${raw_bid:.2f}")
+
+        # 中心 Call/Put 即時 Bid 價差條件檢核明細
+        c_bid = r.get('c_center_bid', 0.0)
+        p_bid = r.get('p_center_bid', 0.0)
+        diff = r.get('center_bid_diff')
+        max_diff = r.get('max_center_bid_diff', 0.20)
+        cond_met = r.get('center_bid_condition_met', False)
+        if diff is not None and c_bid > 0 and p_bid > 0:
+            chk_icon = "✅ 符合" if cond_met else "⏸️ 未達標"
+            lines.append(f"     • ⚖️ 中心 Call/Put Bid: ${c_bid:.2f} vs ${p_bid:.2f} (價差: ${diff:.2f} <= ${max_diff:.2f} -> {chk_icon})")
+        else:
+            lines.append(f"     • ⚖️ 中心 Call/Put Bid: 無有效報價 (Call: ${c_bid:.2f}, Put: ${p_bid:.2f} -> ⏸️ 未達標)")
+
+    '''
     lines.extend([
         f"",
         f"📊 投組 Greeks 彙總：",
@@ -1072,7 +1186,7 @@ def send_symbol_dte0_summary(symbol, legs_sets, results):
         except Exception:
             pass
 
-    error_items = [r for r in results if r.get('error_msg')]
+    error_items = [r for r in results if r.get('error_msg') and r.get('status') not in ('ConditionNotMet', 'DryRun-ConditionNotMet')]
     if error_items:
         lines.append("\n⚠️ 委託異常警示：")
         for err_r in error_items:
@@ -1095,14 +1209,16 @@ def send_symbol_dte0_summary(symbol, legs_sets, results):
                 "limit_price": r.get('limit_price'),
                 "tp_price": r.get('tp_limit_price'),
                 "order_id": r.get('order_id'),
-                "tp_order_id": r.get('tp_order_id')
+                "tp_order_id": r.get('tp_order_id'),
+                "legs_quote": r.get('legs_quote_str', '')
             }
             for r in results
         ]
     }
+    '''
 
     try:
-        ok = send_trade_notification(symbol, message_text, payload)
+        ok = send_trade_notification(symbol, lines, "payload")
         if ok:
             print(f"-> 📲 [LINE 推播成功] 已發送 {symbol} 0DTE 五組統一彙總通知至手機！")
         else:
@@ -1151,6 +1267,7 @@ def run_dte0_cycle():
         bid_up = g_info.get('bid_up')
         tp = g_info.get('TP') or g_info.get('tp')
         iron = str(g_info.get('iron', 'short')).strip().lower()
+        max_center_bid_diff = g_info.get('max_center_bid_diff')
 
         # 讀取 price_jump
         raw_jump = g_info.get('price_jump') or env_config.get('PRICE_JUMP') or env_config.get('price_jump')
@@ -1176,7 +1293,8 @@ def run_dte0_cycle():
             
             wing_desc = f"wings: +{wing_width_call}/-{wing_width_put}" if (wing_width_call or wing_width_put) else "ATM 雙腿"
             tp_desc = f"TP: ${float(tp):.2f}" if tp else "TP: 預設"
-            print(f"-> 準備為 {underlying.symbol} 建立 5 組 0DTE 賣方組合部位 (方向: {iron.upper()}, {wing_desc}, bid_up: ${bid_up or '預設'}, {tp_desc}, price_jump: {price_jump})...")
+            diff_desc = f"max_center_bid_diff: {max_center_bid_diff}" if max_center_bid_diff is not None else "max_center_bid_diff: 0.20"
+            print(f"-> 準備為 {underlying.symbol} 建立 5 組 0DTE 賣方組合部位 (方向: {iron.upper()}, {wing_desc}, bid_up: ${bid_up or '預設'}, {tp_desc}, price_jump: {price_jump}, {diff_desc})...")
             sets = get_dte0_butterfly_sets(
                 underlying=underlying,
                 opt_class=opt_class,
@@ -1187,7 +1305,8 @@ def run_dte0_cycle():
                 bid_up=bid_up,
                 tp=tp,
                 iron=iron,
-                price_jump=price_jump
+                price_jump=price_jump,
+                max_center_bid_diff=max_center_bid_diff
             )
             if sets:
                 # 若為正式送單模式，先主動清理舊有反向掛單，避免 Error 201 衝突
@@ -1211,6 +1330,8 @@ def run_dte0_cycle():
                 elif any(r.get('status') == 'Filled' for r in results):
                     any_filled = True
                     print(f"-> 🎉 偵測到 {underlying.symbol} 0DTE 組合已有委託成功成交 (Filled)！")
+                elif any(r.get('status') == 'ConditionNotMet' for r in results):
+                    print(f"-> ⏸️ {underlying.symbol} 0DTE 組合因中心 Call/Put 即時 Bid 價差未滿足門檻 (<= 0.20)，本次循環未送單。")
             else:
                 print(f"-> ⚠️ 未能成功建構 {underlying.symbol} 0DTE 組合。")
         else:
@@ -1234,9 +1355,9 @@ if __name__ == '__main__':
 
     try:
         connect_ib()
-        for i in range(11):
+        for i in range(21):
             print(f"\n" + "=" * 70)
-            print(f"🚀 [0DTE 執行循環] 第 {i}/10 次 (共最多 11 次) - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"🚀 [0DTE 執行循環] 第 {i}/20 次 - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print("=" * 70)
 
             is_filled = run_dte0_cycle()
@@ -1245,7 +1366,7 @@ if __name__ == '__main__':
                 break
 
             if i < 10:
-                print(f"\n⏳ 0DTE 委託未成交，等待 5 分鐘 (300 秒) 後進行下一次嘗試 (第 {i+1}/10 次)...")
+                print(f"\n⏳ 0DTE 委託未成交，等待 5 分鐘 (300 秒) 後進行下一次嘗試 (第 {i+1}/20 次)...")
                 try:
                     for _ in range(60 * 5):
                         if ib.isConnected():
@@ -1256,7 +1377,7 @@ if __name__ == '__main__':
                     print("\n[使用者中斷] 停止等待。")
                     break
             else:
-                print(f"\n⚠️ 已完成 10 次重試 (共 11 次嘗試)，0DTE 仍未成交，結束執行。")
+                print(f"\n⚠️ 已完成 20 次重試 ，0DTE 仍未成交，結束執行。")
 
     except KeyboardInterrupt:
         print("\n[使用者中斷] 程式已手動終止。")

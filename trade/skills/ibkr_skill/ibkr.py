@@ -24,12 +24,14 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ENV_FILE = os.path.join(BASE_DIR, ".env")
 
 try:
-    from ib_insync import IB, Option, Contract, ComboLeg, LimitOrder, MarketOrder, StopOrder, TagValue
+    from ib_insync import IB, Option, Contract, ComboLeg, Order, OrderComboLeg, LimitOrder, MarketOrder, StopOrder, TagValue
 except ImportError:
     IB = None
     Option = None
     Contract = None
     ComboLeg = None
+    Order = None
+    OrderComboLeg = None
     LimitOrder = None
     MarketOrder = None
     StopOrder = None
@@ -228,8 +230,11 @@ def execute_adaptive_option_bracket(contract_info, dry_run=False, env_path=ENV_F
         bracket.parent.orderType = "LMT"
         bracket.parent.lmtPrice = current_price
         bracket.parent.tif = "DAY"
+        bracket.parent.smartComboRoutingParams = [TagValue("NonGuaranteed", "1")]
         bracket.takeProfit.tif = "GTC"
+        bracket.takeProfit.smartComboRoutingParams = [TagValue("NonGuaranteed", "1")]
         bracket.stopLoss.tif = "GTC"
+        bracket.stopLoss.smartComboRoutingParams = [TagValue("NonGuaranteed", "1")]
 
         if target_account:
             bracket.parent.account = target_account

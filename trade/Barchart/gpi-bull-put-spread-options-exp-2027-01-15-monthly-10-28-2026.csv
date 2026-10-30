@@ -1,0 +1,4 @@
+Price~,"Exp Date",DTE,"Leg1 Strike",Type,Bid1,"Leg2 Strike",Type,Ask2,BE,BE%,"Max Profit","Max Loss","Max Profit%",Risk/Reward,"Net Delta","Loss Prob"
+246.89,2027-01-15,79,240.00,Put,15.3,180.00,Put,3.3,228,-7.65%,12,48,+25.00%,"4.00 to 1",0.333845,35.3%
+246.89,2027-01-15,79,240.00,Put,15.3,200.00,Put,7.1,231.8,-6.11%,8.2,31.8,+25.79%,"3.88 to 1",0.266623,38.3%
+"Downloaded from Barchart.com as of 10-28-2026 10:41am CDT"

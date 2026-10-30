@@ -137,9 +137,14 @@ def send_push_message(message_text: str, env_path: str = None) -> bool:
         return False
 
     url = 'https://api.line.me/v2/bot/message/push'
+    clean_text = str(message_text)
+    # LINE Messaging API 單則訊息嚴格上限 5,000 字元，保守截斷保留緩衝
+    if len(clean_text) > 4000:
+        clean_text = clean_text[:3900] + "\n\n...(為符合 LINE 推播上限，其餘內容已截斷，請查閱完整存檔)..."
+
     message_payload = {
         'to': user_id,
-        'messages': [{'type': 'text', 'text': str(message_text)}]
+        'messages': [{'type': 'text', 'text': clean_text}]
     }
 
     total_tokens = len(line_tokens)
@@ -154,7 +159,10 @@ def send_push_message(message_text: str, env_path: str = None) -> bool:
             if response.status_code == 200:
                 print(f"[LINE Push] Token {i + 1} 發送成功")
                 return True
-            print(f"[LINE Push] Token {i + 1} 失敗，狀態碼: {response.status_code}，準備嘗試下一個。")
+            print(f"[LINE Push] Token {i + 1} 失敗，狀態碼: {response.status_code}, 伺服器回應: {response.text[:200]}")
+            if response.status_code == 400:
+                print(f"[LINE Push] ⚠️ 訊息格式或長度超出 LINE API 限制 (HTTP 400)，終止輪替。")
+                return False
             line_tokens = rotate_line_tokens_in_env(env_path=env_path, current_tokens=line_tokens)
             if i == total_tokens - 1:
                 print("[LINE Push] 所有 LINE Token 皆已失效或達到額度上限。")

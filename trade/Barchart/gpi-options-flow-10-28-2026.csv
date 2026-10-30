@@ -1,0 +1,3 @@
+Symbol,Price~,"Exp Date",Type,Strike,DTE,"Bid x Size","Ask x Size",Trade,Size,Side,Premium,Volume,"Open Int",IV,Delta,Code,*,Time
+GPI,246.59,2026-11-20,Put,220,23,"2.45 x 16","4.80 x 38",3.5,20,mid,7000,20,40,55.17%,-0.1825463887,AUTO,N/A,"11:04:52 ET"
+"Downloaded from Barchart.com as of 10-28-2026 10:40am CDT"

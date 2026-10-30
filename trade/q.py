@@ -23,6 +23,7 @@ import scipy.optimize as optimize
 from dotenv import load_dotenv, find_dotenv, set_key
 
 from ib_insync import *
+from ib_insync import Order, OrderComboLeg, TagValue
 import shioaji as sj
 from notifier import send_push_message, send_trade_notification
 from vxm_config import load_vxm_config, save_vxm_config
@@ -2960,7 +2961,7 @@ def evaluate_and_run_vxm(ib_instance, execute_order=True):
                         min_tick=0.05
                     )
                 else:
-                    order = LimitOrder(trade_action, trade_qty, current_mid)
+                    order = Order(action=trade_action, totalQuantity=trade_qty, orderType='LMT', lmtPrice=current_mid, smartComboRoutingParams=[TagValue('NonGuaranteed', '1')])
                     order.tif = 'DAY'
                     order.outsideRth = True
                     if TARGET_ACCOUNT:
@@ -3425,7 +3426,7 @@ def close_dash_position():
         return jsonify({'status': 'error', 'message': 'Missing parameters.'})
 
     import random
-    from ib_insync import IB, Contract, MarketOrder, TagValue
+    from ib_insync import IB, Contract, Order, OrderComboLeg, LimitOrder, MarketOrder, TagValue
     import asyncio
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -3500,7 +3501,7 @@ def close_dash_position():
             else:
                 res_msg = f'平倉單步進超時已徹底撤單: {action} {qty} 口 {contract.localSymbol or conId} (避免死水期被動接刀)'
         else:
-            order = LimitOrder(action, float(qty), current_mid or 0.05)
+            order = Order(action=action, totalQuantity=float(qty), orderType='LMT', lmtPrice=current_mid or 0.05, smartComboRoutingParams=[TagValue('NonGuaranteed', '1')])
             order.tif = 'GTC' if contract.secType in ('FOP', 'FUT') else 'DAY'
             if TARGET_ACCOUNT:
                 order.account = TARGET_ACCOUNT
@@ -3546,7 +3547,7 @@ def api_group_close():
         return jsonify({"status": "error", "message": f"【{group_name}】目前無任何未平倉部位"}), 400
 
     import random
-    from ib_insync import IB, Contract, MarketOrder, TagValue
+    from ib_insync import IB, Contract, Order, OrderComboLeg, LimitOrder, MarketOrder, TagValue
     import asyncio
 
     loop = asyncio.new_event_loop()
@@ -4199,7 +4200,7 @@ def execute_barchart_trade():
     limit_price = clean_num(payload.get('limit_price'))
 
     import random, asyncio
-    from ib_insync import IB, Contract, ComboLeg, LimitOrder
+    from ib_insync import IB, Contract, ComboLeg, Order, OrderComboLeg, LimitOrder, TagValue
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     local_ib = IB()
@@ -4220,7 +4221,7 @@ def execute_barchart_trade():
             l2 = ComboLeg(conId=int(leg2_conId), ratio=1, action='SELL', exchange='SMART')
             contract.comboLegs = [l1, l2]
 
-            order = LimitOrder(action, 1, limit_price)
+            order = Order(action=action, totalQuantity=1, orderType='LMT', lmtPrice=limit_price, smartComboRoutingParams=[TagValue('NonGuaranteed', '1')])
             if TARGET_ACCOUNT:
                 order.account = TARGET_ACCOUNT
             order.tif = 'DAY'
@@ -4242,7 +4243,7 @@ def execute_barchart_trade():
             l2 = ComboLeg(conId=int(call_conId), ratio=1, action='BUY', exchange='SMART')
             contract.comboLegs = [l1, l2]
 
-            order = LimitOrder(action, 1, limit_price)
+            order = Order(action=action, totalQuantity=1, orderType='LMT', lmtPrice=limit_price, smartComboRoutingParams=[TagValue('NonGuaranteed', '1')])
             if TARGET_ACCOUNT:
                 order.account = TARGET_ACCOUNT
             order.tif = 'DAY'
@@ -4262,7 +4263,7 @@ def execute_barchart_trade():
             contract = Contract(conId=int(conId))
             local_ib.qualifyContracts(contract)
 
-            order = LimitOrder(action, 1, limit_price)
+            order = Order(action=action, totalQuantity=1, orderType='LMT', lmtPrice=limit_price, smartComboRoutingParams=[TagValue('NonGuaranteed', '1')])
             if TARGET_ACCOUNT:
                 order.account = TARGET_ACCOUNT
             order.tif = 'DAY'
@@ -4802,7 +4803,7 @@ def trigger_delta_hedge(action: str, current_price: float, symbol: str, qty: int
                 min_tick=min_tick
             )
         else:
-            order = LimitOrder(action, qty_int, current_price)
+            order = Order(action=action, totalQuantity=qty_int, orderType='LMT', lmtPrice=current_price, smartComboRoutingParams=[TagValue('NonGuaranteed', '1')])
             order.outsideRth = True
             order.tif = 'DAY'
             if TARGET_ACCOUNT:
@@ -5367,6 +5368,96 @@ def init_shioaji():
 # ==============================================================================
 # Main loop
 # ==============================================================================
+
+# ==============================================================================
+# 📁 歷史持倉損益快照自動存檔模組 (每天 4:30 ~ 4:50 輸出至 trade/history/)
+# ==============================================================================
+HISTORY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history")
+
+
+class CaptureStdout:
+    """
+    自適應終端輸出攔截器：
+    即時將文字輸出至原本的 sys.stdout，同時將字串收集於緩衝區中，
+    供歷史持倉紀錄存檔使用。
+    """
+    def __init__(self):
+        self.buffer = []
+        self._stdout = sys.stdout
+        self._prev = None
+        self.is_active = False
+
+    def write(self, s):
+        try:
+            self._stdout.write(s)
+        except Exception:
+            pass
+        self.buffer.append(s)
+
+    def flush(self):
+        try:
+            self._stdout.flush()
+        except Exception:
+            pass
+
+    def __getattr__(self, name):
+        return getattr(self._stdout, name)
+
+    def start(self):
+        self.buffer.clear()
+        self._prev = sys.stdout
+        sys.stdout = self
+        self.is_active = True
+        return self
+
+    def stop(self):
+        if self.is_active and self._prev:
+            sys.stdout = self._prev
+            self.is_active = False
+
+    def __enter__(self):
+        return self.start()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+
+    def get_value(self):
+        return "".join(self.buffer)
+
+
+def is_in_history_save_window(dt: datetime.datetime) -> bool:
+    """
+    檢查當前時間是否在每天 4:30 ~ 4:50 存檔時段。
+    涵蓋凌晨 04:30~04:50 (美股收盤結算) 與下午 16:30~16:50 (防12/24小時制認知差異)。
+    亦可透過環境變數 FORCE_SAVE_HISTORY=true 強制存檔測試。
+    """
+    m = dt.hour * 60 + dt.minute
+    is_am = (4 * 60 + 30 <= m <= 4 * 60 + 50)
+    is_pm = (16 * 60 + 30 <= m <= 16 * 60 + 50)
+    force = os.getenv("FORCE_SAVE_HISTORY", "").strip().lower() in ("true", "1", "yes")
+    return is_am or force
+    #return is_am or is_pm or force
+
+
+def save_history_snapshot(now_dt: datetime.datetime, content: str):
+    """
+    每天 4:30~4:50 之間將當前持倉損益終端輸出儲存一份至:
+    trade/history/YYYYMMDD_持倉損益.txt (其中 YYYYMMDD 依據當天日期)
+    """
+    if not content or not content.strip():
+        return
+    try:
+        os.makedirs(HISTORY_DIR, exist_ok=True)
+        date_str = now_dt.strftime("%Y%m%d")
+        file_name = f"{date_str}_持倉損益.txt"
+        file_path = os.path.join(HISTORY_DIR, file_name)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(content.strip() + "\n")
+        print(f"📁 [持倉損益存檔] 4:30~4:50 定時快照已成功儲存至: {file_path}")
+    except Exception as e:
+        print(f"⚠️ [持倉損益存檔異常] 無法寫入 history 檔案: {e}")
+
+
 def main():
     threading.Thread(target=auto_exit, daemon=True).start()
     threading.Thread(target=start_dashboard_server, daemon=True).start()
@@ -5411,6 +5502,7 @@ def main():
 
             # --- Orders ---
             dashboard_orders = []
+            cap = CaptureStdout().start()
             print(f"\n--- [ 有效掛單 (Orders: {len(orders)}) ] ---")
             if not orders:
                 print("目前無有效掛單。")
@@ -5682,9 +5774,12 @@ def main():
                         })
 
                     ref_points = None
+                    total_pnl = sum(p['pnl'] for p in group_positions_snapshot if p.get('pnl') is not None)
+                    pnl_str = f"{total_pnl:+,.2f}"
+
                     if g_name != '未分類(Other)':
                         if group_mute_flag.get(g_name, False):
-                            print(f"🎯 [{g_name}] 🔕 缺乏報價，安全鎖啟動，強制靜音！")
+                            print(f"🎯 [{g_name}] 🔕 缺乏報價，安全鎖啟動，強制靜音！ | 未平倉損益={pnl_str}")
                         elif abs(group_greeks[g_name]['delta']) > 0.001 or abs(group_greeks[g_name]['gamma']) > 0.001:
                             u_th = HEDGE_CONFIG[g_name]['upper_threshold']
                             l_th = HEDGE_CONFIG[g_name]['lower_threshold']
@@ -5692,10 +5787,15 @@ def main():
                             print(
                                 f"🎯 [{g_name}] 單邊估計={ref_points:.0f}點 "
                                 f"🎯上限={u_th:.2f}，下限={l_th:.2f} | "
-                                f"當前 {HEDGE_CONFIG[g_name]['hedge_sym']} Δ={group_greeks[g_name]['delta']:.2f} θ={group_greeks[g_name]['theta']:.0f}"
+                                f"當前 {HEDGE_CONFIG[g_name]['hedge_sym']} Δ={group_greeks[g_name]['delta']:.2f} θ={group_greeks[g_name]['theta']:.0f} | "
+                                f"未平倉損益={pnl_str}"
+                            )
+                        else:
+                            print(
+                                f"🎯 [{g_name}] 當前 {HEDGE_CONFIG[g_name]['hedge_sym']} Δ={group_greeks[g_name]['delta']:.2f} θ={group_greeks[g_name]['theta']:.0f} | "
+                                f"未平倉損益={pnl_str}"
                             )
 
-                        total_pnl = sum(p['pnl'] for p in group_positions_snapshot if p.get('pnl') is not None)
                         dashboard_groups.append({
                             "name": g_name,
                             "hedge_sym": HEDGE_CONFIG[g_name]['hedge_sym'],
@@ -5711,7 +5811,7 @@ def main():
                             "positions": group_positions_snapshot,
                         })
                     else:
-                        total_pnl = sum(p['pnl'] for p in group_positions_snapshot if p.get('pnl') is not None)
+                        print(f"🎯 [{g_name}] 未平倉損益={pnl_str}")
                         dashboard_groups.append({
                             "name": g_name,
                             "hedge_sym": "-",
@@ -5910,18 +6010,22 @@ def main():
                         current_time_str = datetime.datetime.now().strftime('%H:%M')
                         is_tw_closed = ("04:59" < current_time_str < "08:46" or "13:44" < current_time_str < "15:01")
 
+                        tmf_total_pnl = sum(float(str(d.get("pnl", 0)).replace(",", "")) for d in df_list if d.get("pnl"))
+                        tmf_pnl_str = f"{tmf_total_pnl:+,.0f}"
+
                         tmf_ref_points = None
                         if tmf_mute_flag:
-                            print("🎯 [台指(TMF)] 🔕 缺乏期權現價，安全鎖啟動，強制靜音暫停對沖！")
+                            print(f"🎯 [台指(TMF)] 🔕 缺乏期權現價，安全鎖啟動，強制靜音暫停對沖！ | 未平倉損益={tmf_pnl_str}")
                         elif is_tw_closed:
-                            print("⏳ [台指(TMF)] 沒開盤！暫停對沖。")
+                            print(f"⏳ [台指(TMF)] 沒開盤！暫停對沖。 | 未平倉損益={tmf_pnl_str}")
                         else:
                             tmf_ref_points = (max(abs(u_th), abs(l_th)) / max(abs(total_portfolio_gamma_tmf), 0.01)) * 100.0
                             print(
                                 f"🎯 [台指(TMF)] (點位修正={tmf_diff:+.1f}點, 標的現價={underlying_price:.1f}, 修正後F={eff_f:.1f}) "
                                 f"單邊門檻估計={tmf_ref_points:.0f}點 "
                                 f"🎯上限={u_th:.2f}，下限={l_th:.2f} "
-                                f"🎯當前 TMF Δ={total_portfolio_delta_tmf:.2f} θ={total_portfolio_theta_tmf:.0f}"
+                                f"🎯當前 TMF Δ={total_portfolio_delta_tmf:.2f} θ={total_portfolio_theta_tmf:.0f} | "
+                                f"未平倉損益={tmf_pnl_str}"
                             )
                             evaluate_and_trigger_hedge(
                                 group_name='台指(TMF)',
@@ -5935,8 +6039,6 @@ def main():
                                 last_hedge_times_dict=last_hedge_times,
                                 cooldown_seconds=HEDGE_COOLDOWN_SECONDS,
                             )
-
-                        tmf_total_pnl = sum(float(str(d.get("pnl", 0)).replace(",", "")) for d in df_list if d.get("pnl"))
                         dashboard_groups.append({
                             "name": "台指(TMF)",
                             "hedge_sym": tmf_config['hedge_sym'],
@@ -6050,14 +6152,24 @@ def main():
             })
 
             print(f"最後更新: {now_dt.strftime('%H:%M:%S')} | 下次更新: {REFRESH_SECONDS}秒後")
+            cap.stop()
+
+            # 每天 4:30~4:50 之間將終端印出的持倉損益文字儲存一份到 trade/history/YYYYMMDD_持倉損益.txt
+            if is_in_history_save_window(now_dt):
+                save_history_snapshot(now_dt, cap.get_value())
+
             ib.sleep(REFRESH_SECONDS)
 
         except KeyboardInterrupt:
+            if 'cap' in locals() and getattr(cap, 'is_active', False):
+                cap.stop()
             print("\n程式手動中斷。")
             if ib.isConnected():
                 ib.disconnect()
             break
         except Exception as e:
+            if 'cap' in locals() and getattr(cap, 'is_active', False):
+                cap.stop()
             print(f"發生錯誤: {e}")
             if ib.isConnected():
                 ib.disconnect()

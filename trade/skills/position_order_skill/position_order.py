@@ -28,12 +28,14 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 try:
-    from ib_insync import IB, Contract, Future, Stock, LimitOrder, MarketOrder, TagValue
+    from ib_insync import IB, Contract, Future, Stock, Order, OrderComboLeg, LimitOrder, MarketOrder, TagValue
 except ImportError:
     IB = None
     Contract = None
     Future = None
     Stock = None
+    Order = None
+    OrderComboLeg = None
     LimitOrder = None
     MarketOrder = None
     TagValue = None
@@ -417,8 +419,14 @@ class PositionOrderSkill:
                 if filled:
                     order_desc = f"{action_prefix}{order_action} {order_qty} 口 {contract.localSymbol} @ Walk-Up 成交均價 ${avg_price:.2f}"
             else:
-                order = LimitOrder(order_action, order_qty, market_price or 0.05)
-                order.tif = "DAY"
+                order = Order(
+                    action=order_action,
+                    totalQuantity=order_qty,
+                    orderType="LMT",
+                    lmtPrice=market_price or 0.05,
+                    tif="DAY",
+                    smartComboRoutingParams=[TagValue("NonGuaranteed", "1")]  # 關鍵：允許跨交易所撮合
+                )
                 if target_account:
                     order.account = target_account
                 trade = ib.placeOrder(contract, order)

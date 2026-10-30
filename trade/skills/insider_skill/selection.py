@@ -71,7 +71,7 @@ class InsiderSelectionSkill:
         else:
             self.api_key = None
 
-    def clean_and_aggregate(self, csv_path, excluded_symbols=None, top_buys_count=40, top_volume_count=25):
+    def clean_and_aggregate(self, csv_path, excluded_symbols=None, top_buys_count=15, top_volume_count=15):
         """
         清洗內部人交易數據，聚合個股淨買入與高管明細，主動過濾排除名單。
         """
@@ -92,6 +92,14 @@ class InsiderSelectionSkill:
 
         # 符號大寫化
         df["Symbol"] = df["Symbol"].astype(str).str.strip().str.upper()
+
+        # 【基金、信託、市政債等物理過濾】：剔除封閉式基金、不動產信託基金、市政債信託等無個股期權標的
+        fund_pattern = r'\b(?:Fund|Trust|Muni|Municipal|Municipals|Closed-End|CEF|ETF|ETN)\b'
+        fund_mask = df["Name"].astype(str).str.contains(fund_pattern, case=False, regex=True)
+        if fund_mask.any():
+            filtered_funds = df[fund_mask]["Symbol"].unique().tolist()
+            df = df[~fund_mask]
+            print(f"[INFO] [SelectionSkill] 已剔除基金/信託/市政債等非期權個股 (共 {len(filtered_funds)} 檔): {filtered_funds[:8]}")
 
         # 【非期權標的物理過濾】：剔除特別股 (Preferred)、權證 (Warrants)、單位 (Units) 等無期權市場之代碼
         # 1. 已知無期權鏈之特殊中小型股、外國 ADR、基金 (如 NYAX, KBDC, BRPSF, MXF)
@@ -224,27 +232,28 @@ class InsiderSelectionSkill:
 
     def parse_symbol_from_report(self, report_text, excluded_symbols=None, valid_symbols=None):
         """
-        自分析報告中提取標的代號，若命中了排除名單或不在候選名單中則判定為無效
+        自分析報告中提取標的代號，若命中了排除名單或不在候選名單中則判定為無效。
+        支援冒號、全形冒號、表格直線符號 (|) 以及加粗 Markdown。
         """
         patterns = [
-            r'推薦標的代號[^\n:]*[：:]\s*[\*`]*([A-Za-z0-9]+)',
+            r'(?:推薦標的代號|推薦代號|推薦標的|標的代號|最佳標的|Symbol|Ticker)[^\n\w]*[:：\|]?\s*[\*`]*([A-Za-z0-9]+)',
+            r'\*\*推薦標的代號[^\*]*\*\*[:：\s]*`?([A-Za-z0-9]+)',
+            r'\*\*Symbol\*\*[：:\s]*`?([A-Za-z0-9]+)',
             r'Symbol[^\n:]*[：:]\s*[\*`]*([A-Za-z0-9]+)',
-            r'標的代號[^\n:]*[：:]\s*[\*`]*([A-Za-z0-9]+)',
         ]
         excluded_set = {s.upper() for s in (excluded_symbols or [])}
         valid_set = {s.upper() for s in (valid_symbols or [])} if valid_symbols else None
 
         for p in patterns:
-            m = re.search(p, report_text, re.IGNORECASE)
-            if m:
+            for m in re.finditer(p, report_text, re.IGNORECASE):
                 sym = m.group(1).strip().upper()
-                if sym not in ("BUY", "CALL", "PUT", "STOCK", "NONE", "N/A", "SYMBOL"):
+                if sym not in ("BUY", "CALL", "PUT", "STOCK", "NONE", "N/A", "SYMBOL", "OPTION", "STRIKE", "DTE"):
                     if sym in excluded_set:
                         print(f"[WARN] [SelectionSkill] AI 推薦的標的 {sym} 位於排除名單中！")
                         return None
                     if valid_set and sym not in valid_set:
-                        print(f"[WARN] [SelectionSkill] AI 推薦的標的 {sym} 未出現在本次內部人數據白名單中（可能為模型幻覺），判定無效！")
-                        return None
+                        # 若白名單存在但該符號不在其中，先跳過看後續 pattern 是否有符合白名單者
+                        continue
                     return sym
         return None
 
@@ -299,11 +308,16 @@ class InsiderSelectionSkill:
                 print(f"[WARN] [SelectionSkill] 第 {attempt} 次請求異常: {e}")
             time.sleep(2)
 
-        # 若 AI 未能成功給出合法代號，啟動安全降級（直接取排行榜榜首）
+        # 若 AI 未能成功給出合法代號，啟動安全降級（依序挑選第一檔不在排除名單中的合格標的）
         if not selected_symbol:
-            fallback_sym = str(top_summary.iloc[0]["Symbol"]).strip().upper()
-            print(f"[WARN] [SelectionSkill] AI 產出解析失敗，啟動備援機制：自動選取淨買入榜首 {fallback_sym}")
-            selected_symbol = fallback_sym
+            for _, row in top_summary.iterrows():
+                cand_sym = str(row["Symbol"]).strip().upper()
+                if cand_sym and cand_sym not in set(excluded_symbols or []):
+                    selected_symbol = cand_sym
+                    break
+            if not selected_symbol:
+                selected_symbol = str(top_summary.iloc[0]["Symbol"]).strip().upper()
+            print(f"[WARN] [SelectionSkill] AI 產出解析失敗，啟動備援機制：自動選取淨買入合格榜首 {selected_symbol}")
 
         # 取得標的詳細資訊
         meta = top_summary[top_summary["Symbol"] == selected_symbol]

@@ -20,13 +20,15 @@ import math
 from typing import Optional, Tuple, Any
 
 try:
-    from ib_insync import IB, Contract, Order, LimitOrder, Trade
+    from ib_insync import IB, Contract, Order, LimitOrder, Trade, OrderComboLeg, TagValue
 except ImportError:
     IB = None
     Contract = None
     Order = None
     LimitOrder = None
     Trade = None
+    OrderComboLeg = None
+    TagValue = None
 
 
 def is_valid_price(p: Any) -> bool:
@@ -244,9 +246,11 @@ def walk_up_limit_price(
         # 確保價格大於零
         target_price = max(min_tick or 0.01, target_price)
 
-        # 更新訂單限價
+        # 更新訂單限價與跨交易所路由參數
         order.lmtPrice = target_price
         order.orderType = 'LMT'
+        if TagValue is not None and not getattr(order, 'smartComboRoutingParams', None):
+            order.smartComboRoutingParams = [TagValue("NonGuaranteed", "1")]
 
         # 關鍵：沿用同一物件與 orderId 重新送出，IBKR 自動識別為 Modify (Order Replace)
         if i == 0 and current_trade is not None:
@@ -352,7 +356,13 @@ def execute_walk_up_order(
         print(f"\n❌ [{sym_name}] 自適應步進下單中止：修整後基準價格無效 (${fmt_price(base_price, min_tick)})，拒絕向 IBKR 送單！")
         return False, None, 0.0
 
-    order = LimitOrder(action_upper, qty_val, base_price)
+    order = Order(
+        action=action_upper,
+        totalQuantity=qty_val,
+        orderType="LMT",
+        lmtPrice=base_price,
+        smartComboRoutingParams=[TagValue("NonGuaranteed", "1")]  # 關鍵：允許跨交易所撮合
+    )
     order.tif = tif
     order.outsideRth = outside_rth
     if account:

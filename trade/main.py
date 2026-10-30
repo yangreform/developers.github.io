@@ -20,6 +20,7 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
 from ib_insync import *
+from ib_insync import Order, OrderComboLeg, TagValue
 from notifier import send_push_message, send_trade_notification
 
 try:
@@ -684,7 +685,7 @@ def webhook():
                     min_tick=min_tick
                 )
             else:
-                order = LimitOrder(action, quantity, mkt_price)
+                order = Order(action=action, totalQuantity=quantity, orderType="LMT", lmtPrice=mkt_price, smartComboRoutingParams=[TagValue("NonGuaranteed", "1")])
                 order.outsideRth = True
                 order.tif = tif_val
                 trade = ib.placeOrder(contract, order)

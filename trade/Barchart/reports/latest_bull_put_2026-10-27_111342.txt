@@ -1,0 +1,240 @@
+==分析時間：2026-10-27 11:13:42==
+We need answer in Chinese likely. Need analyze candidates and choose one best Bull Put vertical. Need obey constraints. Need compute metrics. Need be careful. Need produce specified markdown. Need select唯一最佳. We need evaluate all candidates under DTE 20-35, price >=30. Need use Net Credit = Width - Max Loss as given. Need compute Break-Even Buffer. For bull put spread: short put strike K1 higher, long put K2 lower. Net credit C. Breakeven = K1 - C. Buffer = Price - BE, percent = (Price - BE)/Price? Usually downside cushion from current price to breakeven. Need compute. Max Return % = Net Credit / Max Loss? For credit spread, max profit = net credit, max loss = width - credit. Return on risk = credit / max loss *100. Some might use credit/width? The output says Max Return % likely Net Credit / Max Loss. Need compute.
+
+Need select best. Let's parse data.
+
+Candidates with DTE 20-35 all? DTE listed: PLTR 25, MRNA 31, CRWV 25, NOW31, PLTR29, MRNA31, etc. All DTE 20-35? Some 34, 30. All within 20-35 except none >35? DTE 31 etc. Price >=30: SMCI price 31.63 and 35.57 are >=30 actually. Constraint says exclude <30, SMCI 31.63 and 35.57 are >=30, so allowed. But "小型股" maybe price low but >=30. CRWV price 57, 61. All allowed except none below 30. Need evaluate.
+
+Need identify best. Criteria: high safety buffer, low loss prob, reasonable net credit, DTE. Need compute for each maybe. Need choose one with best combination. We need be rigorous. Let's create table with metrics.
+
+Given columns:
+Symbol Price Exp DTE Leg1 Strike Leg2 Strike Width Max Loss Width-MaxLoss Net Credit Max Profit Loss Prob IV Rank
+
+Actually Net Credit = Width - MaxLoss. Max Profit = Net Credit. Loss Prob given.
+
+Need compute BE = Leg1 Strike - Net Credit. Buffer $ = Price - BE. Buffer % = (Price - BE)/Price *100 = (Price - Leg1 + NetCredit)/Price *100. Also distance from short strike to price? Price - Leg1. BE buffer includes credit.
+
+Max Return % = Net Credit / Max Loss *100. Also maybe annualized? Not required. Need compute.
+
+Let's list candidates with metrics. I can do manual calculations. Need maybe choose MRNA? Let's inspect.
+
+Candidate list sorted by Net Credit ascending. Need evaluate safety.
+
+Let's calculate for each candidate maybe enough. We need pick唯一最佳. Need consider loss prob. The table's Loss Prob seems all around 14-18%, but weird: PLTR 14.3%, MRNA 14.6-17.8, CRWV 15.3 etc. Loss prob maybe probability of touching? They are all low. Need choose with highest buffer and return.
+
+Let's compute for all or key candidates.
+
+First, constraints:
+- DTE 20-35: all listed? DTE values: 25,31,25,31,25,31,29,31,31,30,29,31,25,30,31,30,25,31,30,30,30,31,31,25,34,31,34,30,30,31,25,34,31,31. All within 20-35. Good.
+- Price >=30: all? SMCI 31.63, 35.57 >=30. All others >30. Good.
+- Net Credit = Width - Max Loss as given. Good.
+
+Need choose best. Let's compute key metrics.
+
+I'll create table for each candidate with:
+Symbol Price DTE K1 K2 Width C MaxLoss LossProb BE Buffer$ Buffer% Return%=C/MaxLoss*100. Also maybe credit/width.
+
+Let's compute carefully.
+
+Candidate 1 PLTR 198.64, DTE25, K1=165, K2=160, Width5, MaxLoss4.32, C=0.68, LossProb14.3, IV83.16.
+BE = 165 - 0.68 = 164.32. Buffer$ = 198.64 - 164.32 = 34.32. Buffer% = 34.32 / 198.64 = 17.277? Compute: 198.64*0.1728=34.324. So 17.28%. Return = 0.68/4.32=15.7407%. Short strike distance = 33.64 (16.94%). Credit small.
+
+2 MRNA 242.08, DTE31, K1=175, K2=155, Width20, MaxLoss17.28, C=2.72, LP14.6.
+BE=175-2.72=172.28. Buffer=242.08-172.28=69.80. Buffer%=69.80/242.08=28.83%. Return=2.72/17.28=15.7407%. Good.
+
+3 MRNA 242.08, DTE31, K1=175, K2=160, Width15, MaxLoss12.90, C=2.10, LP14.9.
+BE=172.90. Buffer=69.18. Buffer%=28.58%. Return=2.10/12.90=16.279%. Good.
+
+4 MRNA 242.08, DTE31, K1=175, K2=165, Width10, MaxLoss8.55, C=1.45, LP15.2.
+BE=173.55. Buffer=68.53. Buffer%=28.31%. Return=1.45/8.55=16.959%. Good.
+
+5 CRWV 57.06, DTE25, K1=42.5, K2=40, Width2.5, MaxLoss2.12, C=0.38, LP15.3.
+BE=42.12. Buffer=14.94. Buffer%=14.94/57.06=26.18%. Return=0.38/2.12=17.9245%. Good.
+
+6 NOW 149.54, DTE31, K1=125, K2=120, Width5, MaxLoss4.28, C=0.72, LP15.4.
+BE=124.28. Buffer=25.26. Buffer%=25.26/149.54=16.89%. Return=0.72/4.28=16.822%. Good.
+
+7 PLTR 200.50, DTE29, K1=170, K2=160, Width10, MaxLoss8.69, C=1.31, LP16.0.
+BE=168.69. Buffer=31.81. Buffer%=31.81/200.50=15.865%. Return=1.31/8.69=15.075%. Good.
+
+8 MRNA 242.08, DTE31, K1=180, K2=150, Width30, MaxLoss25.79, C=4.21, LP16.1.
+BE=175.79. Buffer=66.29. Buffer%=66.29/242.08=27.38%. Return=4.21/25.79=16.324%. Good.
+
+9 MRNA 242.08, DTE31, K1=180, K2=155, Width25, MaxLoss21.28, C=3.72, LP16.3.
+BE=176.28. Buffer=65.80. Buffer%=27.18%. Return=3.72/21.28=17.481%. Good.
+
+10 NOW 153.12, DTE30, K1=130, K2=120, Width10, MaxLoss8.61, C=1.39, LP16.4.
+BE=128.61. Buffer=24.51. Buffer%=24.51/153.12=16.006%. Return=1.39/8.61=16.144%. Good.
+
+11 PLTR 200.50, DTE29, K1=170, K2=165, Width5, MaxLoss4.30, C=0.70, LP16.5.
+BE=169.30. Buffer=31.20. Buffer%=31.20/200.50=15.561%. Return=0.70/4.30=16.279%. Good.
+
+12 MRNA 242.08, DTE31, K1=180, K2=160, Width20, MaxLoss16.90, C=3.10, LP16.6.
+BE=176.90. Buffer=65.18. Buffer%=26.92%. Return=3.10/16.90=18.343%. Good.
+
+13 PLTR 198.64, DTE25, K1=170, K2=150, Width20, MaxLoss17.35, C=2.65, LP16.7.
+BE=167.35. Buffer=31.29. Buffer%=31.29/198.64=15.752%. Return=2.65/17.35=15.274%. Good.
+
+14 CRWV 61.82, DTE30, K1=47.5, K2=42.5, Width5, MaxLoss4.30, C=0.70, LP16.8.
+BE=46.80. Buffer=15.02. Buffer%=15.02/61.82=24.30%. Return=0.70/4.30=16.279%. Good.
+
+15 MRNA 242.08, DTE31, K1=180, K2=165, Width15, MaxLoss12.55, C=2.45, LP16.9.
+BE=177.55. Buffer=64.53. Buffer%=26.66%. Return=2.45/12.55=19.522%. Good.
+
+16 NOW 153.12, DTE30, K1=130, K2=125, Width5, MaxLoss4.21, C=0.79, LP17.0.
+BE=129.21. Buffer=23.91. Buffer%=23.91/153.12=15.616%. Return=0.79/4.21=18.765%. Good.
+
+17 PLTR 198.64, DTE25, K1=170, K2=155, Width15, MaxLoss12.79, C=2.21, LP17.1.
+BE=167.79. Buffer=30.85. Buffer%=30.85/198.64=15.529%. Return=2.21/12.79=17.279%. Good.
+
+18 MRNA 242.08, DTE31, K1=180, K2=170, Width10, MaxLoss8.35, C=1.65, LP17.2.
+BE=178.35. Buffer=63.73. Buffer%=63.73/242.08=26.33%. Return=1.65/8.35=19.760%. Good.
+
+19 CRWV 61.82, DTE30, K1=47.5, K2=45, Width2.5, MaxLoss2.16, C=0.34, LP17.4.
+BE=47.16. Buffer=14.66. Buffer%=14.66/61.82=23.72%. Return=0.34/2.16=15.741%. Good.
+
+20 RDDT 153.28, DTE30, K1=125, K2=115, Width10, MaxLoss8.60, C=1.40, LP17.4.
+BE=123.60. Buffer=29.68. Buffer%=29.68/153.28=19.36%. Return=1.40/8.60=16.279%. Good.
+
+21 PLTR 201.72, DTE30, K1=172.5, K2=160, Width12.5, MaxLoss10.72, C=1.78, LP17.4.
+BE=170.72. Buffer=31.00. Buffer%=31.00/201.72=15.368%. Return=1.78/10.72=16.604%. Good.
+
+22 MRNA 242.08, DTE31, K1=180, K2=175, Width5, MaxLoss4.25, C=0.75, LP17.6.
+BE=179.25. Buffer=62.83. Buffer%=25.95%. Return=0.75/4.25=17.647%. Good.
+
+23 MRNA 242.08, DTE31, K1=185, K2=140, Width45, MaxLoss39.14, C=5.86, LP17.6.
+BE=179.14. Buffer=62.94. Buffer%=26.00%. Return=5.86/39.14=14.972%. Good.
+
+24 PLTR 198.64, DTE25, K1=170, K2=160, Width10, MaxLoss8.37, C=1.63, LP17.6.
+BE=168.37. Buffer=30.27. Buffer%=30.27/198.64=15.237%. Return=1.63/8.37=19.474%. Good.
+
+25 NOW 141.97, DTE34, K1=120, K2=110, Width10, MaxLoss8.56, C=1.44, LP17.7.
+BE=118.56. Buffer=23.41. Buffer%=23.41/141.97=16.49%. Return=1.44/8.56=16.822%. Good.
+
+26 MRNA 242.08, DTE31, K1=185, K2=150, Width35, MaxLoss29.64, C=5.36, LP17.8.
+BE=179.64. Buffer=62.44. Buffer%=25.79%. Return=5.36/29.64=18.084%. Good.
+
+27 SMCI 31.63, DTE34, K1=25, K2=22, Width3, MaxLoss2.60, C=0.40, LP17.8.
+BE=24.60. Buffer=7.03. Buffer%=7.03/31.63=22.23%. Return=0.40/2.60=15.385%. Good.
+
+28 MRNA 245.81, DTE30, K1=190, K2=150, Width40, MaxLoss34.15, C=5.85, LP17.9.
+BE=184.15. Buffer=61.66. Buffer%=61.66/245.81=25.08%. Return=5.85/34.15=17.131%. Good.
+
+29 PLTR 201.72, DTE30, K1=172.5, K2=165, Width7.5, MaxLoss6.35, C=1.15, LP17.9.
+BE=171.35. Buffer=30.37. Buffer%=30.37/201.72=15.057%. Return=1.15/6.35=18.110%. Good.
+
+30 SMCI 35.57, DTE30, K1=29, K2=25, Width4, MaxLoss3.44, C=0.56, LP18.0.
+BE=28.44. Buffer=7.13. Buffer%=7.13/35.57=20.05%. Return=0.56/3.44=16.279%. Good.
+
+31 MRNA 242.08, DTE31, K1=185, K2=155, Width30, MaxLoss25.13, C=4.87, LP18.0.
+BE=180.13. Buffer=61.95. Buffer%=25.59%. Return=4.87/25.13=19.379%. Good.
+
+32 CRWV 57.06, DTE25, K1=45, K2=35, Width10, MaxLoss8.50, C=1.50, LP18.1.
+BE=43.50. Buffer=13.56. Buffer%=13.56/57.06=23.76%. Return=1.50/8.50=17.647%. Good.
+
+33 CRWV 61.39, DTE34, K1=47.5, K2=40, Width7.5, MaxLoss6.46, C=1.04, LP18.1.
+BE=46.46. Buffer=14.93. Buffer%=14.93/61.39=24.32%. Return=1.04/6.46=16.099%. Good.
+
+34 PLTR 192.60, DTE31, K1=165, K2=150, Width15, MaxLoss12.88, C=2.12, LP18.1.
+BE=162.88. Buffer=29.72. Buffer%=29.72/192.60=15.43%. Return=2.12/12.88=16.460%. Good.
+
+35 META 694.25, DTE31, K1=620, K2=590, Width30, MaxLoss25.85, C=4.15, LP18.2.
+BE=615.85. Buffer=78.40. Buffer%=78.40/694.25=11.29%. Return=4.15/25.85=16.054%. Good.
+
+Need choose best. Candidate MRNA seems high buffer ~26-28%, loss prob ~14.6-18.0, returns ~15-19.5%. Among MRNA, which is best? Need balance safety buffer, low loss prob, return, net credit. The "唯一最佳" maybe MRNA 242.08 2026-11-20 DTE31, K1=180, K2=160, Width20, C=3.10, MaxLoss16.90, LossProb16.6, Return 18.34%, Buffer 26.92%. Or MRNA 180/165 C2.45 LP16.9 Return19.52 Buffer26.66. Or MRNA 180/170 C1.65 LP17.2 Return19.76 Buffer26.33. Or MRNA 175/165 C1.45 LP15.2 Return16.96 Buffer28.31. Need decide.
+
+Criteria:
+1 safety buffer: MRNA 175/155 has highest buffer 28.83% and LP14.6, but return 15.74%. MRNA 175/160 buffer28.58 LP14.9 return16.28. MRNA 175/165 buffer28.31 LP15.2 return16.96. MRNA 180/150 buffer27.38 LP16.1 return16.32. MRNA 180/155 buffer27.18 LP16.3 return17.48. MRNA 180/160 buffer26.92 LP16.6 return18.34. MRNA 180/165 buffer26.66 LP16.9 return19.52. MRNA 180/170 buffer26.33 LP17.2 return19.76. MRNA 185/155 buffer25.59 LP18.0 return19.38. MRNA 185/150 buffer25.79 LP17.8 return18.08. MRNA 185/140 buffer26.00 LP17.6 return14.97. MRNA 190/150 buffer25.08 LP17.9 return17.13.
+
+Need "勝率極高、安全緩衝極充足、性價比最高". Could pick MRNA 175/165? It has very high buffer 28.31%, low LP 15.2%, decent return 16.96%. But MRNA 180/160 has slightly lower buffer but higher return and LP 16.6. Which is better? Need maybe use risk-adjusted score. We can compute some composite.
+
+Also consider IV Rank: MRNA 68.42, PLTR 83.16. High IV rank means richer premium. But MRNA has high absolute price and buffer. However MRNA candidate with K1=175 has lower short strike, more cushion. MRNA 175/165: short strike 175, current 242.08, distance 67.08 (27.7%). BE 173.55, buffer 68.53 (28.31%). Loss prob 15.2%. Credit 1.45, max loss 8.55, return 16.96%. This seems very safe. But net credit $1.45 per spread, max loss $8.55. For one contract, net credit $145, max loss $855. The return on risk 16.96% over 31 days. Annualized ~199%? Actually 16.96% * 365/31 = 199.7%. Good. MRNA 180/160: short strike 180, distance 62.08 (25.65%), BE 176.90, buffer 65.18 (26.92%), LP16.6, credit $3.10, max loss $16.90, return18.34%. More credit but less buffer and slightly higher loss prob. Which is "性價比最高"? Maybe MRNA 180/160 offers higher credit and still 26.9% buffer. But safety "極充足" maybe 175/165 better. Need determine.
+
+Let's examine all candidates. Maybe RDDT has buffer 19.36, LP17.4, return16.28. CRWV has buffer 26.18, LP15.3, return17.92, DTE25. CRWV 57.06 K1=42.5 K2=40: buffer 26.18%, LP15.3, return17.92. That's quite good. But price lower, less liquidity? CRWV maybe CoreWeave? Price 57, high IV rank 73.59, DTE25. Short strike 42.5, current 57.06, distance 14.56 (25.5%). BE 42.12, buffer 14.94 (26.18%). Loss prob 15.3. Credit 0.38, max loss 2.12, return17.92. This has better buffer than MRNA 180/160? Actually 26.18 vs 26.92, similar. Lower LP 15.3 vs 16.6. Return 17.92 vs 18.34. DTE25 vs31. But stock price 57, width 2.5, credit $38, max loss $212. Liquidity? CRWV maybe less liquid than MRNA? But Barchart official list. However constraint says price >=30, so allowed. But "小型股" maybe not, CRWV is mid-cap? Could be CoreWeave, high volatility. Need consider liquidity. The prompt says "流動性與 DTE 硬性約束" but only gives DTE and price. It doesn't provide bid-ask spread. We cannot assess actual liquidity beyond constraints. But CRWV might have less liquidity than MRNA? MRNA is large-cap biotech, options liquid. PLTR very liquid. MRNA has high IV rank 68.42. PLTR high IV rank 83.16 but buffer lower ~15-17%. NOW buffer ~16-24? NOW 130/120 buffer 16.0, LP16.4, return16.14. META buffer 11.3, low. RDDT buffer 19.36. SMCI buffer ~20-22 but price low. MRNA seems best safety.
+
+Need maybe choose MRNA 175/165? Let's evaluate "唯一最佳" with multi-factor. We can create scoring.
+
+Factors:
+- Loss Prob: lower better.
+- Buffer %: higher better.
+- Return %: higher better.
+- DTE: within range; maybe 25-31 optimal? All.
+- Net Credit absolute? Maybe higher better but per risk.
+- Width-MaxLoss? Already.
+
+Let's compute a simple score maybe z-scores. But need final answer just choose one and justify. Need ensure no mistakes.
+
+Let's identify candidate with best combination of high buffer and low loss prob and decent return. MRNA 175/165: buffer 28.31, LP 15.2, return 16.96. MRNA 175/160: buffer 28.58, LP 14.9, return 16.28. MRNA 175/155: buffer 28.83, LP 14.6, return 15.74. The 175/165 has slightly lower buffer than 175/160 but higher return. Which is better? If safety is top priority, 175/155 has highest buffer and lowest LP, but lower return. The prompt says "勝率極高、安全緩衝極充足、性價比最高". It wants all. "在確保極高安全邊際的前提下，提供健康的每口淨權利金收入". So safety first, then return. MRNA 175/155: short strike 175, long 155, width 20, credit 2.72, max loss 17.28, return 15.74%, buffer 28.83%, LP14.6. MRNA 175/165: width 10, credit 1.45, max loss 8.55, return 16.96%, buffer 28.31%, LP15.2. Difference in buffer 0.52%, LP 0.6%, return +1.22%. Which is more "性價比"? Maybe 175/165 better because similar safety, higher return. MRNA 175/160: buffer 28.58, LP14.9, return16.28. It dominates 175/155? It has slightly lower buffer but higher return and LP slightly higher. 175/160 maybe sweet spot. Compare 175/160 vs 175/165: 175/160 buffer +0.27%, LP -0.3%, return -0.68%. 175/160 has better safety and lower LP but lower return. 175/165 has higher return. Which is best? Need decide.
+
+Maybe use risk-adjusted return per loss probability? For 175/160: return 16.28, LP14.9, buffer28.58. 175/165: return16.96, LP15.2, buffer28.31. Very close. 175/160 has lower LP and higher buffer, slightly lower return. The prompt emphasizes "勝率極高、安全緩衝極充足" before "性價比". So 175/160 may be best. But "性價比最高" maybe 180/160 with return18.34 and buffer26.92, LP16.6. Need weigh.
+
+Let's compute "expected value" using loss prob? For credit spread, if loss prob is probability of breakeven? If LP is probability of max loss? The table "Loss Prob" likely probability that short put expires ITM? For bull put, loss occurs if price below BE? Actually if short put expires below strike, assignment, but profit if above BE. Loss Prob maybe probability of short leg expiring ITM (below K1), not below BE. If Loss Prob = probability of any loss? Barchart might define probability of loss at expiration? For credit spreads, "Loss Probability" maybe chance of max loss? Hmm. But given all 14-18%. If LP is probability of short put ITM, then actual loss probability (below BE) is lower because credit buffer. But we can use as given. Expected value = (1-p)*C - p*MaxLoss? If p is probability of max loss. For 175/160: C=2.72, MaxLoss=17.28, p=0.146. EV = 0.854*2.72 - 0.146*17.28 = 2.323 - 2.523 = -0.20? Negative. That seems odd. If p is probability of touching? Not useful. If p is probability of loss (below BE), EV = (1-p)*C - p*MaxLoss? Then negative for many. But options are priced with edge? Maybe p is probability of short put expiring ITM, not max loss. If short put ITM, loss may be less than max. So not.
+
+Maybe compute return/LP ratio: 175/160: 16.28/14.9=1.093; 175/165:16.96/15.2=1.116; 180/160:18.34/16.6=1.105; CRWV 42.5/40:17.92/15.3=1.171. CRWV has best return/LP. But buffer lower than MRNA? 26.18 vs 28.58. CRWV LP15.3, return17.92, buffer26.18. It might be more "性價比". But CRWV price 57, DTE25, high IV. Is CRWV a small stock? Price >=30. But maybe less liquid. The prompt says "流動性硬性約束" only price >=30 and DTE. It doesn't exclude CRWV. But "小型股" threshold is $30, so CRWV allowed. However "華爾街頂級期權量化經理人" might prefer large-cap liquid MRNA/PLTR. The list includes CRWV, SMCI, RDDT. CRWV is CoreWeave, high volatility AI stock. It may have wider bid-ask and gap risk. MRNA is large-cap but biotech, event risk. PLTR is large-cap, high IV rank. MRNA has high IV rank 68.42, PLTR 83.16. PLTR candidates have buffer ~15-17%, lower. MRNA has much better buffer.
+
+Let's examine MRNA 180/160: short strike 180, current 242.08, distance 62.08 (25.65%). BE 176.90, buffer 65.18 (26.92%). Loss prob 16.6. Return 18.34. This is a nice balance. MRNA 175/160: short strike 175, distance 67.08 (27.71%), BE 172.28, buffer 69.80 (28.83%), LP14.6, return15.74. MRNA 175/165: short strike 175, distance 67.08, BE 173.55, buffer 68.53 (28.31%), LP15.2, return16.96. MRNA 180/160: short strike 180, distance 62.08, BE 176.90, buffer 65.18 (26.92%), LP16.6, return18.34. Which is "唯一最佳"? Need maybe use a composite score. Let's define score = Buffer% + (Return% - LossProb%)? Or Buffer% + Return% - LossProb%. Compute:
+175/155: 28.83 +15.74 -14.6 = 29.97
+175/160: 28.58 +16.28 -14.9 = 29.96
+175/165: 28.31 +16.96 -15.2 = 30.07
+180/150: 27.38 +16.32 -16.1 = 27.60
+180/155: 27.18 +17.48 -16.3 = 28.36
+180/160: 26.92 +18.34 -16.6 = 28.66
+180/165: 26.66 +19.52 -16.9 = 29.28
+180/170: 26.33 +19.76 -17.2 = 28.89
+185/155: 25.59 +19.38 -18.0 = 26.97
+CRWV 42.5/40: 26.18 +17.92 -15.3 = 28.80
+RDDT: 19.36 +16.28 -17.4 = 18.24
+PLTR 170/160 DTE25: 15.75 +15.27 -16.7 = 14.32
+MRNA 175/165 scores highest by this simple metric. But maybe weight safety more. If weight buffer 2x: 2*Buffer + Return - Loss:
+175/155: 57.66+15.74-14.6=58.80
+175/160: 57.16+16.28-14.9=58.54
+175/165: 56.62+16.96-15.2=58.38
+180/160: 53.84+18.34-16.6=55.58
+CRWV: 52.36+17.92-15.3=54.98
+So 175/155 best if safety heavily weighted. If weight return more: Buffer + 2*Return - Loss:
+175/155: 28.83+31.48-14.6=45.71
+175/160: 28.58+32.56-14.9=46.24
+175/165: 28.31+33.92-15.2=47.03
+180/160: 26.92+36.68-16.6=47.00
+180/165: 26.66+39.04-16.9=48.80
+So 180/165 best if return weighted. But safety lower.
+
+The prompt says "勝率極高、安全緩衝極充足、性價比最高". It might expect selecting a candidate with highest buffer and low loss prob, not necessarily highest return. MRNA 175/165 or 175/160. Need maybe mention why not 180/160: slightly lower buffer and higher loss prob. But 180/160 has higher return. "性價比最高" could favor 180/160. Hmm.
+
+Let's look at "Net Credit" values. The prompt says "預期收入基準：嚴格以 Width - Max Loss 作為唯一基準". They might want us to not fabricate. They might expect us to pick one with high Net Credit? But also safety. The list is sorted by Net Credit ascending. The best might be one with high Net Credit but not too risky. MRNA 180/160 has Net Credit 3.10, Max Loss 16.90, return 18.34, buffer 26.92, LP16.6. MRNA 180/165 has Net Credit 2.45, Max Loss 12.55, return 19.52, buffer 26.66, LP16.9. MRNA 180/170 has Net Credit 1.65, Max Loss 8.35, return 19.76, buffer 26.33, LP17.2. MRNA 185/155 has Net Credit 4.87, Max Loss 25.13, return 19.38, buffer 25.59, LP18.0. MRNA 185/150 has Net Credit 5.36, Max Loss 29.64, return 18.08, buffer 25.79, LP17.8. MRNA 190/150 has Net Credit 5.85, Max Loss 34.15, return 17.13, buffer 25.08, LP17.9. If we want high net credit and safety, MRNA 180/160 seems good: credit $3.10, max loss $16.90, buffer 26.92%, LP16.6. MRNA 175/165: credit $1.45, max loss $8.55, buffer 28.31%, LP15.2. Which is "性價比"? Return on risk is higher for 180/160 (18.34 vs 16.96). But absolute credit is double. However max loss also double. The risk-adjusted return is higher for 180/160. But safety buffer is lower by 1.39 percentage points, loss prob higher by 1.4 percentage points. Is that worth +1.38% return? Maybe yes. But "安全緩衝極充足" maybe 26.92% is still very充足. So 180/160 might be the best balance.
+
+Let's compute for MRNA 180/160:
+Price 242.08
+Exp 2026-11-20
+DTE 31
+Leg1 180, Leg2 160
+Width 20
+Max Loss 16.90
+Net Credit 3.10 (20 - 16.90)
+BE = 180 - 3.10 = 176.90
+Buffer = 242.08 - 176.90 = 65.18
+Buffer % = 65.18 / 242.08 = 0.26924 = 26.92%
+Max Return = 3.10 / 16.90 = 0.18343195 = 18.34%
+Loss Prob = 16.6%
+IV Rank = 68.42%
+
+MRNA 175/165:
+Price 242.08
+DTE31
+K1=175, K2=165
+Width10
+MaxLoss8.55
+C=1.45
+BE=173.55
+Buffer=68.53
+Buffer%=28.31%
+Return=16.96%
+LP=15.2%
+
+MRNA 175/160:
+K1=175 K2=160 Width15 MaxLoss12.90 C=2.10
+BE=172.90 Buffer=69.18 Buffer%=28.58% Return=16.28% LP14.9%
+
+MRNA 180/165:
+K1=180 K2=165 Width15 MaxLoss12.55 C=2.45
+BE

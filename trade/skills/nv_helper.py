@@ -23,11 +23,11 @@ try:
 except ImportError:
     OpenAI = None
 
-# 預設候選模型順序：以 DeepSeek Flash 模型為首選
+# 預設候選模型：以 DeepSeek Flash 為首選模型 (在 NVIDIA NIM 平台穩定可用，並具備可靠備援)
 CANDIDATE_MODELS = [
     "deepseek-ai/deepseek-v4.1-flash",
-    "deepseek-ai/deepseek-r1",
-    "meta/llama-3.3-70b-instruct",
+    "minimaxai/minimax-m3.1-flash",
+    "z-ai/glm-5.3-flash",
 ]
 
 
@@ -89,20 +89,24 @@ def call_nv_for_skill(
     prompt,
     api_key=None,
     candidate_models=None,
-    timeout=60,
+    timeout=180,
     min_chars=50,
     validate_func=None,
-    max_output_tokens=262144,
-    temperature=1.0,
+    max_output_tokens=8192,
+    temperature=0.7,
     top_p=0.95,
     retry_on_busy=True,
+    enable_thinking=False,
+    system_prompt=None,
 ):
     """
     通用 NVIDIA API (OpenAI Client 相容) 模型呼叫器：
-      - 依序嘗試候選模型 (預設首選 deepseek-ai/deepseek-v4.1-flash)
+      - 依序嘗試候選模型 (首選 deepseek-ai/deepseek-v4.1-flash，備援支援 minimax/glm)
+      - 支援流式 (Streaming) 接收，杜絕長思考階段之 Socket 逾時
+      - 預設關閉 DeepSeek 冗長英文思考模式 (thinking: False)，直接高效產出結構化 Markdown
       - 支援內容完整性檢驗 (validate_func)
       - 支援 503 高負載與 429 速率限制自動重試
-      - 支援 max_tokens 自動降級調適
+      - 支援 max_tokens 自動調適
       - 回傳完整文字報告字串
     """
     key = api_key or load_nv_api_key()
@@ -115,7 +119,7 @@ def call_nv_for_skill(
     models = valid_nv_models if valid_nv_models else CANDIDATE_MODELS
     base_url = "https://integrate.api.nvidia.com/v1"
 
-    # 初始化 OpenAI Client
+    # 初始化 OpenAI Client (設定寬裕的超時上限以因應深度推理)
     client = None
     if OpenAI:
         try:
@@ -124,40 +128,78 @@ def call_nv_for_skill(
             print(f"[WARN] [NVHelper] 初始化 OpenAI 客戶端失敗: {ce}，將改用 requests 直接連線。")
             client = None
 
+    default_system = (
+        "你是一名華爾街頂級量化交易與期權分析專家。請嚴格以繁體中文直接輸出結構化量化報告與 Markdown 格式。"
+        "請直接輸出完整的最終 Markdown 內容 (content)，切勿將 tokens 耗盡於思考階段！"
+    )
+    sys_content = system_prompt or default_system
+    messages = [
+        {"role": "system", "content": sys_content},
+        {"role": "user", "content": prompt}
+    ]
+
     for m_name in models:
         max_attempts = 2 if retry_on_busy else 1
-        current_max_tokens = max_output_tokens
+        current_max_tokens = min(max_output_tokens, 16384) if max_output_tokens > 8192 else max_output_tokens
 
         for attempt in range(1, max_attempts + 1):
             if attempt > 1:
                 print(f"[INFO] [NVHelper] 模型 {m_name} 進行第 {attempt} 次嘗試...")
             else:
-                print(f"[INFO] [NVHelper] 嘗試呼叫 NVIDIA 模型: {m_name} (max_tokens={current_max_tokens})...")
+                print(f"[INFO] [NVHelper] 嘗試呼叫 NVIDIA 模型: {m_name} (max_tokens={current_max_tokens}, thinking={enable_thinking})...")
 
             try:
                 text = None
 
-                # 優先使用 OpenAI Client
+                # 優先使用 OpenAI Client (啟用 Streaming 保持長連線活躍)
                 if client:
+                    create_kwargs = {
+                        "model": m_name,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "top_p": top_p,
+                        "max_tokens": current_max_tokens,
+                        "stream": True,
+                    }
+                    if not enable_thinking and "deepseek" in m_name.lower():
+                        create_kwargs["extra_body"] = {"chat_template_kwargs": {"thinking": False}}
+
                     try:
-                        completion = client.chat.completions.create(
-                            model=m_name,
-                            messages=[{"role": "user", "content": prompt}],
-                            temperature=temperature,
-                            top_p=top_p,
-                            max_tokens=current_max_tokens,
-                            stream=False,
-                        )
-                        if completion and completion.choices:
-                            text = completion.choices[0].message.content or ""
+                        stream_resp = client.chat.completions.create(**create_kwargs)
                     except Exception as oai_err:
                         err_str = str(oai_err)
-                        # 檢查是否為 max_tokens 超出模型上限的錯誤 (例如限制 4096 / 8192 等)
-                        if "max_tokens" in err_str.lower() and current_max_tokens > 4096:
-                            print(f"[WARN] [NVHelper] 模型 {m_name} max_tokens 限制過高 ({current_max_tokens})，自動調降為 4096 重試...")
+                        # 若 extra_body 不被支援，移除後降級重試
+                        if "extra_body" in create_kwargs or "chat_template_kwargs" in err_str:
+                            create_kwargs.pop("extra_body", None)
+                            try:
+                                stream_resp = client.chat.completions.create(**create_kwargs)
+                            except Exception as fallback_err:
+                                err_str = str(fallback_err)
+                                if "max_tokens" in err_str.lower() and current_max_tokens > 4096:
+                                    print(f"[WARN] [NVHelper] 模型 {m_name} max_tokens 限制過高 ({current_max_tokens})，調降為 4096 重試...")
+                                    current_max_tokens = 4096
+                                    continue
+                                raise fallback_err
+                        elif "max_tokens" in err_str.lower() and current_max_tokens > 4096:
+                            print(f"[WARN] [NVHelper] 模型 {m_name} max_tokens 限制過高 ({current_max_tokens})，調降為 4096 重試...")
                             current_max_tokens = 4096
                             continue
-                        raise oai_err
+                        else:
+                            raise oai_err
+
+                    content_parts = []
+                    reasoning_parts = []
+                    for chunk in stream_resp:
+                        if not chunk.choices:
+                            continue
+                        delta = chunk.choices[0].delta
+                        if hasattr(delta, "reasoning_content") and delta.reasoning_content:
+                            reasoning_parts.append(delta.reasoning_content)
+                        if delta.content:
+                            content_parts.append(delta.content)
+                    c_text = "".join(content_parts).strip()
+                    r_text = "".join(reasoning_parts).strip()
+                    text = c_text if c_text else r_text
 
                 # 若無 OpenAI Client 則使用 requests REST API
                 else:
@@ -167,18 +209,35 @@ def call_nv_for_skill(
                     }
                     payload = {
                         "model": m_name,
-                        "messages": [{"role": "user", "content": prompt}],
+                        "messages": messages,
                         "temperature": temperature,
                         "top_p": top_p,
                         "max_tokens": current_max_tokens,
                         "stream": False,
                     }
+                    if not enable_thinking and "deepseek" in m_name.lower():
+                        payload["chat_template_kwargs"] = {"thinking": False}
+
                     r = requests.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=timeout)
                     if r.status_code == 200:
                         res_json = r.json()
                         choices = res_json.get("choices", [])
                         if choices:
-                            text = choices[0].get("message", {}).get("content", "")
+                            msg_dict = choices[0].get("message", {})
+                            c_text = (msg_dict.get("content") or "").strip()
+                            r_text = (msg_dict.get("reasoning_content") or "").strip()
+                            text = c_text if c_text else r_text
+                    elif r.status_code == 400 and ("chat_template_kwargs" in r.text or "extra_body" in r.text):
+                        payload.pop("chat_template_kwargs", None)
+                        r2 = requests.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=timeout)
+                        if r2.status_code == 200:
+                            res_json = r2.json()
+                            choices = res_json.get("choices", [])
+                            if choices:
+                                msg_dict = choices[0].get("message", {})
+                                c_text = (msg_dict.get("content") or "").strip()
+                                r_text = (msg_dict.get("reasoning_content") or "").strip()
+                                text = c_text if c_text else r_text
                     elif r.status_code == 400 and "max_tokens" in r.text and current_max_tokens > 4096:
                         print(f"[WARN] [NVHelper] 模型 {m_name} 報錯 max_tokens 過大，調降至 4096 重試...")
                         current_max_tokens = 4096

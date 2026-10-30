@@ -58,7 +58,7 @@ if "%MM%"=="33" (
             )
         )
 
-        if "%HH%"=="22" (
+        if "%HH%"=="21" (
             wmic process where "name='py.exe' or name='python.exe'" get commandline 2>nul | find "DTE0_SELL.py" >nul
             if not errorlevel 1 (
                 echo [OK] DTE0_SELL.py is running.

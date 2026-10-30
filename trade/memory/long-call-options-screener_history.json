@@ -4,30 +4,6 @@
   "blacklist": [],
   "history": [
     {
-      "symbol": "NVDA",
-      "recommended_at": "2026-09-30 01:32:58",
-      "company_name": "",
-      "insider_net_buy": 0.0,
-      "selected_call": {
-        "symbol": "NVDA",
-        "strike": 210.0,
-        "exp_date": "20261023",
-        "exp_date_disp": "2026-10-23",
-        "ref_price": 22.05,
-        "ask": 22.05,
-        "delta": 0.84,
-        "dte": 24,
-        "underlying_price": 229.64,
-        "volume": 280,
-        "open_int": 1323,
-        "right": "C",
-        "action": "BUY",
-        "strategy": "Long Call"
-      },
-      "status": "recommended",
-      "notes": "Selected by Long Call Pipeline on 2026-09-30 01:32:12"
-    },
-    {
       "symbol": "RXRX",
       "recommended_at": "2026-10-02 02:33:05",
       "company_name": "",
@@ -124,52 +100,52 @@
       "notes": "Selected by Long Call Pipeline on 2026-10-16 23:33:08"
     },
     {
-      "symbol": "AAPL",
-      "recommended_at": "2026-10-19 23:35:14",
-      "company_name": "",
-      "insider_net_buy": 0.0,
-      "selected_call": {
-        "symbol": "AAPL",
-        "strike": 320.0,
-        "exp_date": "20261120",
-        "exp_date_disp": "2026-11-20",
-        "ref_price": 28.3,
-        "ask": 28.3,
-        "delta": 0.81,
-        "dte": 32,
-        "underlying_price": 345.12,
-        "volume": 200,
-        "open_int": 6902,
-        "right": "C",
-        "action": "BUY",
-        "strategy": "Long Call"
-      },
-      "status": "recommended",
-      "notes": "Selected by Long Call Pipeline on 2026-10-19 23:33:06"
-    },
-    {
       "symbol": "PAA",
-      "recommended_at": "2026-10-20 23:38:40",
+      "recommended_at": "2026-10-28 00:38:10",
       "company_name": "",
       "insider_net_buy": 0.0,
       "selected_call": {
         "symbol": "PAA",
-        "strike": 24.0,
+        "strike": 25.0,
         "exp_date": "20261120",
         "exp_date_disp": "2026-11-20",
         "ref_price": 1.5,
         "ask": 1.5,
-        "delta": 0.852139,
-        "dte": 31,
-        "underlying_price": 25.29,
-        "volume": 100,
-        "open_int": 10394,
+        "delta": 0.879118,
+        "dte": 24,
+        "underlying_price": 26.41,
+        "volume": 1314,
+        "open_int": 7422,
         "right": "C",
         "action": "BUY",
         "strategy": "Long Call"
       },
       "status": "recommended",
-      "notes": "Selected by Long Call Pipeline on 2026-10-20 23:33:08"
+      "notes": "Selected by Long Call Pipeline on 2026-10-28 00:33:08"
+    },
+    {
+      "symbol": "DGX",
+      "recommended_at": "2026-10-30 00:34:40",
+      "company_name": "",
+      "insider_net_buy": 0.0,
+      "selected_call": {
+        "symbol": "DGX",
+        "strike": 230.0,
+        "exp_date": "20261120",
+        "exp_date_disp": "2026-11-20",
+        "ref_price": 23.0,
+        "ask": 23.0,
+        "delta": 0.860876,
+        "dte": 22,
+        "underlying_price": 250.99,
+        "volume": 400,
+        "open_int": 521,
+        "right": "C",
+        "action": "BUY",
+        "strategy": "Long Call"
+      },
+      "status": "recommended",
+      "notes": "Selected by Long Call Pipeline on 2026-10-30 00:33:06"
     }
   ]
 }

@@ -26,6 +26,9 @@ import sys
 import time
 import math
 import datetime
+import logging
+
+logger = logging.getLogger("ScaleInOrderSkill")
 
 # 確保基礎路徑
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -33,14 +36,16 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 try:
-    from ib_insync import IB, Contract, Option, LimitOrder, MarketOrder, StopOrder, TagValue
+    from ib_insync import IB, Contract, Option, Order, LimitOrder, MarketOrder, StopOrder, OrderComboLeg, TagValue
 except ImportError:
     IB = None
     Contract = None
     Option = None
+    Order = None
     LimitOrder = None
     MarketOrder = None
     StopOrder = None
+    OrderComboLeg = None
     TagValue = None
 
 try:
@@ -338,10 +343,74 @@ class ScaleInOrderSkill:
             print(f"  -> 🔍 [模擬模式 (Dry-Run)] 模擬加碼母單成交: {action} {quantity:g}口")
             return True, None, (limit_price or 1.0)
 
-        # 優先向 IBKR 預查目標合約 (BAG 組合單或單腿) 之即時真實市場報價
-        # 避免因靜態/歷史 Barchart 表格數據 (如 50 分鐘前數據) 偏離最新盤面導致掛單無法成交
+        # 雙腿盤口流動性檢查與公允價格計算 (若為 2 腿垂直價差組合單，強制過濾流動性死水並以雙腿合成公允價)
         live_mid = None
-        if self.ib and self.ib.isConnected():
+        if getattr(contract, 'secType', '') == 'BAG' and len(getattr(contract, 'comboLegs', []) or []) == 2 and self.ib and self.ib.isConnected():
+            eff_dirs = self.get_effective_leg_directions(contract, action)
+            short_leg = next((l for l in contract.comboLegs if eff_dirs.get(l.conId) == 'SELL'), None)
+            long_leg = next((l for l in contract.comboLegs if eff_dirs.get(l.conId) == 'BUY'), None)
+            if short_leg and long_leg:
+                try:
+                    c_short = Contract(conId=short_leg.conId, exchange=getattr(short_leg, 'exchange', 'SMART') or 'SMART')
+                    c_long = Contract(conId=long_leg.conId, exchange=getattr(long_leg, 'exchange', 'SMART') or 'SMART')
+                    self.ib.reqMarketDataType(3)
+                    short_put_ticker = self.ib.reqMktData(c_short, '', False, False)
+                    long_put_ticker = self.ib.reqMktData(c_long, '', False, False)
+                    self.ib.sleep(2.0)  # 等待雙腿行情回傳
+
+                    # 自動校準防呆：若傳入之 ComboLeg 方向未依 Order.action 反轉 (導致貴腿與便宜腿顛倒)，自動校正為 IBKR 標準正限價方向
+                    if (
+                        action.upper() == 'SELL'
+                        and short_put_ticker.bid > 0
+                        and long_put_ticker.bid > 0
+                        and short_put_ticker.bid < long_put_ticker.bid
+                    ):
+                        short_leg, long_leg = long_leg, short_leg
+                        short_leg.action = 'BUY'
+                        long_leg.action = 'SELL'
+                        short_put_ticker, long_put_ticker = long_put_ticker, short_put_ticker
+                        c_short, c_long = c_long, c_short
+
+                    # 雙腿盤口流動性檢查
+                    if long_put_ticker.ask <= 0 or short_put_ticker.bid <= 0:
+                        logger.warning("雙腿存在零報價死水期，做市商無意撮合，放棄此標的！")
+                        print("  -> ⚠️ [流動性熔斷] 雙腿存在零報價死水期，做市商無意撮合，放棄此標的！")
+                        try:
+                            self.ib.cancelMktData(c_short)
+                            self.ib.cancelMktData(c_long)
+                        except Exception:
+                            pass
+                        return False, None, 0.0
+
+                    natural_bid = short_put_ticker.bid - long_put_ticker.ask
+                    if natural_bid <= 0.05:
+                        logger.warning(f"即時做市商買盤 Natural Bid 僅 ${natural_bid:.2f} <= $0.05，毫無收租價值，終止下單！")
+                        print(f"  -> ⚠️ [流動性熔斷] 即時做市商買盤 Natural Bid 僅 ${natural_bid:.2f} <= $0.05，毫無收租價值，終止下單！")
+                        try:
+                            self.ib.cancelMktData(c_short)
+                            self.ib.cancelMktData(c_long)
+                        except Exception:
+                            pass
+                        return False, None, 0.0
+
+                    # 計算真實市場做市商買盤 (Natural Bid) 與公允中價 (Mid)
+                    natural_ask = short_put_ticker.ask - long_put_ticker.bid
+                    mid_price = (natural_bid + natural_ask) / 2
+                    if mid_price > 0.01:
+                        live_mid = round(mid_price, 2)
+                        logger.info(f"即時做市商買盤: ${natural_bid:.2f} | 啟動 Walk-Up 起始限價: ${live_mid:.2f}")
+                        print(f"  -> 🎯 [即時盤口公允計算] 做市商 Natural Bid: ${natural_bid:.2f}, Natural Ask: ${natural_ask:.2f} -> 公允中間價 (Mid): ${live_mid:.2f}")
+
+                    try:
+                        self.ib.cancelMktData(c_short)
+                        self.ib.cancelMktData(c_long)
+                    except Exception:
+                        pass
+                except Exception as ex:
+                    print(f"  -> [流動性檢驗提示] 雙腿盤口預查異常: {ex}")
+
+        # 若未透過雙腿取得 live_mid，向 IBKR 預查目標合約市價 (避免因靜態/歷史 Barchart 表格數據偏離最新盤面)
+        if (live_mid is None or live_mid <= 0.01) and self.ib and self.ib.isConnected():
             try:
                 self.ib.reqMarketDataType(3)
                 ticker = self.ib.reqMktData(contract, '', False, False)
@@ -398,7 +467,13 @@ class ScaleInOrderSkill:
                 print(f"  -> ⚠️ 加碼母單步進超時已徹底撤單，目前狀態: {status}")
                 return False, trade, 0.0
         else:
-            order = LimitOrder(action=action, totalQuantity=quantity, lmtPrice=current_mid)
+            order = Order(
+                action=action,
+                totalQuantity=quantity,
+                orderType="LMT",
+                lmtPrice=current_mid,
+                smartComboRoutingParams=[TagValue("NonGuaranteed", "1")]  # 關鍵：允許跨交易所撮合
+            )
             order.tif = "DAY"
             if target_account:
                 order.account = target_account
@@ -502,21 +577,25 @@ class ScaleInOrderSkill:
         if all_exact_same or not distinct_old_contracts:
             # 情況 A: 完全相同合約，合併為單一總口數 (total_qty) OCA 括號單
             oca_group_id = f"OCA_{symbol}_{int(time.time() * 1000) % 1000000}"
-            tp_order = LimitOrder(
+            tp_order = Order(
                 action=opposite_action,
                 totalQuantity=total_qty,
+                orderType="LMT",
                 lmtPrice=take_profit_price,
                 tif="GTC",
                 ocaGroup=oca_group_id,
-                ocaType=1
+                ocaType=1,
+                smartComboRoutingParams=[TagValue("NonGuaranteed", "1")]  # 關鍵：允許跨交易所撮合
             )
-            sl_order = StopOrder(
+            sl_order = Order(
                 action=opposite_action,
                 totalQuantity=total_qty,
-                stopPrice=stop_loss_price,
+                orderType="STP",
+                auxPrice=stop_loss_price,
                 tif="GTC",
                 ocaGroup=oca_group_id,
-                ocaType=1
+                ocaType=1,
+                smartComboRoutingParams=[TagValue("NonGuaranteed", "1")]  # 關鍵：允許跨交易所撮合
             )
             if target_account:
                 tp_order.account = target_account
@@ -554,21 +633,25 @@ class ScaleInOrderSkill:
             # 情況 B: 跨不同履約價組合，分別掛出專屬 OCA 括號單
             # 1. 本次加碼新合約之 OCA 括號單
             oca_group_new = f"OCA_{symbol}_NEW_{int(time.time() * 1000) % 1000000}"
-            tp_order_new = LimitOrder(
+            tp_order_new = Order(
                 action=opposite_action,
                 totalQuantity=added_qty,
+                orderType="LMT",
                 lmtPrice=take_profit_price,
                 tif="GTC",
                 ocaGroup=oca_group_new,
-                ocaType=1
+                ocaType=1,
+                smartComboRoutingParams=[TagValue("NonGuaranteed", "1")]  # 關鍵：允許跨交易所撮合
             )
-            sl_order_new = StopOrder(
+            sl_order_new = Order(
                 action=opposite_action,
                 totalQuantity=added_qty,
-                stopPrice=stop_loss_price,
+                orderType="STP",
+                auxPrice=stop_loss_price,
                 tif="GTC",
                 ocaGroup=oca_group_new,
-                ocaType=1
+                ocaType=1,
+                smartComboRoutingParams=[TagValue("NonGuaranteed", "1")]  # 關鍵：允許跨交易所撮合
             )
             if target_account:
                 tp_order_new.account = target_account
@@ -611,21 +694,25 @@ class ScaleInOrderSkill:
                 old_sl = old_data.get("sl_price") or stop_loss_price
 
                 oca_group_old = f"OCA_{symbol}_OLD_{int(time.time() * 1000) % 1000000}"
-                tp_order_old = LimitOrder(
+                tp_order_old = Order(
                     action=opposite_action,
                     totalQuantity=old_qty,
+                    orderType="LMT",
                     lmtPrice=old_tp,
                     tif="GTC",
                     ocaGroup=oca_group_old,
-                    ocaType=1
+                    ocaType=1,
+                    smartComboRoutingParams=[TagValue("NonGuaranteed", "1")]  # 關鍵：允許跨交易所撮合
                 )
-                sl_order_old = StopOrder(
+                sl_order_old = Order(
                     action=opposite_action,
                     totalQuantity=old_qty,
-                    stopPrice=old_sl,
+                    orderType="STP",
+                    auxPrice=old_sl,
                     tif="GTC",
                     ocaGroup=oca_group_old,
-                    ocaType=1
+                    ocaType=1,
+                    smartComboRoutingParams=[TagValue("NonGuaranteed", "1")]  # 關鍵：允許跨交易所撮合
                 )
                 if target_account:
                     tp_order_old.account = target_account

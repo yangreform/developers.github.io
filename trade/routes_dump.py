@@ -144,7 +144,7 @@ def close_dash_position():
         contract = Contract(conId=int(conId))
         local_ib.qualifyContracts(contract)
         
-        from ib_insync import IB, Contract, LimitOrder
+        from ib_insync import IB, Contract, Order, OrderComboLeg, LimitOrder, TagValue
         ticker = local_ib.reqMktData(contract, '', False, False)
         local_ib.sleep(0.8)
         current_mid = ticker.midpoint()
@@ -167,7 +167,7 @@ def close_dash_position():
             filled, trade, avg_p = execute_walk_up_order(local_ib, contract, action, float(qty), current_mid)
             return jsonify({'status': 'ok', 'message': f'Order placed (Custom Walk-Up): {action} {qty} (Filled: {filled})'})
         else:
-            order = LimitOrder(action, float(qty), current_mid)
+            order = Order(action=action, totalQuantity=float(qty), orderType='LMT', lmtPrice=current_mid, smartComboRoutingParams=[TagValue('NonGuaranteed', '1')])
             order.tif = 'DAY'
             trade = local_ib.placeOrder(contract, order)
             local_ib.sleep(1)
@@ -189,7 +189,7 @@ def place_dash_trade_bull_put():
          return jsonify({'status': 'error', 'message': 'Invalid conIds for legs.'})
          
     try:
-        from ib_insync import Contract, ComboLeg, LimitOrder
+        from ib_insync import Contract, ComboLeg, Order, OrderComboLeg, LimitOrder, TagValue
         # Build BAG
         contract = Contract()
         contract.symbol = symbol
@@ -228,11 +228,11 @@ def place_dash_trade_bull_put():
             limit_price = round(limit_price, 2)
             
             # Parent limit order
-            parent = LimitOrder('SELL', 1, limit_price)
+            parent = Order(action='SELL', totalQuantity=1, orderType='LMT', lmtPrice=limit_price, smartComboRoutingParams=[TagValue('NonGuaranteed', '1')])
             parent.transmit = False
             
             # Child limit order
-            take_profit = LimitOrder('BUY', 1, round(limit_price * 0.25, 2))
+            take_profit = Order(action='BUY', totalQuantity=1, orderType='LMT', lmtPrice=round(limit_price * 0.25, 2), smartComboRoutingParams=[TagValue('NonGuaranteed', '1')])
             take_profit.transmit = True
 
             parent.orderId = local_ib.client.getReqId()

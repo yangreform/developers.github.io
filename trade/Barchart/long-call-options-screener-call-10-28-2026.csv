@@ -1,0 +1,3 @@
+Symbol,Price~,"Exp Date",DTE,Strike,Type,Moneyness,Ask,"%TP Ask","BE (Ask)","%BE (Ask)",Volume,"Open Int","IV Rank",IV,Delta,"Profit Prob"
+AMD,566.79,2026-11-20,23,270.00,Call,+52.36%,300.05,0.58%,570.05,0.58%,141,831,39.01%,75.18%,0.999973,50.59%
+"Downloaded from Barchart.com as of 10-28-2026 11:33am CDT"

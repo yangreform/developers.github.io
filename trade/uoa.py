@@ -40,7 +40,10 @@ import time
 import re
 import datetime
 import argparse
+import logging
 import pandas as pd
+
+logger = logging.getLogger("UOASkill")
 
 # 確保 Windows 主控台正確輸出 UTF-8 字符
 if sys.platform == "win32":
@@ -110,12 +113,15 @@ except ImportError:
     send_push_message = None
 
 try:
-    from ib_insync import IB, Option, Contract, ComboLeg
+    from ib_insync import IB, Option, Contract, ComboLeg, Order, OrderComboLeg, TagValue
 except ImportError:
     IB = None
     Option = None
     Contract = None
     ComboLeg = None
+    Order = None
+    OrderComboLeg = None
+    TagValue = None
 
 
 def normalize_exp_date(date_val):
@@ -228,6 +234,43 @@ def clean_and_prepare_vertical_spread_data(csv_path_input, spread_type="bull-put
     if dedup_cols:
         combined_sp = combined_sp.drop_duplicates(subset=dedup_cols)
 
+    # 1. 排除標的股價低於 $30 的小型股（低價股的價外 Put 權利金常只有幾分錢，手續費佔比過高且缺乏造市商流動性）
+    price_col = next((c for c in ["Price~", "Price", "Stock Price"] if c in combined_sp.columns), None)
+    if price_col:
+        price_num = pd.to_numeric(combined_sp[price_col].astype(str).str.replace("$", "").str.strip(), errors="coerce")
+        before_cnt = len(combined_sp)
+        valid_price_mask = price_num >= 30.0
+        if valid_price_mask.any():
+            combined_sp = combined_sp[valid_price_mask]
+            print(f"[INFO] [{spread_name}Skill] 股價門檻檢驗 (Price >= $30): 排除 {before_cnt - len(combined_sp)} 筆低價股，剩餘 {len(combined_sp)} 筆")
+
+    # 2. DTE 嚴格限制在 20 ～ 35 天（排除 > 45 天的冷門合約）
+    if "DTE" in combined_sp.columns:
+        dte_num = pd.to_numeric(combined_sp["DTE"].astype(str).str.strip(), errors="coerce")
+        # 先排除 > 45 天的冷門合約
+        combined_sp = combined_sp[dte_num <= 45].copy()
+        # 優先嚴格限制在 20 ~ 35 天甜蜜期
+        dte_current = pd.to_numeric(combined_sp["DTE"].astype(str).str.strip(), errors="coerce")
+        dte_sweet = combined_sp[(dte_current >= 20) & (dte_current <= 35)]
+        if not dte_sweet.empty:
+            combined_sp = dte_sweet
+            print(f"[INFO] [{spread_name}Skill] DTE 嚴格約束 (20~35 天): 鎖定 {len(combined_sp)} 筆甜蜜期合約")
+        else:
+            print(f"[WARN] [{spread_name}Skill] 無 20~35 天合約，使用已排除 > 45 天之合約 (共 {len(combined_sp)} 筆)")
+
+    # 3. 價差寬度 Width 與 Width - Max Loss (唯一基準)
+    if "Leg1 Strike" in combined_sp.columns and "Leg2 Strike" in combined_sp.columns:
+        s1 = pd.to_numeric(combined_sp["Leg1 Strike"], errors="coerce")
+        s2 = pd.to_numeric(combined_sp["Leg2 Strike"], errors="coerce")
+        combined_sp["Width"] = (s1 - s2).abs().round(2)
+
+        ml_col = next((c for c in ["Max Loss", "MaxLoss"] if c in combined_sp.columns), None)
+        if ml_col:
+            ml_num = pd.to_numeric(combined_sp[ml_col].astype(str).str.replace("$", "").str.strip(), errors="coerce")
+            combined_sp["Width-MaxLoss"] = (combined_sp["Width"] - ml_num).round(2)
+            # 確保 Net Credit 嚴格等於 Width - Max Loss 唯一基準
+            combined_sp["Net Credit"] = combined_sp["Width-MaxLoss"]
+
     # 確保 Net Credit 欄位存在 (Barchart 個股垂直價差常以 Max Profit 代表每口最大淨權利金收入)
     if "Net Credit" not in combined_sp.columns and "Max Profit" in combined_sp.columns:
         combined_sp["Net Credit"] = combined_sp["Max Profit"]
@@ -275,8 +318,8 @@ def build_vertical_spread_prompt(top_df, target_symbols=None, spread_type="bull-
     display_cols = [
         c for c in [
             "Symbol", "Price~", "Exp Date", "DTE", "Leg1 Strike", "Leg1 Bid", "Bid1",
-            "Leg2 Strike", "Leg2 Ask", "Ask2", "Net Credit", "Max Profit", "Max Loss",
-            "Return", "Max Profit%", "Loss Prob", "BE (Buffer)", "BE%", "IV Rank"
+            "Leg2 Strike", "Leg2 Ask", "Ask2", "Width", "Max Loss", "Width-MaxLoss",
+            "Net Credit", "Max Profit", "Return", "Max Profit%", "Loss Prob", "BE (Buffer)", "BE%", "IV Rank"
         ] if c in top_df.columns
     ]
     table_str = top_df[display_cols].to_string(index=False)
@@ -295,7 +338,7 @@ def build_vertical_spread_prompt(top_df, target_symbols=None, spread_type="bull-
         buffer_criteria = """1. **安全防禦空間 (Break-Even Buffer %)**：
    優先挑選下檔緩衝空間充足（BE Buffer 較大），現貨價格遠高於賣出下翼 Put 履約價，具備堅實技術支撐的標的。
 2. **極高勝率與低跌破機率 (Low Loss Probability)**：
-   跌破虧損機率 (Loss Prob) 越低越優（建議小於 20%~25%），享有 75% 以上的高概率收租勝率。"""
+   跌破虧損機率 (Loss Prob) 越低越優（通常建議小於 20%~25%），享有 75% 以上的高概率收租勝率。"""
 
     return f"""你是一名華爾街頂級期權量化經理人與波動率價差收租專家。
 請根據以下來自 Barchart {spread_name} 官方篩選器針對【{target_str}】的未過期候選價差組合清單，進行深度的多因子量化評選，挑選出該標的「唯一最佳、勝率極高、安全緩衝極充足、性價比最高」的 1 組 {spread_name} 垂直價差組合：{target_note}
@@ -306,12 +349,25 @@ def build_vertical_spread_prompt(top_df, target_symbols=None, spread_type="bull-
 {table_str}
 
 ======================================================================
+【🚨 流動性與 DTE 硬性約束條件 (CRITICAL RULES - 必須嚴格遵守)】
+======================================================================
+1. **DTE 嚴格限制在 20 ～ 35 天**：
+   - 挑選組合之到期天數 (DTE) 必須嚴格落在 20 至 35 天範圍內。
+   - 嚴格排除 > 45 天的冷門合約（時間過長、Theta 衰退過慢且缺乏近月做市商流動性）。
+2. **排除標的股價低於 $30 的小型股**：
+   - 標的現價 (Price) 必須 >= $30。
+   - 嚴格排除股價 < $30 的小型股（低價股的價外期權權利金常只有幾分錢，手續費佔比過高且缺乏造市商流動性）。
+3. **預期收入基準：嚴格以 Width - Max Loss 作為唯一基準**：
+   - AI 推薦之組合淨權利金收入 (Net Credit)，必須嚴格以表格中的【價差寬度 (Width) - 最大虧損 (Max Loss)】作為唯一基準 (Width = |Leg1 Strike - Leg2 Strike|，Net Credit = Width - Max Loss)。
+   - **絕對不得自行臆測、捏造或隨意估計預期收入！**
+
+======================================================================
 【量化評比標準】
 {buffer_criteria}
 3. **合理的淨權利金收入 (Net Credit & Return %)**：
-   在確保極高安全邊際的前提下，提供健康的年化報酬率與每口淨權利金收入（Net Credit 建議至少 $0.30~$1.50 以上）。
+   在確保極高安全邊際的前提下，提供健康的每口淨權利金收入（嚴格以 Width - Max Loss 為準）。
 4. **期限窗口最適性 (DTE Horizon)**：
-   到期天數 DTE 介於 14 至 50 天（時間價值 Theta 加速衰退甜蜜期）。
+   DTE 嚴格限制在 20 至 35 天（鎖定時間價值 Theta 加速衰退甜蜜期與做市商高流動性窗口，嚴格排除 > 45 天）。
 
 ======================================================================
 【輸出格式規範】
@@ -319,21 +375,22 @@ def build_vertical_spread_prompt(top_df, target_symbols=None, spread_type="bull-
 
 #### 📌 【最佳 {spread_name} 垂直價差推薦】
 - **推薦標的代號 (Symbol)**: [標的代號，如 {target_str}]
-- **標的現價 (Price)**: $[現價]
+- **標的現價 (Price)**: $[現價，必須 >= 30]
 - **建議策略**: {spread_name} ({spread_title_zh})
 - **到期日 (Exp Date)**: [YYYY-MM-DD]
-- **到期天數 (DTE)**: [數字] 天
+- **到期天數 (DTE)**: [數字] 天 (必須介於 20~35 天)
 - **{leg1_label}**: 履約價 $[數字] @ Bid $[數字]
 - **{leg2_label}**: 履約價 $[數字] @ Ask $[數字]
-- **淨權利金收入 (Net Credit)**: $[數字] (每口最大獲利)
+- **價差寬度 (Width)**: $[數字]
 - **最大虧損風險 (Max Loss)**: $[數字]
+- **淨權利金收入 (Net Credit)**: $[數字] (必須嚴格等於 Width - Max Loss，不得臆測)
 - **損益兩平點與安全空間 (Break-Even Buffer)**: $[數字] (緩衝約 [百分比]%)
 - **最大報酬率 (Max Return %)**: [數字]%
 - **虧損機率 (Loss Prob %)**: [數字]%
 - **進場推薦理由與深度量化分析**:
   1. [安全邊際與支撐/壓力防守評估]
   2. [勝率與 Loss Prob 優勢]
-  3. [權利金收斂與 Theta 衰退性價比]
+  3. [權利金收斂與 Theta 衰退性價比 (符合 DTE 20~35 天及流動性約束)]
 """
 
 
@@ -358,20 +415,35 @@ def parse_best_vertical_spread(report_text, top_df, default_symbol=None, spread_
     exp_date_norm = normalize_exp_date(exp_m.group(1)) if exp_m else None
 
     # Leg 1 Short Leg (Short Put or Short Call)
-    leg1_m = re.search(r"(?:賣出下翼|賣出上翼|Short Put|Short Call|Leg 1).*?履約價.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
+    leg1_m = re.search(r"(?:賣出下翼|賣出上翼|Short Put|Short Call|Leg 1).*?履約價.*?\$?\s*([0-9]+(?:\.[0-9]+)?)", report_text, re.IGNORECASE)
     if not leg1_m:
-        leg1_m = re.search(r"Leg 1 Strike.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
-    leg1_strike = float(leg1_m.group(1)) if leg1_m else None
+        leg1_m = re.search(r"Leg 1 Strike.*?\$?\s*([0-9]+(?:\.[0-9]+)?)", report_text, re.IGNORECASE)
+    leg1_strike = None
+    if leg1_m:
+        try:
+            leg1_strike = float(leg1_m.group(1))
+        except Exception:
+            leg1_strike = None
 
     # Leg 2 Long Leg (Long Put or Long Call)
-    leg2_m = re.search(r"(?:買入保護|Long Put|Long Call|Leg 2).*?履約價.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
+    leg2_m = re.search(r"(?:買入保護|Long Put|Long Call|Leg 2).*?履約價.*?\$?\s*([0-9]+(?:\.[0-9]+)?)", report_text, re.IGNORECASE)
     if not leg2_m:
-        leg2_m = re.search(r"Leg 2 Strike.*?\$?([0-9\.]+)", report_text, re.IGNORECASE)
-    leg2_strike = float(leg2_m.group(1)) if leg2_m else None
+        leg2_m = re.search(r"Leg 2 Strike.*?\$?\s*([0-9]+(?:\.[0-9]+)?)", report_text, re.IGNORECASE)
+    leg2_strike = None
+    if leg2_m:
+        try:
+            leg2_strike = float(leg2_m.group(1))
+        except Exception:
+            leg2_strike = None
 
     # Net Credit
-    credit_m = re.search(r"(?:淨權利金收入|Net Credit).*?[:：]\s*[*_`]*\$?([0-9\.]+)", report_text, re.IGNORECASE)
-    net_credit = float(credit_m.group(1)) if credit_m else 0.50
+    credit_m = re.search(r"(?:淨權利金收入|Net Credit).*?[:：]\s*[*_`]*\$?\s*([0-9]+(?:\.[0-9]+)?)", report_text, re.IGNORECASE)
+    net_credit = 0.50
+    if credit_m:
+        try:
+            net_credit = float(credit_m.group(1))
+        except Exception:
+            net_credit = 0.50
 
     # 備援：若解析缺失，自 top_df 首筆取出
     if not symbol or not exp_date_norm or leg1_strike is None or leg2_strike is None:
@@ -399,6 +471,29 @@ def parse_best_vertical_spread(report_text, top_df, default_symbol=None, spread_
     else:
         if leg1_strike < leg2_strike:
             leg1_strike, leg2_strike = leg2_strike, leg1_strike
+
+    # 嚴格以表格中的 Width - Max Loss 作為唯一基準校正 net_credit
+    if top_df is not None and not top_df.empty:
+        cond = (top_df["Symbol"].astype(str).str.upper() == symbol)
+        if exp_date_norm and "Exp Date" in top_df.columns:
+            cond = cond & (top_df["Exp Date"].astype(str) == exp_date_norm)
+        if leg1_strike and "Leg1 Strike" in top_df.columns:
+            cond = cond & (pd.to_numeric(top_df["Leg1 Strike"], errors="coerce") == leg1_strike)
+        matches = top_df[cond]
+        if not matches.empty:
+            matched_row = matches.iloc[0]
+            ml_col = next((c for c in ["Max Loss", "MaxLoss"] if c in matched_row), None)
+            if ml_col:
+                try:
+                    ml_val = float(str(matched_row[ml_col]).replace("$", "").strip())
+                    exact_width = abs(leg1_strike - leg2_strike)
+                    exact_credit = round(exact_width - ml_val, 2)
+                    if exact_credit > 0:
+                        if abs(net_credit - exact_credit) > 0.01:
+                            print(f"[INFO] [{strategy_name}Skill] 依硬性約束校正 Net Credit: ${exact_credit:.2f} (原解析: ${net_credit:.2f}, Width=${exact_width:.2f}, MaxLoss=${ml_val:.2f})")
+                        net_credit = exact_credit
+                except Exception:
+                    pass
 
     spread_info = {
         "symbol": symbol,
@@ -532,9 +627,52 @@ def execute_vertical_spread_scale_in_order(spread_info, dry_run=False):
 
         print(f"[SUCCESS] ✅ 雙腿合約通過 IBKR 驗證: Short {leg_type_str} conId={short_contract.conId}, Long {leg_type_str} conId={long_contract.conId}")
 
+        # 向 IBKR 取得合約即時盤口報價進行流動性死水檢驗
+        ib.reqMarketDataType(3)
+        short_put_ticker = ib.reqMktData(short_contract, '', False, False)
+        long_put_ticker = ib.reqMktData(long_contract, '', False, False)
+        ib.sleep(1.5)
+
+        # 雙腿盤口流動性檢查
+        if long_put_ticker.ask <= 0 or short_put_ticker.bid <= 0:
+            logger.warning("雙腿存在零報價死水期，做市商無意撮合，放棄此標的！")
+            print("⚠️ [流動性熔斷] 雙腿存在零報價死水期，做市商無意撮合，放棄此標的！")
+            try:
+                ib.cancelMktData(short_contract)
+                ib.cancelMktData(long_contract)
+            except Exception:
+                pass
+            return {"status": "error", "message": "雙腿存在零報價死水期，做市商無意撮合"}
+
+        natural_bid = short_put_ticker.bid - long_put_ticker.ask
+        if natural_bid <= 0.05:
+            logger.warning(f"即時做市商買盤 Natural Bid 僅 ${natural_bid:.2f} <= $0.05，毫無收租價值，終止下單！")
+            print(f"⚠️ [流動性熔斷] 即時做市商買盤 Natural Bid 僅 ${natural_bid:.2f} <= $0.05，毫無收租價值，終止下單！")
+            try:
+                ib.cancelMktData(short_contract)
+                ib.cancelMktData(long_contract)
+            except Exception:
+                pass
+            return {"status": "error", "message": f"Natural Bid ${natural_bid:.2f} <= 0.05"}
+
+        natural_ask = short_put_ticker.ask - long_put_ticker.bid
+        mid_price = (natural_bid + natural_ask) / 2
+        start_price = round(mid_price, 2)
+        logger.info(f"即時做市商買盤: ${natural_bid:.2f} | 啟動 Walk-Up 起始限價: ${start_price:.2f}")
+        print(f"[INFO] [SpreadSkill] 雙腿即時盤口: Short {leg_type_str} (Bid=${short_put_ticker.bid:.2f}, Ask=${short_put_ticker.ask:.2f}) | Long {leg_type_str} (Bid=${long_put_ticker.bid:.2f}, Ask=${long_put_ticker.ask:.2f})")
+        print(f"[INFO] [SpreadSkill] 即時做市商買盤: ${natural_bid:.2f} | 啟動 Walk-Up 起始限價: ${start_price:.2f} (原 Barchart 參考: ${credit:.2f})")
+
+        try:
+            ib.cancelMktData(short_contract)
+            ib.cancelMktData(long_contract)
+        except Exception:
+            pass
+
         # 建立 BAG 垂直價差組合單
-        c1 = ComboLeg(conId=short_contract.conId, ratio=1, action="SELL", exchange="SMART")
-        c2 = ComboLeg(conId=long_contract.conId, ratio=1, action="BUY", exchange="SMART")
+        # 重要：當母單為 SELL 且使用正數限價 (Credit) 時，IBKR 實際執行方向 = Order.action * ComboLeg.action
+        # 因此賣出腿 (short_contract) 必須設為 BUY (SELL*BUY=SELL)，買入保護腿 (long_contract) 必須設為 SELL (SELL*SELL=BUY)
+        c1 = ComboLeg(conId=short_contract.conId, ratio=1, action="BUY", exchange="SMART")
+        c2 = ComboLeg(conId=long_contract.conId, ratio=1, action="SELL", exchange="SMART")
         bag_contract = Contract(
             symbol=symbol,
             secType="BAG",
@@ -543,10 +681,10 @@ def execute_vertical_spread_scale_in_order(spread_info, dry_run=False):
             comboLegs=[c1, c2],
         )
 
-        take_profit_price = round(credit * 0.5, 2)
-        stop_loss_price = round(credit * 2.0, 2)
+        take_profit_price = round(start_price * 0.5, 2)
+        stop_loss_price = round(start_price * 2.0, 2)
 
-        print(f"  -> 附屬單規劃:")
+        print(f"  -> 附屬單規劃 (以真實市場起始價 ${start_price:.2f} 計算):")
         print(f"     • 🎯 Profit Taker (50%停利單): ${take_profit_price:.2f}")
         print(f"     • 🛑 Stop Loss    (2倍停損單):  ${stop_loss_price:.2f}")
 
@@ -557,7 +695,7 @@ def execute_vertical_spread_scale_in_order(spread_info, dry_run=False):
             symbol=symbol,
             action="SELL",
             quantity=1.0,
-            credit=credit,
+            credit=start_price,
             take_profit_price=take_profit_price,
             stop_loss_price=stop_loss_price,
             target_account=target_account,

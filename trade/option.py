@@ -9,6 +9,7 @@ except ImportError:
     from backports import zoneinfo
 import requests
 from ib_insync import *
+from ib_insync import Order, OrderComboLeg, TagValue
 
 from notifier import send_push_message, send_trade_notification
 import sys
@@ -942,8 +943,14 @@ def execute_butterfly(legs):
     action_chinese = 'Walk-Up 買入' if is_long else 'Walk-Up 賣出'
 
     # 建立自適應步進限價訂單 (Custom Walk-Up)
-    order = LimitOrder(order_action, TRADE_QTY, limit_price)
-    order.tif = 'DAY'
+    order = Order(
+        action=order_action,
+        totalQuantity=TRADE_QTY,
+        orderType='LMT',
+        lmtPrice=limit_price,
+        tif='DAY',
+        smartComboRoutingParams=[TagValue('NonGuaranteed', '1')]  # 關鍵：允許跨交易所撮合
+    )
 
     # 即時查詢 trade/.env 中的 OP_SEND_WEBHOOK 開關與目標帳號
     env_cfg = load_env_config()

@@ -164,38 +164,70 @@ class OptionsFlowSkill:
     def parse_call_contract(self, report_text, default_symbol="DELL"):
         """
         自期權分析報告中解析期權合約規格：symbol, strike, exp_date (YYYYMMDD), ref_price
+        支援 Markdown 列表、表格 (含 | 分隔符) 以及多種語言中英文混排標籤。
         """
         sym_clean = default_symbol.strip().upper()
 
-        # 標的代號
+        # 1. 標的代號
         patterns = [
-            r'推薦標的代號[^\n:]*[：:]\s*[\*`]*([A-Za-z0-9]+)',
-            r'Symbol[^\n:]*[：:]\s*[\*`]*([A-Za-z0-9]+)',
-            r'標的代號[^\n:]*[：:]\s*[\*`]*([A-Za-z0-9]+)',
+            r'(?:推薦標的代號|標的代號|Symbol|Ticker)[^\n\w]*[:：\|]?\s*[\*`]*([A-Za-z0-9]+)',
+            r'\*\*推薦標的代號[^\*]*\*\*[:：\s]*`?([A-Za-z0-9]+)',
+            r'\*\*Symbol\*\*[：:\s]*`?([A-Za-z0-9]+)',
         ]
         for p in patterns:
             m = re.search(p, report_text, re.IGNORECASE)
             if m:
                 s = m.group(1).strip().upper()
-                if s not in ("BUY", "CALL", "PUT", "STOCK", "NONE", "N/A", "SYMBOL"):
+                if s not in ("BUY", "CALL", "PUT", "STOCK", "NONE", "N/A", "SYMBOL", "OPTION", "STRIKE", "DTE"):
                     sym_clean = s
                     break
 
-        # 履約價
-        strike_match = re.search(r'(?:履約價|Strike)[^\n:]*[：:]\s*[\*\$]*\s*(\d+\.?\d*)', report_text, re.IGNORECASE)
-        strike = float(strike_match.group(1)) if strike_match else None
-        if not strike:
-            m_st = re.search(r'Strike\s*[:\*\$]*\s*(\d+\.?\d*)', report_text, re.IGNORECASE)
-            if m_st:
-                strike = float(m_st.group(1))
+        # 2. 履約價 Strike
+        strike = None
+        strike_patterns = [
+            r'(?:履約價|Strike)[^\n\d]*[:：\|]\s*[\*\$]*\s*(\d+(?:\.\d+)?)',
+            r'Strike\s*[:\*\$\|]*\s*(\d+(?:\.\d+)?)',
+            r'\$(\d+(?:\.\d+)?)\s*(?:CALL|Call|C\b)',
+            r'(?:CALL|Call|C\b)\s*@?\s*\$?(\d+(?:\.\d+)?)',
+        ]
+        for sp in strike_patterns:
+            m = re.search(sp, report_text, re.IGNORECASE)
+            if m:
+                try:
+                    strike = float(m.group(1))
+                    break
+                except (ValueError, TypeError):
+                    continue
 
-        # 到期日
-        exp_match = re.search(r'到期日[^\d]*(\d{4}[-/]\d{2}[-/]\d{2})', report_text)
-        exp_date = exp_match.group(1).replace("-", "").replace("/", "") if exp_match else None
+        # 3. 到期日 Expiration Date
+        exp_date = None
+        exp_patterns = [
+            r'(?:到期日|Expiration|Exp Date)[^\d]*(\d{4}[-/]\d{2}[-/]\d{2})',
+            r'(?:到期日|Expiration|Exp Date)[^\d]*(\d{8})',
+            r'\b(\d{4}[-/]\d{2}[-/]\d{2})\b',
+        ]
+        for ep in exp_patterns:
+            m = re.search(ep, report_text, re.IGNORECASE)
+            if m:
+                raw_d = m.group(1).replace("-", "").replace("/", "").strip()
+                if len(raw_d) == 8 and raw_d.isdigit() and raw_d.startswith("20"):
+                    exp_date = raw_d
+                    break
 
-        # 參考價格 / 權利金
-        ref_match = re.search(r'(?:參考價格|權利金|Trade|Ask)[^\$\d\n]*\$?(\d+\.?\d*)', report_text, re.IGNORECASE)
-        ref_price = float(ref_match.group(1)) if ref_match else 1.0
+        # 4. 參考價格 / 權利金 Reference Price
+        ref_price = 1.0
+        ref_patterns = [
+            r'(?:參考價格|權利金|Reference Price|Premium|Trade|Ask)[^\$\d\n]*\$?\s*(\d+(?:\.\d+)?)',
+            r'\$\s*(\d+(?:\.\d+)?)\s*(?:權利金|premium|/股)',
+        ]
+        for rp in ref_patterns:
+            m = re.search(rp, report_text, re.IGNORECASE)
+            if m:
+                try:
+                    ref_price = float(m.group(1))
+                    break
+                except (ValueError, TypeError):
+                    continue
 
         return {
             "symbol": sym_clean,
